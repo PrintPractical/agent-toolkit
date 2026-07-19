@@ -1,0 +1,89 @@
+# Plan — {{change-title}}
+
+**Change ID:** {{id}}
+**Architecture ref:** architecture.md
+**Decisions ref:** decisions.md
+**Date:** {{date}}
+
+> This plan is the single source of truth for implementation. Each task is a checkbox. `implement` marks tasks complete in real time. Do not add tasks during implementation — if new work is discovered, kick back to `specify`.
+
+## Traceability check
+
+Every firm acceptance criterion must trace to at least one task. Every firm seam must have at least one firm-seam test task.
+
+| AC ID | Task(s) | Firm-seam test task |
+|---|---|---|
+| AC-{{id}}-01 | Section N, Task M | Section N, Task K |
+
+<!-- Fill before plan gate is approved. -->
+
+---
+
+## Section 1: {{section-name}}
+
+> **Scope:** {{What this section covers. Files and modules touched. Decisions implemented.}}
+> **Decisions implemented:** {{list of decision references from decisions.md}}
+> **Seams touched:** {{list of seam IDs, with firmness}}
+
+### Tests
+
+- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}, firmness: firm]
+  - Target: `{{test file path}}`
+  - Assert: `{{behavioral assertion from AC}}`
+  - Traces to: `[SEAM-{{id}}-01]`
+
+- [ ] Write unit tests for {{component}} [seam: internal, firmness: soft]
+  - Target: `{{test file path}}`
+
+### Implementation
+
+- [ ] {{specific task}} — `{{target file}}`
+  - {{concrete detail: what to add/change/delete. Complete enough for a cheap model to execute.}}
+
+- [ ] {{specific task}} — `{{target file}}`
+
+### Refactor cycle
+
+- [ ] Review section 1 implementation: identify poor choices, repetitive code, deep functions
+- [ ] Apply refactors (soft-seam tests may be rewritten; firm-seam tests must remain green)
+- [ ] Run tests — must pass before moving to section 2
+
+---
+
+## Section 2: {{section-name}}
+
+> **Scope:** {{description}}
+
+### Tests
+
+- [ ] {{test task}} [seam: {{seam-id}}, firmness: {{firm|soft}}]
+
+### Implementation
+
+- [ ] {{task}}
+
+### Refactor cycle
+
+- [ ] Review section 2 implementation
+- [ ] Apply refactors
+- [ ] Run tests — must pass before moving to section 3
+
+---
+
+<!-- Add sections as needed. Each section must end with its own refactor cycle and green tests. -->
+
+---
+
+## Final section: Documentation reconciliation
+
+> **Triggered by:** `implement` gate approved, user confirms happy.
+> **Goal:** Update all CONTEXT.md files in `manifest.context_targets` to reflect this change.
+
+- [ ] Run `context-verify.mjs` — baseline drift report
+- [ ] Update root `CONTEXT.md`: {{what changes}}
+- [ ] Update `{{component}}/CONTEXT.md`: {{what changes}}
+- [ ] Re-stamp provenance on all updated CONTEXT.md files (`validated-at: <HEAD sha>`)
+- [ ] Verifier subagent: confirm CONTEXT claims match implemented code
+- [ ] Present reconciliation summary to user
+- [ ] User approves → docs gate → approved
+- [ ] Run `change-archive.mjs` → zip to `.changes/archive/{{id}}.zip`

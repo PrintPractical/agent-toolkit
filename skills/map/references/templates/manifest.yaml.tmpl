@@ -1,0 +1,33 @@
+id: "{{id}}"
+title: "{{title}}"
+class: feature  # feature | bug | small | epic
+stage: architect  # architect | specify | plan | implement | done
+language: ""  # rust | c | cpp | leave empty for language-agnostic
+
+# parent: "{{epic-id}}"   # uncomment for child changes; set to the epic's change ID
+# children: []            # uncomment for epic manifests; populated by epic-split.mjs
+
+gates:
+  architect:  pending
+  specify:    pending
+  plan:       pending
+  implement:  pending
+  docs:       pending
+
+artifacts:
+  architecture: architecture.md
+  decisions:    decisions.md
+  plan:         plan.md
+
+context_targets:
+  - CONTEXT.md
+  # Add component CONTEXT.md files this change touches:
+  # - src/<component>/CONTEXT.md
+
+kickbacks: []
+# kickback entry shape:
+# - type:       defect | amendment
+#   stage:      specify | plan | implement
+#   at:         <iso-timestamp>
+#   missed:     "What the upstream spec should have caught"
+#   resolution: "What was decided to resolve it"

@@ -1,0 +1,15 @@
+{
+  "name": "agent-toolkit",
+  "version": "0.1.0",
+  "description": "Opinionated, spec-driven planning and development skills for greenfield and brownfield projects",
+  "type": "module",
+  "scripts": {
+    "build": "node packages/build/sync-shared.mjs",
+    "test": "node --test packages/build/__tests__/*.test.mjs",
+    "verify": "node packages/build/context-verify.mjs --all"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Entry Ramps",
+      "description": "Start here. Choose the ramp that matches your situation.",
+      "skills": ["architect", "triage", "map", "reforge"]
+    },
+    {
+      "title": "Spec Spine",
+      "description": "The core pipeline: architect feeds specify, which feeds plan, which feeds implement.",
+      "skills": ["specify", "plan", "implement"]
+    },
+    {
+      "title": "Maintenance",
+      "description": "On-demand tools for keeping specs and code in sync.",
+      "skills": ["verify", "what-now"]
+    }
+  ]
+}

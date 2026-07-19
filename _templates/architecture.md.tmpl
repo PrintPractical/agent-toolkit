@@ -1,0 +1,81 @@
+# Architecture — {{change-title}}
+
+**Change ID:** {{id}}
+**Date:** {{date}}
+**Class:** {{feature | bug | small | epic}}
+**Language:** {{language}}
+
+## Summary
+
+{{One paragraph: what this change does and why. The "elevator pitch" for the change.}}
+
+## Context Gathered
+
+{{Which CONTEXT.md files were read. What existing seams and contracts are relevant. What the current state is that this change works within or against.}}
+
+## Architectural Decisions
+
+{{Each decision as a distinct entry. Decisions that arise from challenges or overrides include both sides.}}
+
+### Decision: {{decision-name}}
+
+**Statement:** {{What was decided.}}
+**Firmness:** soft | firm
+**Justification (if firm):** {{One sentence. Required for firm. Omit for soft.}}
+**Alternatives considered:** {{What else was evaluated and why it was not chosen.}}
+
+<!-- Repeat for each decision -->
+
+## Seams
+
+{{Seams created or modified by this change. Each carries firmness and, if firm, initial acceptance criteria.}}
+
+### Seam: {{seam-name}}  [firmness: soft | firm]
+
+**What crosses this boundary:** {{description}}
+**Testability approach:** {{How this seam will be tested.}}
+
+{{#if firm}}
+**Criteria:**
+- [SEAM-{{id}}-{{seq}}] {{behavioral assertion}} → will-enforce-by: {{planned test path}}
+{{/if}}
+
+<!-- Repeat for each seam -->
+
+## Refactors Taken On
+
+{{Refactors surfaced during architect that are in scope for this change. Each is a first-class decision, scoped, justified, and sized. No refactors are discovered during implement — they are all here.}}
+
+### Refactor: {{refactor-name}}
+
+**Scope:** {{What files / modules are touched.}}
+**Justification:** {{Why this is better than matching existing patterns.}}
+**Size estimate:** {{small | medium | large}}
+**Approved:** {{yes | pending user approval}}
+
+<!-- Repeat for each refactor. If none, state "None — no refactors in scope." -->
+
+## Observability Requirements
+
+{{What must be instrumented, traced, or metered as part of this change. Not optional.}}
+
+## Testability Requirements
+
+{{Beyond seam-level testing: integration scenarios, edge cases that must be covered. Feed directly into plan.}}
+
+## Open Risks
+
+{{Known unknowns, external dependencies that could affect the design, areas where the dry-run in specify should probe hardest.}}
+
+## Validity Check Results
+
+{{Filled by the adversarial validity-check subagent. Do not edit manually.}}
+
+**Gaps found:** {{0 | list of gaps}}
+**Status:** pending | passed | passed-after-resolution
+
+<!-- Gap entries (if any):
+### Gap: {{gap-description}}
+**Raised by:** validity-check subagent
+**Resolution:** {{how it was addressed}}
+-->
