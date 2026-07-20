@@ -67,6 +67,19 @@ describe('sync-shared.mjs', () => {
     }
   });
 
+  it('requires current dependency versions and version-matched Rust source evidence', () => {
+    const protocol = fs.readFileSync(path.join(REPO_ROOT, '_shared/challenge-protocol.md'), 'utf8');
+    assert.match(protocol, /Package versions and APIs are time-sensitive facts, not model knowledge/);
+    assert.match(protocol, /select the newest stable release allowed by those constraints/);
+    assert.match(protocol, /Preserve existing dependency requirements and resolved versions unless the task explicitly includes an upgrade/);
+
+    const rust = fs.readFileSync(path.join(IDIOMS_DIR, 'rust.md'), 'utf8');
+    assert.match(rust, /`cargo add <crate>` without a remembered version/);
+    assert.match(rust, /Run `cargo fetch`/);
+    assert.match(rust, /`cargo metadata --format-version 1`/);
+    assert.match(rust, /metadata-reported manifest path rather than assuming `~\/\.cargo`/);
+  });
+
   it('syncs every canonical idiom pack to every consuming skill', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
     const packNames = fs.readdirSync(IDIOMS_DIR).filter(name => name.endsWith('.md')).sort();

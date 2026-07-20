@@ -14,6 +14,14 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 
 ## Power Checklist
 
+### Cargo and Dependencies
+
+- [ ] **MUST treat `Cargo.toml`, workspace configuration, `Cargo.lock`, `rust-version`, configured registries, and explicit user requirements as dependency constraints.** Preserve existing requirements and locked versions unless the task explicitly includes an upgrade.
+- [ ] **MUST let Cargo select a new registry dependency's current version when the user has not specified one.** Run `cargo add <crate>` without a remembered version, using the appropriate package, dependency kind, target, feature, and default-feature flags. Use an online registry lookup when establishing freshness; `--offline` may use stale local metadata.
+- [ ] **MUST fetch a newly added dependency before relying on its implementation or API.** Run `cargo fetch`, then use `cargo metadata --format-version 1` to confirm the exact resolved version, source, enabled dependency relationship, and `manifest_path`.
+- [ ] **MUST inspect the exact resolved crate when source or API details matter.** Locate its source from the metadata-reported manifest path rather than assuming `~/.cargo`; `CARGO_HOME`, alternate registries, Git dependencies, and path dependencies may place it elsewhere. Version-matched rustdoc is acceptable supporting evidence, but remembered APIs or documentation for another release are not.
+- [ ] **MUST review manifest and lockfile changes after adding a crate.** Keep only the requested dependency and features, and do not fold unrelated dependency upgrades into the change.
+
 ### Ownership and APIs
 
 - [ ] **MUST make ownership and borrowing contracts clear.** Prefer `&str` to `&String` and `&[T]` to `&Vec<T>` when only a view is required; return owned data when ownership must cross a boundary.
@@ -67,3 +75,6 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - Lock guards across `.await`, lock-order ambiguity, or cancellation leaving shared state half-updated.
 - Scattered `unsafe`, missing safety rationale, unchecked FFI assumptions, or safe wrappers whose invariants callers can violate.
 - Broad lint allowances, ignored `Result`s, wildcard matches that hide owned variants, or reachable placeholders/panics in production paths.
+- Crate versions copied from model memory, old examples, or cache-only results instead of selected through the configured registry.
+- Code written against a remembered API or documentation that does not match the version reported by `cargo metadata`.
+- Hard-coded `~/.cargo` source paths, or incidental upgrades to existing locked dependencies while adding one crate.

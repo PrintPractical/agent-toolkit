@@ -22,6 +22,15 @@ Challenge any proposal that:
 
 **Default stance toward existing code:** soft. Existing code is not automatically correct. If a better solution exists — especially one that uses the language's own power or is cleaner structurally — surface it. The user would rather hear about a larger refactor that yields a better result than have the agent match mediocre existing patterns.
 
+## Dependency evidence
+
+Package versions and APIs are time-sensitive facts, not model knowledge.
+
+- Treat user requirements, repository manifests, lockfiles, runtime/toolchain support, and configured registries as authoritative constraints. Preserve existing dependency requirements and resolved versions unless the task explicitly includes an upgrade.
+- When introducing a dependency without a user-specified version, query the project's configured package registry during the current session and select the newest stable release allowed by those constraints. Never insert a version remembered from training data, an old example, or a cache-only lookup.
+- Before relying on an external package's API, resolve and fetch it through the project's package manager, identify the exact resolved version, and inspect that version's local source, declarations, generated documentation, or version-matched official documentation. Memory and documentation for a different version are not evidence.
+- If current registry metadata or version-matched source cannot be obtained, state the blocker instead of silently substituting a remembered version or API.
+
 ## The challenge pattern
 
 1. **State the concern.** One sentence. Be specific, not generic.
