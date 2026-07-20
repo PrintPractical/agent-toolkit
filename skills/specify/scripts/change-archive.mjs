@@ -23,11 +23,17 @@ import {
 
 const { values } = parseArgs({
   options: {
+    help:  { type: 'boolean', short: 'h', default: false },
     id:    { type: 'string' },
     force: { type: 'boolean', default: false }, // bypass docs gate check (emergency use)
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: change-archive.mjs --id <change-id> [--force]');
+  process.exit(0);
+}
 
 if (!values.id) {
   console.error('Usage: change-archive.mjs --id <change-id> [--force]');

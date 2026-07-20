@@ -28,6 +28,7 @@ import { getChangedFilesSince } from './lib/index.mjs';
 
 const { values } = parseArgs({
   options: {
+    help:       { type: 'boolean', short: 'h', default: false },
     root:       { type: 'string', default: process.cwd() },
     path:       { type: 'string' }, // single CONTEXT.md path
     all:        { type: 'boolean', default: false },
@@ -35,6 +36,11 @@ const { values } = parseArgs({
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: context-verify.mjs [--root <directory>] [--path <context-file>] [--all] [--run-tests]');
+  process.exit(0);
+}
 
 const repoRoot = path.resolve(values.root);
 

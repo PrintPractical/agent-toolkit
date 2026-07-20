@@ -18,11 +18,17 @@ import { parseArgs } from 'util';
 
 const { values } = parseArgs({
   options: {
+    help:   { type: 'boolean', short: 'h', default: false },
     root:   { type: 'string', default: process.cwd() },
     ignore: { type: 'string', default: '' }, // comma-separated additional dirs to skip
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: context-discover.mjs [--root <directory>] [--ignore <dir,dir,...>]');
+  process.exit(0);
+}
 
 const repoRoot = path.resolve(values.root);
 const ignoreDirs = new Set([

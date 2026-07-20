@@ -26,6 +26,7 @@ import {
 
 const { values } = parseArgs({
   options: {
+    help:     { type: 'boolean', short: 'h', default: false },
     title:    { type: 'string' },
     class:    { type: 'string', default: 'feature' },
     language: { type: 'string', default: '' },
@@ -33,6 +34,11 @@ const { values } = parseArgs({
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language rust|c|cpp] [--parent <epic-id>]');
+  process.exit(0);
+}
 
 if (!values.title) {
   console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language rust|c|cpp] [--parent <epic-id>]');

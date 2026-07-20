@@ -20,10 +20,16 @@ import {
 
 const { values } = parseArgs({
   options: {
-    id: { type: 'string' },
+    help: { type: 'boolean', short: 'h', default: false },
+    id:   { type: 'string' },
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: change-status.mjs [--id <change-id>]');
+  process.exit(0);
+}
 
 const repoRoot = process.cwd();
 

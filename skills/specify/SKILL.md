@@ -119,8 +119,10 @@ If you are running `specify` because `implement` kicked back (not a fresh sessio
 - Run a targeted dry-run covering just that gap.
 - Update `decisions.md` with the new resolution.
 - Reconcile `architecture.md` if needed.
+- Set the latest kickback entry's `resolution` in `manifest.yaml` to the actual decision. Do not leave it empty or use a placeholder such as `pending`.
 - Re-approve the specify gate.
-- Remind the user to re-approve the plan gate after `plan` updates `plan.md`.
+- Confirm that approval advanced the manifest to `stage: plan`.
+- Remind the user to run `plan` and re-approve its gate after `plan.md` is updated. Do not tell them to resume `implement` while the current stage is `plan`.
 
 ## Reference files
 

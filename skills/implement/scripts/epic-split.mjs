@@ -34,11 +34,17 @@ import {
 
 const { values } = parseArgs({
   options: {
+    help:     { type: 'boolean', short: 'h', default: false },
     epic:     { type: 'string' },
     children: { type: 'string' },   // JSON array of { title, class?, language? }
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: epic-split.mjs --epic <epic-id> --children \'[{"title":"...", "class":"feature"}, ...]\'');
+  process.exit(0);
+}
 
 if (!values.epic || !values.children) {
   console.error('Usage: epic-split.mjs --epic <epic-id> --children \'[{"title":"...", "class":"feature"}, ...]\'');

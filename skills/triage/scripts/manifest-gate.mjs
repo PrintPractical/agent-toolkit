@@ -23,6 +23,7 @@ import {
 
 const { values } = parseArgs({
   options: {
+    help:    { type: 'boolean', short: 'h', default: false },
     id:      { type: 'string' },
     gate:    { type: 'string' },
     stage:   { type: 'string' },
@@ -31,6 +32,12 @@ const { values } = parseArgs({
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: manifest-gate.mjs --id <id> --gate <gate> [--approve|--reset]');
+  console.log('       manifest-gate.mjs --id <id> --stage <stage>');
+  process.exit(0);
+}
 
 if (!values.id) {
   console.error('Usage: manifest-gate.mjs --id <id> --gate <gate> [--approve|--reset]');

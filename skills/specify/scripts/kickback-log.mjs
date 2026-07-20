@@ -19,6 +19,7 @@ import {
 
 const { values } = parseArgs({
   options: {
+    help:       { type: 'boolean', short: 'h', default: false },
     id:         { type: 'string' },
     type:       { type: 'string' },   // defect | amendment
     stage:      { type: 'string' },   // specify | plan | implement
@@ -27,6 +28,11 @@ const { values } = parseArgs({
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --missed "<text>" [--resolution "<text>"]');
+  process.exit(0);
+}
 
 if (!values.id || !values.type || !values.stage || !values.missed) {
   console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --missed "<text>" [--resolution "<text>"]');
@@ -63,6 +69,10 @@ const entry = {
 
 manifest.kickbacks = manifest.kickbacks || [];
 manifest.kickbacks.push(entry);
+manifest.stage = 'specify';
+manifest.gates = manifest.gates || {};
+manifest.gates.specify = 'pending';
+manifest.gates.plan = 'pending';
 
 writeManifest(values.id, manifest, repoRoot);
 
@@ -76,13 +86,14 @@ console.error(`  Stage:      ${values.stage}`);
 console.error(`  Missed:     ${values.missed}`);
 if (values.resolution) console.error(`  Resolution: ${values.resolution}`);
 console.error(`  Total defect kickbacks this change: ${defectCount}`);
+console.error(`  Stage:      specify (specify and plan gates reset to pending)`);
 
 if (values.type === 'defect') {
   console.error(`\nThis is a DEFECT kickback — the spec process should have caught this.`);
-  console.error(`Return to 'specify' for an amendment session before resuming 'implement'.`);
+  console.error(`Run 'specify', then 'plan', before resuming 'implement'.`);
 } else {
   console.error(`\nThis is an AMENDMENT kickback — legitimate requirement evolution.`);
-  console.error(`Return to 'specify' to incorporate the new information.`);
+  console.error(`Run 'specify', then 'plan', before resuming 'implement'.`);
 }
 
 process.stdout.write(JSON.stringify({
@@ -90,4 +101,6 @@ process.stdout.write(JSON.stringify({
   kickback: entry,
   total_defects: defectCount,
   frequency,
+  stage: manifest.stage,
+  reset_gates: ['specify', 'plan'],
 }) + '\n');

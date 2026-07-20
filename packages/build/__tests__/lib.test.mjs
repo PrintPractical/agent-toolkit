@@ -58,6 +58,26 @@ describe('parseYaml', () => {
     // Empty sequence or null — both acceptable
     assert.ok(result.kickbacks === null || (Array.isArray(result.kickbacks) && result.kickbacks.length === 0));
   });
+
+  it('parses block sequence mappings without leaking nested keys', () => {
+    const yaml = [
+      'stage: specify',
+      'kickbacks:',
+      '  - type: defect',
+      '    stage: implement',
+      '    missed: Missing error behavior',
+      '    resolution: null',
+    ].join('\n');
+
+    const result = parseYaml(yaml);
+    assert.equal(result.stage, 'specify');
+    assert.deepEqual(result.kickbacks, [{
+      type: 'defect',
+      stage: 'implement',
+      missed: 'Missing error behavior',
+      resolution: null,
+    }]);
+  });
 });
 
 // ── stringifyYaml ────────────────────────────────────────────────────────────
@@ -89,6 +109,11 @@ describe('stringifyYaml', () => {
     const obj = { note: 'key: value' };
     const yaml = stringifyYaml(obj);
     assert.ok(yaml.includes('"key: value"'));
+  });
+
+  it('round-trips empty strings without converting them to null', () => {
+    const yaml = stringifyYaml({ resolution: '' });
+    assert.equal(parseYaml(yaml).resolution, '');
   });
 });
 

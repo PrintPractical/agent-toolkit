@@ -54,6 +54,7 @@ Epic:                 architect → specify → (decompose) → done
 - **No skill auto-advances past a gate.** Every gate transition requires explicit user approval in the session.
 - Each spine skill checks the prior gate on startup and refuses to proceed if it is not `approved`.
 - `change-status.mjs` prints the current stage and the recommended next skill.
+- A kickback from `plan` or `implement` returns the stage to `specify` and resets the `specify` and `plan` gates. Re-approving those gates advances through `plan` and back to `implement` without losing completed checklist work.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs` to create child change manifests. The epic's `architecture.md` + `decisions.md` become parent context for each child's `architect` session.
 
@@ -93,6 +94,8 @@ An epic is a container for multiple related feature/bug/small changes that are t
 ## Kickback types and quality metric
 
 Kickback entries log times when `implement` had to stop and return to an upstream stage.
+
+An empty `resolution` means the kickback is unresolved. The targeted `specify` session replaces it with the actual decision before the specify gate is re-approved.
 
 - **`defect`** — The upstream spec was incomplete; the dry-run in `specify` should have caught this. Counts against kickback frequency.
 - **`amendment`** — Legitimate external requirement change or new information. Does not count against kickback frequency.

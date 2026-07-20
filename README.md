@@ -107,7 +107,7 @@ implement
 
 `brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or gate; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
 
-**Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops, logs a kickback to `manifest.yaml`, and returns to `specify`. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
+**Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops and logs a kickback to `manifest.yaml`. The logger returns the change to `specify` and resets the `specify` and `plan` gates, so both stages must be re-approved before implementation resumes. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
 
 ---
 

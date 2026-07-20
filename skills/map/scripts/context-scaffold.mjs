@@ -17,12 +17,18 @@ import { getHeadSha } from './lib/index.mjs';
 
 const { values } = parseArgs({
   options: {
+    help:    { type: 'boolean', short: 'h', default: false },
     path:    { type: 'string' },
     name:    { type: 'string', default: '' },
     root:    { type: 'boolean', default: false },
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: context-scaffold.mjs --path <directory> [--name "Name"] [--root]');
+  process.exit(0);
+}
 
 if (!values.path) {
   console.error('Usage: context-scaffold.mjs --path <directory> [--name "Name"] [--root]');

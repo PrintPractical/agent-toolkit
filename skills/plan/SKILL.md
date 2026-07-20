@@ -82,10 +82,10 @@ If during planning you find a decision that was not made (a real ambiguity), you
 
 Log the kickback:
 ```
-node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --stage plan --missed "<description>" --resolution "pending"
+node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --stage plan --missed "<description>"
 ```
 
-Do not invent answers. Do not continue until the ambiguity is resolved.
+This returns the change to `specify` and resets the `specify` and `plan` gates. Do not invent answers or continue until the ambiguity is resolved.
 
 ## Phase 5: Write the file
 

@@ -21,10 +21,16 @@ import { parseArgs } from 'util';
 
 const { values } = parseArgs({
   options: {
+    help:  { type: 'boolean', short: 'h', default: false },
     check: { type: 'boolean', default: false },
   },
   strict: true,
 });
+
+if (values.help) {
+  console.log('Usage: sync-shared.mjs [--check]');
+  process.exit(0);
+}
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
 

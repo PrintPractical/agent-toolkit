@@ -91,15 +91,22 @@ function parseSequence(lines, startIdx, baseIndent) {
           items.push(null);
           i++;
         }
-      } else if (val.includes(':')) {
-        // single-line mapping as list item
-        const obj = {};
-        val.split(',').forEach(pair => {
-          const [k, v] = pair.split(':').map(s => s.trim());
-          if (k) obj[k] = parseScalar(v || '');
-        });
-        items.push(parseScalar(val));
+      } else if (/^[A-Za-z_][A-Za-z0-9_-]*:/.test(val)) {
+        // Mapping whose first key shares the sequence marker line. Merge any
+        // indented continuation keys into the same object.
+        const colonIdx = val.indexOf(':');
+        const obj = {
+          [val.slice(0, colonIdx).trim()]: parseScalar(val.slice(colonIdx + 1).trim()),
+        };
         i++;
+
+        const nextIndent = findNextIndent(lines, i);
+        if (nextIndent > indent) {
+          const { value, endIdx } = parseBlock(lines, i, nextIndent);
+          Object.assign(obj, value);
+          i = endIdx;
+        }
+        items.push(obj);
       } else {
         items.push(parseScalar(val));
         i++;
@@ -183,6 +190,7 @@ export function stringifyYaml(obj, indent = 0) {
 function serializeScalar(v) {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'boolean' || typeof v === 'number') return String(v);
+  if (v === '') return '""';
   if (typeof v === 'string' && (v.includes(':') || v.includes('#') || v.includes('"'))) {
     return `"${v.replace(/"/g, '\\"')}"`;
   }

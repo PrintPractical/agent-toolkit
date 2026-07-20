@@ -88,8 +88,9 @@ When you encounter:
 3. Log the kickback:
 ```
 node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --stage implement \
-  --missed "<what the spec didn't cover>" [--resolution "<pending>"]
+  --missed "<what the spec didn't cover>"
 ```
+   This records an unresolved kickback, returns the stage to `specify`, and resets the `specify` and `plan` gates to `pending`.
 4. Tell the user: **run `specify` to resolve this, then re-run `plan` to update the checklist, then resume `implement`.**
 5. Do not continue this session until the kickback is resolved.
 
