@@ -78,10 +78,11 @@ List all active changes in a table with their current stage and next action. Ask
 If there are no changes in `.changes/active/`:
 
 Ask the user:
-> "There are no active changes. What are you working on? Tell me:"
-> - "It's a new project or I have no CONTEXT.md files" → use `map` first, then `architect`
-> - "I have a PoC I want to rebuild properly" → use `reforge`
-> - "I have a new feature or significant change" → use `architect`
+    > "There are no active changes. What are you working on? Tell me:"
+    > - "It's a new project or I have no CONTEXT.md files" → use `map` first, then `architect`
+    > - "I have a PoC I want to rebuild properly" → use `reforge`
+    > - "I have an early idea or I'm still comparing solutions" → use `brainstorm`
+    > - "I have a new feature or significant change" → use `architect`
 > - "I have a bug or small fix" → use `triage`
 
 ## Reference files

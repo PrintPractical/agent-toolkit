@@ -30,6 +30,7 @@ Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads 
 
 | Your situation | Start with |
 |---|---|
+| Early idea or competing solution directions | `brainstorm` |
 | Existing repo with no CONTEXT.md files | `map` |
 | You have a PoC you want to rebuild from scratch | `reforge` |
 | Bug or small isolated fix | `triage` |
@@ -66,6 +67,13 @@ map
 **Use when:** new feature, non-trivial change, or anything that touches more than one component.
 
 ```
+brainstorm (optional)
+ └─ frames the problem, evidence, constraints, and anti-goals
+ └─ explores distinct approaches and their tradeoffs
+ └─ optionally produces: architect-seed.md (provisional input only)
+
+  → architect challenges and formalizes the direction
+
 architect
  └─ gathers relevant CONTEXT.md files
  └─ adversarial discussion: seams, decisions, refactors, idioms
@@ -96,6 +104,8 @@ implement
  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance
  └─ approves: implement gate → docs gate → archives change
 ```
+
+`brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or gate; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
 
 **Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops, logs a kickback to `manifest.yaml`, and returns to `specify`. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
 

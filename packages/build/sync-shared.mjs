@@ -49,6 +49,7 @@ const ALL_TEMPLATES = [
   { src: '_templates/decisions.md.tmpl',        dest: 'templates/decisions.md.tmpl' },
   { src: '_templates/plan.md.tmpl',             dest: 'templates/plan.md.tmpl' },
   { src: '_templates/reforge-seed.md.tmpl',     dest: 'templates/reforge-seed.md.tmpl' },
+  { src: '_templates/architect-seed.md.tmpl',   dest: 'templates/architect-seed.md.tmpl' },
 ];
 
 const IDIOMS = {
@@ -61,6 +62,11 @@ const ALL_IDIOMS = Object.values(IDIOMS);
 const CORE_IDIOMS = [IDIOMS.rust, IDIOMS.c, IDIOMS.cpp];
 
 const SYNC_MAP = {
+  brainstorm: [
+    { src: '_shared/challenge-protocol.md',     dest: 'challenge-protocol.md' },
+    { src: '_shared/change-lifecycle.md',       dest: 'change-lifecycle.md' },
+    { src: '_templates/architect-seed.md.tmpl', dest: 'templates/architect-seed.md.tmpl' },
+  ],
   architect: [
     ...ALL_SHARED,
     ...ALL_TEMPLATES,

@@ -45,6 +45,15 @@ describe('sync-shared.mjs', () => {
     assert.ok(srcContent.equals(destContent), 'Synced file must match canonical source');
   });
 
+  it('syncs the brainstorm architect seed template', () => {
+    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+
+    const src = path.join(REPO_ROOT, '_templates/architect-seed.md.tmpl');
+    const dest = path.join(REPO_ROOT, 'skills/brainstorm/references/templates/architect-seed.md.tmpl');
+
+    assert.ok(fs.readFileSync(src).equals(fs.readFileSync(dest)), 'Brainstorm seed template must match canonical source');
+  });
+
   it('check mode exits with code 1 when drift exists', () => {
     // Introduce drift
     const driftPath = path.join(REPO_ROOT, 'skills/architect/references/challenge-protocol.md');
@@ -63,10 +72,10 @@ describe('sync-shared.mjs', () => {
     }
   });
 
-  it('all 9 skills have a references/ directory after sync', () => {
+  it('all 10 skills have a references/ directory after sync', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
     for (const skill of skills) {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
@@ -76,7 +85,7 @@ describe('sync-shared.mjs', () => {
   it('every skill bundles its helper scripts + lib (self-contained)', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
     const expectedScripts = [
       'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
       'manifest-gate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',

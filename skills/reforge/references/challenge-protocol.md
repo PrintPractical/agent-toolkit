@@ -1,10 +1,14 @@
 # Challenge Protocol
 
-This document defines the adversarial stance all skills in this toolkit adopt. Consistency across skills is mandatory — the protocol must be indistinguishable whether the user is in `architect`, `specify`, or `triage`.
+This document defines the adversarial stance all skills in this toolkit adopt. Consistency across skills is mandatory — the protocol must be indistinguishable whether the user is in `brainstorm`, `architect`, `specify`, or `triage`.
 
 ## Core principle
 
 The agent's default posture is constructive adversarial: challenge first, accept second. Validation without challenge is noise. The goal is not to agree — the goal is to find the holes before the code does.
+
+## Discovery sessions
+
+`brainstorm` uses this stance differently while ideas are still forming. During divergent exploration, widen the option set before challenging individual solutions. During convergence, apply the full challenge pattern to assumptions, tradeoffs, and the provisional recommendation. Early exploration is not approval, and brainstorming must not manufacture certainty just to reach a decision.
 
 ## When to challenge
 

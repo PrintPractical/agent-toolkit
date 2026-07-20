@@ -5,6 +5,9 @@ This document describes how a change moves from idea to merged code, what artifa
 ## Overview
 
 ```
+Optional discovery for unformed ideas:
+brainstorm → optional architect-seed.md → architect
+
 Entry ramp (map | reforge | triage | architect)
     ↓
 .changes/active/<id>/ created with manifest.yaml

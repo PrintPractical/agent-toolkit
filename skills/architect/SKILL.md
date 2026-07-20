@@ -28,12 +28,13 @@ You have strong architectural opinions. Read `references/challenge-protocol.md` 
 ## Preconditions
 
 Before starting, check:
-1. Is there an active change in `.changes/active/`? If yes, load `manifest.yaml`. If no, create one:
+1. **Check for an optional architect seed.** Read a seed path explicitly supplied by the user. If none was supplied and `architect-seed.md` exists at the project root, ask whether it applies to this change before loading it. A seed is input to challenge, not an approved decision. Use it to confirm the title, class, and language before creating a manifest. A user may also supply a `reforge-seed.md` as the same kind of non-binding input.
+2. Is there an active change in `.changes/active/`? If yes, load `manifest.yaml`. If no, create one:
    ```
    node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" [--class feature|epic] [--language <lang>]
    ```
-2. If the manifest stage is not `architect` or the architect gate is already `approved`, inform the user and stop.
-3. **Check `manifest.class`.** If `epic`, follow the Epic Decomposition path below instead of the standard path.
+3. If the manifest stage is not `architect` or the architect gate is already `approved`, inform the user and stop.
+4. **Check `manifest.class`.** If `epic`, follow the Epic Decomposition path below instead of the standard path.
 
 ---
 
@@ -65,6 +66,8 @@ node "$SKILL_DIR/scripts/context-discover.mjs"
 ```
 
 Read the root CONTEXT.md and any component CONTEXT.md files relevant to the epic's scope.
+
+Read any selected architect or reforge seed and treat it as provisional context. Record that seed in `architecture.md` under `Context Gathered`.
 
 ### Epic Phase 3: High-level architectural discussion
 
@@ -134,6 +137,7 @@ Read:
 - Root `CONTEXT.md` (system-level architecture, seams, glossary)
 - Component `CONTEXT.md` files for components this change touches
 - `manifest.yaml` (for class, language, parent epic ID, any prior kickbacks)
+- Any architect or reforge seed selected during Preconditions. Treat its options and recommendation as starting challenges, not decisions. Record the seed in `architecture.md` under `Context Gathered`.
 - **If `manifest.parent` is set (this is a child of an epic):** load the parent epic's `architecture.md`, `decisions.md`, and any `architect-seed.md` in this change's directory. These are your starting context — do not re-litigate decisions already made at the epic level.
 
 Note any `firm` seams the change must interact with. Note any `Known-soft-spots` that this change could address (these are explicitly open for improvement).
