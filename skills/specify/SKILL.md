@@ -35,7 +35,7 @@ If preconditions fail, tell the user what's wrong and which step to run instead.
 
 Load `architecture.md` fully. This is your spec baseline.
 
-If `manifest.language` is set, load `references/idioms/<lang>.md` for interface design guidance.
+If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for interface design guidance. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## Phase 1: Interface inventory
 

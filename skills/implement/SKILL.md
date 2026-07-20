@@ -30,7 +30,7 @@ Load `manifest.yaml`. Verify:
 - `gates.implement` is `pending`.
 - `plan.md` exists.
 
-If `manifest.language` is set, load `references/idioms/<lang>.md`. You will use it in refactor cycles.
+If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the refactor cycles. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## The loop: per section
 
@@ -53,11 +53,11 @@ Write any test tasks labeled `[firmness: soft]` in this section.
 This is mandatory. Review the section's implementation:
 - Dead code, unused variables, unused imports
 - Repetitive code that should be extracted into a named function
-- Functions longer than ~50 lines — candidates for splitting
-- Deep nesting (>3 levels) — extract inner logic
+- Functions or modules carrying multiple responsibilities that would become clearer with named boundaries
+- Control flow whose nesting or branching obscures invariants, error paths, or the main operation
 - Idioms violations from the idioms pack (if language is set)
 - Missing error handling for paths that can fail
-- Any `TODO`, `unwrap()`, `expect()`, `todo!()` in paths that can be reached
+- Reachable placeholders, unconditional failures, or suppressed errors that are not part of an approved fail-fast policy
 
 Apply refactors. Rules during refactor:
 - **Firm-seam tests must remain green at all times.** If a firm-seam test fails after a refactor, STOP. This is not a test problem — the refactor changed behavior. That means it is not a pure refactor. Kickback (see below).

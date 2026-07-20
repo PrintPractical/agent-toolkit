@@ -58,14 +58,20 @@ const ALL_TEMPLATES = [
   { src: '_templates/architect-seed.md.tmpl',   dest: 'templates/architect-seed.md.tmpl' },
 ];
 
-const IDIOMS = {
-  rust: { src: '_idioms/rust.md', dest: 'idioms/rust.md' },
-  c:    { src: '_idioms/c.md',    dest: 'idioms/c.md' },
-  cpp:  { src: '_idioms/cpp.md',  dest: 'idioms/cpp.md' },
-};
+const idiomFiles = fs.readdirSync(path.join(repoRoot, '_idioms'))
+  .filter(name => name.endsWith('.md'))
+  .sort();
 
-const ALL_IDIOMS = Object.values(IDIOMS);
-const CORE_IDIOMS = [IDIOMS.rust, IDIOMS.c, IDIOMS.cpp];
+for (const name of idiomFiles) {
+  if (!/^[a-z][a-z0-9-]*\.md$/.test(name)) {
+    throw new Error(`Invalid idiom pack filename: ${name}. Use lowercase kebab-case.`);
+  }
+}
+
+const ALL_IDIOMS = idiomFiles.map(name => ({
+  src: `_idioms/${name}`,
+  dest: `idioms/${name}`,
+}));
 
 const SYNC_MAP = {
   brainstorm: [

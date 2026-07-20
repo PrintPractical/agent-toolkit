@@ -1,93 +1,71 @@
 # C Idioms Pack
 
-Language-specific power-checklist and smell-list for C projects. Loaded by `architect`, `specify`, and `implement` when `manifest.language = c`.
+## Applicability
+
+Use this guidance when designing, specifying, implementing, reviewing, triaging, or reforging C code. The project's C standard, compiler and warning policy, target ABI/OS, embedded or freestanding constraints, allocation policy, coding standard, and compatibility requirements take precedence.
+
+- **MUST** marks correctness, defined behavior, memory/thread safety, or an explicit project/ABI contract.
+- **PREFER** marks the disciplined default; depart when measured constraints or established project conventions justify it.
+- **CONSIDER** marks a contextual technique that depends on platform, lifetime, performance, or toolchain support.
 
 ## Core principle
 
-**C gives you maximum control and zero guardrails. That power requires discipline.** The language will not protect you from resource leaks, buffer overflows, use-after-free, or undefined behavior. Every pattern in this pack exists because C lets you do the wrong thing silently. The goal is to make discipline mechanical, not heroic.
-
-Flag any proposal that relies on programmer alertness rather than structural enforcement.
-
----
+**Make bounds, ownership, lifetimes, error states, and cleanup mechanically visible.** C provides few guardrails, so interfaces and control flow must carry the contracts that stronger type systems would otherwise enforce.
 
 ## Power Checklist
 
-### Ownership and Resource Management
+### Interfaces and Ownership
 
-- [ ] **Every allocation has a paired deallocation, documented at the allocation site.** `malloc` calls should be immediately followed by a null check and should have the corresponding `free` either in the same function or explicitly handed to a documented owner. Use `/* transferred to: <owner> */` comments when ownership moves.
-- [ ] **Use opaque pointer patterns for encapsulation.** Forward-declare structs in headers (`typedef struct Foo Foo;`) and define them only in the implementation file. This enforces information hiding at the compiler level.
-- [ ] **Use `const` aggressively.** `const char *str`, `const MyStruct *s`. Distinguish `T const *` (pointer to const T) from `T * const` (const pointer to T). `const` in function signatures is a contract, not a hint.
-- [ ] **Use `restrict` on non-aliasing pointer arguments.** Enables optimizer improvements and documents aliasing intent.
-- [ ] **Use designated initializers for struct initialization.** `MyStruct s = { .field1 = val, .field2 = val };` over positional initialization. Resilient to struct field reordering.
+- [ ] **MUST document ownership for every pointer-bearing API.** State whether inputs are borrowed, outputs are caller-owned, ownership transfers, aliases remain valid, and which function releases a resource.
+- [ ] **MUST pair buffers with capacities and produced/consumed lengths.** Define whether lengths include a terminator and whether partial output is possible.
+- [ ] **MUST keep pointers within the lifetime and bounds of their object.** Returning stack addresses, retaining expired borrows, invalid pointer arithmetic, and misaligned access are defects.
+- [ ] **PREFER opaque structs and narrow headers when representation is not part of the ABI.** Expose data directly when it is intentionally a stable interchange or hardware-facing layout.
+- [ ] **PREFER `const` for pointees not modified through an interface.** Remember that it does not imply immutability through aliases or thread safety.
+- [ ] **CONSIDER `restrict` only for a documented, proven non-aliasing contract over the relevant accesses.** Violating that caller contract causes undefined behavior; do not add it as a generic optimization hint.
 
-### Error Handling
+### Sizes and Memory
 
-- [ ] **Establish and document a consistent error-handling convention for each module.** Options: return code (`int`, `enum ErrorCode`), out-parameter for error (`int *err`), negative errno, or a result struct. Choose one per module and stay consistent.
-- [ ] **Check every return value that can fail.** `malloc`, `fopen`, `read`, `write`, `pthread_mutex_lock` — all can fail. Unchecked returns are bugs waiting to happen.
-- [ ] **Use `errno` correctly.** Only check `errno` immediately after a failed syscall/library call. Reset to 0 before calls that set it when you intend to check it.
-- [ ] **Propagate errors up, don't swallow them.** A function that detects an error must return it. Logging and continuing is not error handling.
-- [ ] **Avoid `assert()` for runtime error handling.** `assert` is for invariants that must hold during development. It is typically compiled out in release builds. Use explicit checks and returns for production error paths.
+- [ ] **MUST check size arithmetic before allocation, indexing, or byte-count conversion.** Guard multiplication and addition against `SIZE_MAX`, and reject values not representable in the destination type.
+- [ ] **MUST preserve the original pointer across `realloc` failure.** Assign to a temporary, define zero-size behavior, and update ownership only on success.
+- [ ] **MUST initialize every object before any read.** Prefer complete designated initializers or `{0}` where semantic zero initialization is appropriate; do not confuse initialization with raw `memset` or mask missing fields with unnecessary blanket clearing.
+- [ ] **PREFER `size_t` for object sizes and counts, and `ptrdiff_t` for pointer differences.** Use fixed-width integers such as `uint32_t` when exact width is part of a wire format, file format, hardware register, ABI, or persisted-data contract, not as a blanket replacement for native integer types.
+- [ ] **PREFER stack storage for bounded, suitably sized local lifetimes and heap storage when size or lifetime requires it.** Account for stack limits, VLAs, alignment, and allocator policy.
+- [ ] **CONSIDER setting a pointer to `NULL` after `free` when that specific variable remains live and may be reused or cleaned up again.** It does not invalidate aliases and is unnecessary when the variable immediately leaves scope.
 
-### Memory Safety
+### Strings and Byte Operations
 
-- [ ] **Zero-initialize structs and arrays at declaration.** `MyStruct s = {0};`. Avoids reading uninitialized memory.
-- [ ] **Prefer stack allocation over heap when the lifetime is clear and the size is bounded.** Heap allocation for small, fixed-lifetime objects is unnecessary complexity.
-- [ ] **Use `snprintf`, not `sprintf`.** Always. No exceptions. Same for `strncpy` over `strcpy`, `strncat` over `strcat`.
-- [ ] **Track buffer sizes alongside buffer pointers.** A `char *buf` is incomplete. A `char *buf, size_t buf_len` pair is complete. Never pass a buffer without its size.
-- [ ] **Use `valgrind` or ASAN/UBSAN as standard practice,** not as a last resort. Enable sanitizers in debug/test builds by default.
+- [ ] **MUST never use `gets`, and must prove bounds for every copy, append, and format operation.** Check truncation and required-size semantics explicitly.
+- [ ] **PREFER length-aware designs.** Use `snprintf` for formatting (checking negative and `>= capacity` results), or validated lengths plus `memcpy` when exact byte copying is intended.
+- [ ] **Do not recommend `strncpy` or `strncat` as generally safe replacements.** `strncpy` may omit termination and pad the destination; `strncat`'s count is not destination capacity. Use them only when their exact semantics are required and all bounds/termination invariants are proven.
+- [ ] **CONSIDER platform/project helpers such as `strlcpy`, `strlcat`, or checked wrappers only when available and their truncation semantics are accepted.** Portability and return-value handling remain part of the contract.
 
-### Concurrency (POSIX threads)
+### Errors and Cleanup
 
-- [ ] **Protect every shared mutable resource with a mutex.** Document which mutex protects which data with `/* guarded by mutex_name */` comments.
-- [ ] **Initialize mutexes statically when possible.** `pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;`
-- [ ] **Avoid holding a mutex longer than necessary.** Do work outside the critical section; only protect the data access.
-- [ ] **Use condition variables correctly.** Always check the predicate in a `while` loop, not `if`, to handle spurious wakeups.
+- [ ] **MUST define a consistent error convention per API.** Specify success/failure values, output validity on failure, partial progress, retry behavior, and whether errors are enum values, status codes, or `errno`-based.
+- [ ] **MUST use `errno` only when the called API documents it as meaningful for that outcome.** Inspect it after detecting failure and before another call can change it; set it to zero first only for APIs whose documented success/failure interpretation requires that (for example, disambiguating some conversion results).
+- [ ] **MUST check relevant return values and handle short I/O, interruption, partial initialization, and cleanup failures according to policy.** Do not assume one `read`/`write` transfers the requested amount.
+- [ ] **MUST keep one clear cleanup path for partially acquired resources.** Reverse acquisition order; a disciplined `goto cleanup` is often safer than duplicated early-return cleanup.
+- [ ] **PREFER `assert` for internal invariants, not expected runtime failures or untrusted input.** Its removal under `NDEBUG` must not change required behavior or side effects.
 
-### API Design
+### Concurrency and Tooling
 
-- [ ] **Use `size_t` for sizes and counts, not `int`.** `int` overflow on 64-bit sizes is a real bug class.
-- [ ] **Use `typedef enum` for flag/state values.** Named enum values are self-documenting and prevent magic numbers.
-- [ ] **Separate interface (`.h`) from implementation (`.c`) cleanly.** Headers expose the minimum surface. Implementation details stay in `.c`.
-- [ ] **Use `static` for internal functions.** `static` at file scope limits visibility and enables the compiler to optimize more aggressively.
-
----
+- [ ] **MUST synchronize shared mutable state and define lock/atomic ownership.** `volatile` is not a threading primitive; use C atomics or platform synchronization with a valid memory-order design.
+- [ ] **MUST keep signal handlers within the platform's async-signal-safe rules.** Coordinate with normal code using permitted primitives and documented signal semantics.
+- [ ] **PREFER scoped, auditable critical sections and condition-predicate loops.** Recheck predicates after wakeup and define lock ordering where multiple locks exist.
+- [ ] **PREFER strong compiler warnings in CI for every supported compiler, with narrow documented suppressions.** Use the project's warning baseline rather than assuming one flag set is portable.
+- [ ] **PREFER static analysis and sanitizer-enabled test configurations where supported.** Combine ASan/UBSan, leak/thread tools, fuzzing, and platform tools as applicable; sanitizer success is not a proof of defined behavior.
 
 ## Smell List
 
-### Memory smells
-
-- `malloc` without null check — crash on OOM, undefined behavior on use
-- `free` without setting pointer to `NULL` afterward — double-free risk if the pointer is reused
-- `char buf[N]` without zero-initialization before passing to functions that may read it
-- `strcpy`/`sprintf`/`gets` — buffer overflow as a feature
-- Casting `malloc` result in C (unnecessary, masks missing `#include <stdlib.h>`)
-- Using a freed pointer — use-after-free
-
-### Error handling smells
-
-- Ignoring return values from `malloc`, `fopen`, `read`, `write`, `close`
-- `assert()` on a condition that can be false in production
-- Silent swallowing: calling a function, checking nothing, continuing as if it succeeded
-- Global error variable instead of returned error codes (creates race conditions in concurrent code)
-
-### Ownership smells
-
-- Functions that allocate and return pointers without documenting the caller's responsibility to free
-- Mixed ownership: sometimes the caller frees, sometimes the callee frees, with no documentation
-- Long-lived pointers into short-lived stack memory (classic stack escape bug)
-- `realloc` result assigned back to the original pointer — lost on failure
-
-### Concurrency smells
-
-- Reading shared data without a lock, assuming "it won't change right now"
-- Using `sleep()` for synchronization instead of condition variables
-- Signal handlers that call non-async-signal-safe functions
-- `volatile` used to implement atomics instead of `_Atomic` / `stdatomic.h`
-
-### Portability smells
-
-- `int` used where `int32_t` (or `size_t`, `ptrdiff_t`) is needed for cross-platform correctness
-- Assuming `char` is signed or unsigned — it is implementation-defined
-- `sizeof(int)` assumed to be 4
-- Bit-field packing order assumed to be defined — it is implementation-defined
-- Undefined behavior relied upon as if it were specified (signed integer overflow, pointer arithmetic past one-past-end)
+- Pointer/length APIs with unspecified units, capacity, termination, ownership, aliasing, or lifetime.
+- Allocation-size expressions such as `count * sizeof(T)` without overflow and representability checks.
+- `realloc` assigned directly to the sole owning pointer, or partial initialization with no reverse-order cleanup path.
+- `strcpy`, `strcat`, `sprintf`, or unbounded scans on untrusted/uncertain data; `strncpy`/`strncat` presented as automatically safe.
+- Reading `errno` after success or after intervening calls, or clearing it before every call without API-specific reason.
+- Error paths that leak resources, discard partial I/O, swallow status, or use `assert` for recoverable conditions.
+- Unconditional null-after-free churn that suggests aliases are safe, or no invalidation strategy where a live variable may be reused.
+- Fixed-width integers used everywhere without a boundary requirement, or native widths assumed at wire/ABI/data boundaries.
+- `restrict` added without a caller-visible non-aliasing contract.
+- Signed overflow, out-of-range narrowing, invalid shifts, unchecked pointer arithmetic, or reliance on representation/packing not guaranteed by the target contract.
+- `volatile` synchronization, unsynchronized shared state, unsafe signal-handler calls, or condition waits not guarded by predicate loops.
+- Weak warning settings, broad warning suppression, or safety-sensitive code lacking appropriate static analysis, sanitizer, and boundary tests.

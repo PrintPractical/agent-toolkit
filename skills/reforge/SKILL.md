@@ -58,6 +58,8 @@ Questions (one at a time, challenge answers):
 
 Challenge vague answers. "I'd refactor the architecture" is not an answer. "The event loop model was wrong because X; I'd use Y instead" is an answer.
 
+After the target language is known, load `references/idioms/<lang>.md` if it exists and use it to challenge implementation anti-patterns and the proposed production direction. If no matching pack exists, state that and use the target ecosystem's established conventions and tooling rather than assuming pack guidance.
+
 ## Phase 3: Write reforge-seed.md
 
 Fill `references/templates/reforge-seed.md.tmpl`. Be specific and opinionated. Vague seeds produce vague architecture.

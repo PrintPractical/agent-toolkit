@@ -269,9 +269,9 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
 
 ### Idioms packs
 
-Loaded by `architect`, `specify`, and `implement` based on `manifest.language`. Each pack is a power-checklist + smell-list for the language. Shipped in v1: **Rust**, **C**, **C++**.
+Consulted by `architect`, `specify`, `implement`, `triage`, and `reforge` based on `manifest.language` or the selected target language. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
 
-The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** Adding a new language pack is a first-class extension point — drop `_idioms/<lang>.md`.
+The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** To add a pack, create `_idioms/<lang>.md` using a lowercase kebab-case filename and run `npm run build`; the build discovers and distributes canonical packs automatically. The filename stem is the `manifest.language` value.
 
 ---
 

@@ -1,114 +1,71 @@
 # C++ Idioms Pack
 
-Language-specific power-checklist and smell-list for C++ projects. Loaded by `architect`, `specify`, and `implement` when `manifest.language = cpp`.
+## Applicability
+
+Use this guidance when designing, specifying, implementing, reviewing, triaging, or reforging C++ code. The repository's selected language standard, compiler/library support, ABI and exception/RTTI policy, performance constraints, coding standard, and compatibility commitments take precedence. Version-gate C++20/23 facilities and provide only the fallbacks the supported toolchain requires.
+
+- **MUST** marks correctness, lifetime/resource/thread safety, or an explicit project/ABI contract.
+- **PREFER** marks the idiomatic default; depart when project constraints, profiling, or clearer code justify it.
+- **CONSIDER** marks a contextual option whose value depends on ownership, lifetime, API stability, or toolchain support.
 
 ## Core principle
 
-**Modern C++ (C++17+) has the tools to be both safe and efficient. Use them.** The language has evolved dramatically from C++98. Code that looks like C or Java written in C++ is not idiomatic — it sacrifices safety, clarity, and performance for familiarity with a worse language. The standard library and language features exist precisely to avoid manual resource management, raw loops, and unchecked casts.
-
-Flag any proposal that reaches for a raw pointer, a manual loop, or a `new`/`delete` pair when modern C++ eliminates the need.
-
----
+**Express ownership, lifetime, and invariants with RAII and value-oriented types, then use the simplest abstraction that preserves them.** Modern C++ reduces manual bookkeeping, but abstractions remain subject to lifetime, invalidation, allocation, and version constraints.
 
 ## Power Checklist
 
-### Resource Management (RAII)
+### Resource and Value Semantics
 
-- [ ] **Every resource is owned by an RAII type.** Files, sockets, memory, mutex locks, database connections — all wrapped in types whose destructor releases the resource. No manual resource release outside a destructor or deleter.
-- [ ] **Use `std::unique_ptr` for single ownership, `std::shared_ptr` for shared ownership.** Raw owning pointers (`T*` that are `delete`d) are banned. Raw non-owning pointers (`T*`, `T&`) are fine — they observe, they don't own.
-- [ ] **Use `std::lock_guard` or `std::scoped_lock` for mutex locking.** Never call `mutex.lock()` manually without a paired `mutex.unlock()` — that is an RAII violation.
-- [ ] **Use `std::vector`, `std::string`, `std::array` instead of C arrays.** They manage their own memory, have bounds-checking (in debug mode), and have standard interfaces.
+- [ ] **MUST give every resource one clear RAII owner or an explicit shared-ownership contract.** Wrap memory, handles, locks, transactions, and registrations so all exits clean up correctly.
+- [ ] **PREFER the rule of zero.** Compose standard containers, smart pointers, and RAII members so the compiler-generated destructor/copy/move operations are correct.
+- [ ] **MUST reason about all special members when custom resource management requires one.** Delete unsupported copy/move operations or implement the necessary rule-of-five members consistently; do not blindly define all five.
+- [ ] **PREFER `std::unique_ptr` for exclusive dynamic ownership and direct values when indirection is unnecessary.** Use `std::shared_ptr` only for true shared lifetime ownership, not merely to pass or observe an object.
+- [ ] **MUST distinguish owning from non-owning raw pointers/references.** Raw observation can be appropriate; raw `new`/`delete` ownership should remain inside a justified low-level RAII implementation.
+- [ ] **PREFER returning values normally.** Copy elision and implicit move handle local return values; do not write `return std::move(local);`, which can inhibit NRVO. Use `std::move` when intentionally transferring from a named object elsewhere.
 
-### Move Semantics
+### Views, Containers, and Algorithms
 
-- [ ] **Pass large objects by value when the callee needs ownership, and let move semantics eliminate the copy.** `void process(std::vector<Data> v)` — callers can `std::move` into it.
-- [ ] **Implement move constructors and move assignment for resource-owning types.** The rule of five: if you define one of (destructor, copy ctor, copy assign, move ctor, move assign), define all five.
-- [ ] **Prefer `std::move` explicitly when transferring ownership.** Don't rely on implicit move — make intent clear.
-- [ ] **Use `std::exchange` in move constructors** to null out the source in one expression: `ptr_ = std::exchange(other.ptr_, nullptr)`.
+- [ ] **MUST keep `std::string_view`, `std::span` (C++20), iterators, references, and pointers within the lifetime of their backing storage.** Account for temporaries, reallocation, mutation, coroutine suspension, and asynchronous capture.
+- [ ] **MUST not treat `std::vector::operator[]` as checked.** Use `at()` when runtime bounds checking is required, or establish bounds before indexing; debug-library checks are implementation/configuration features.
+- [ ] **PREFER standard containers and algorithms where their semantics clarify intent.** A direct loop is appropriate for stateful logic, early exits, correlated updates, or when it is clearer than an algorithm pipeline.
+- [ ] **PREFER range-based loops when an index is not part of the operation.** Choose `auto`, `const auto&`, `auto&`, or `auto&&` deliberately based on copying and mutation.
+- [ ] **MUST understand structured-binding ownership.** `auto [k, v] = pair` copies/moves the elements; `auto& [k, v]` or `const auto& [k, v]` binds references. Choose intentionally, especially in map loops.
+- [ ] **CONSIDER `std::string_view` for synchronous read-only string parameters and `std::span` for contiguous ranges when their non-owning nature is clear.** Prefer owning types when data must be retained.
 
-### const-Correctness
+### Results and Errors
 
-- [ ] **Mark all member functions that don't modify state `const`.** `size_t size() const;`
-- [ ] **Pass read-only parameters by `const T&` (large types) or by value (small, cheap-to-copy types).** Never accept a `T&` for a parameter you don't intend to modify.
-- [ ] **Use `const` for all local variables that are not mutated after initialization.** `const auto result = compute();` — this is the default; mutable is the exception.
-- [ ] **Use `constexpr` for compile-time constants and pure functions.** `constexpr int kMaxRetries = 3;` instead of `#define` or a non-const global.
+- [ ] **MUST follow the project's exception policy and maintain exception safety.** Destructors must not allow exceptions to escape during normal cleanup; catch polymorphic exceptions by reference.
+- [ ] **PREFER `std::optional<T>` only to represent presence or absence when no diagnostic is needed.** Use a status/result type, exception, or `std::expected<T, E>` (C++23, when supported) when callers need failure reasons.
+- [ ] **PREFER RAII over catch-and-cleanup code.** Define whether mutating operations provide no-throw, strong, or basic exception guarantees where callers rely on them.
+- [ ] **CONSIDER `[[nodiscard]]` for results whose accidental omission is likely a bug.** Avoid marking routine fluent/value APIs indiscriminately.
 
-### Standard Library Usage
+### Types and Interfaces
 
-- [ ] **Use `<algorithm>` instead of raw loops.** `std::sort`, `std::find_if`, `std::transform`, `std::accumulate`, `std::any_of`, `std::all_of`. Challenge any manual loop that reimplements one of these.
-- [ ] **Use range-based for loops over index loops.** `for (const auto& item : container)` over `for (size_t i = 0; i < container.size(); ++i)` when the index is not needed.
-- [ ] **Use `std::optional<T>` instead of nullable pointers or sentinel values for optional returns.** `std::optional<User> findUser(id)` instead of `User* findUser(id)` returning `nullptr`.
-- [ ] **Use `std::variant<Ts...>` for type-safe unions.** Never use raw `union` for type-polymorphic storage.
-- [ ] **Use `std::string_view` for read-only string parameters.** Accepts `std::string`, `const char*`, and string literals without copying.
-- [ ] **Use `std::span<T>` for non-owning array views** instead of `(T* ptr, size_t len)` pairs (C++20).
+- [ ] **PREFER `enum class`, explicit conversions, and domain value types when they prevent accidental mixing.** Preserve straightforward interoperability where an ABI or protocol requires primitive forms.
+- [ ] **PREFER `const`-correct interfaces and `constexpr` where values or functions are genuinely usable at compile time.** Do not add `const` to copied scalar parameters in public declarations as if it constrained callers.
+- [ ] **PREFER composition over inheritance for reuse.** Use virtual interfaces when runtime substitution is required; give polymorphic bases a suitable virtual destructor when deletion through the base is supported, and mark overrides `override`.
+- [ ] **MUST preserve ABI/lifetime contracts in callbacks and polymorphic APIs.** Returning values from virtual functions does not inherently force heap allocation; decide representation from semantics and measured cost.
+- [ ] **CONSIDER templates, concepts (C++20), variants, or virtual dispatch according to whether polymorphism is compile-time, closed-set, or open/runtime.** Include compile-time, code-size, ABI, and extensibility costs.
 
-### Error Handling
+### Concurrency and Tooling
 
-- [ ] **Use exceptions for truly exceptional conditions** (construction failures, unrecoverable states). Use return values or `std::expected` (C++23) / `std::optional` for expected failure modes (not found, parse error).
-- [ ] **Never throw from destructors.** Destructors that throw during stack unwinding call `std::terminate`.
-- [ ] **Catch by `const` reference, not by value.** `catch (const std::exception& e)`.
-- [ ] **Use RAII to guarantee cleanup in the presence of exceptions.** Never write `try { … } catch (…) { cleanup(); throw; }` when a destructor can do the cleanup.
-
-### Type System
-
-- [ ] **Use `enum class` instead of `enum`.** Scoped enums don't pollute the namespace and don't implicitly convert to integers.
-- [ ] **Use `explicit` on single-argument constructors and conversion operators.** Prevents silent implicit conversions.
-- [ ] **Use `[[nodiscard]]` on functions whose return value must not be ignored.** Error codes, resource handles, expensive computations.
-- [ ] **Use structured bindings (C++17).** `auto [key, value] = *it;` over `auto key = it->first; auto value = it->second;`.
-- [ ] **Prefer `auto` when the type is clear from context or verbose.** `auto it = container.find(key);` over `std::map<std::string, MyType>::iterator it = ...`.
-
-### Object-Oriented Design
-
-- [ ] **Prefer composition over inheritance.** Deep inheritance hierarchies are a design smell. Favor members + interfaces (`virtual` base classes with pure virtuals only).
-- [ ] **Make base classes either concrete leaf types or abstract interfaces.** A non-abstract, non-final base class that is also derived from is a design smell.
-- [ ] **Use `override` on all virtual overrides.** Prevents silent mismatch when base class signatures change.
-- [ ] **Use `final` on classes and virtual functions that must not be overridden.**
-- [ ] **Avoid virtual functions in performance-critical hot paths.** Prefer templates, `std::variant` + `std::visit`, or CRTP.
-
----
+- [ ] **MUST synchronize shared state with mutexes/atomics and a valid memory-order design.** `volatile` and `shared_ptr` reference-count safety do not make pointed-to data thread-safe.
+- [ ] **MUST make asynchronous and coroutine captures lifetime-safe.** Avoid retaining `this`, references, views, or iterators past owner destruction or invalidation.
+- [ ] **PREFER RAII lock types and avoid calling unknown code while holding locks.** Define lock ordering and condition predicates where relevant.
+- [ ] **PREFER the project's formatter, warnings, static analysis, sanitizers, and tests.** Version-check diagnostics and library features across all supported compilers.
 
 ## Smell List
 
-### Pre-modern C++ smells
-
-- `new T` / `delete t` outside of a constructor/`make_unique`/`make_shared` — manual memory management in 2020+ code
-- `T* arr = new T[n]; delete[] arr;` — use `std::vector<T>` instead
-- `NULL` instead of `nullptr` — `NULL` is `0`, `nullptr` is a typed null pointer constant
-- C-style casts `(T*)ptr` instead of `static_cast<T*>`, `reinterpret_cast<T*>` — hides intent and bypasses type system
-- `#define CONSTANT 42` instead of `constexpr int kConstant = 42`
-- `printf` / `scanf` in new C++ code — use `<iostream>`, `std::format` (C++20), or `fmt::format`
-- Non-`const` global variables — prefer dependency injection or function-local statics
-
-### C-style smells (as above, plus)
-
-- Raw char arrays for strings — use `std::string` or `std::string_view`
-- `memcpy`/`memset` on non-trivially-copyable types — undefined behavior
-- `strlen`, `strcpy`, `strcmp` — use `std::string` methods
-
-### Java/OOP smells
-
-- `new` on everything — stack allocation is free and often faster
-- `AbstractBaseFactoryFactory` class hierarchies — flatten with templates or `std::variant`
-- Getter/setter pairs for every field — expose data directly or use meaningful methods
-- Using inheritance for code reuse when composition with members would be cleaner
-
-### Resource safety smells
-
-- Pointer stored across a coroutine suspension point without ensuring it stays valid
-- Iterator invalidation: modifying a container while iterating over it
-- `shared_ptr` cycles — use `weak_ptr` to break them
-- Storing `this` or a reference to a local in a lambda that outlives the scope
-
-### Concurrency smells
-
-- `volatile` used for thread synchronization — use `std::atomic<T>`
-- `std::shared_ptr` used as the synchronization mechanism — it is thread-safe for reference counting only, not for the pointed-to data
-- Race condition on `shared_ptr::use_count()` — it is not a reliable synchronization primitive
-- Holding a lock while calling into unknown code (callbacks, virtual functions) — risk of deadlock
-
-### Performance smells
-
-- Returning large objects by value from virtual functions (forces heap allocation in some ABIs)
-- `std::vector<std::vector<T>>` for a matrix — use a flat `std::vector<T>` with manual indexing
-- Unnecessary copies: `for (auto item : container)` when `for (const auto& item : container)` is correct
-- `std::endl` — it flushes; use `'\n'` unless a flush is intentional
+- Hand-written destructor/copy/move members where rule-of-zero composition would suffice, or all five special members added mechanically.
+- `return std::move(local);`, unnecessary moves from `const`, or use-after-move assumptions beyond a valid but unspecified state.
+- `shared_ptr` used for convenience without shared lifetime, hidden ownership cycles, or `use_count()` used for synchronization.
+- Owning raw pointers, unmatched `new`/`delete`, or manual lock/unlock and cleanup vulnerable to early returns or exceptions.
+- `vector[i]` assumed to perform bounds checks; iterator/reference use after container invalidation.
+- `string_view`, `span`, lambda captures, or coroutine state outliving the referenced object or temporary.
+- `optional` used where failures require diagnostics, or sentinel/null values used where absence should be explicit.
+- Structured bindings that copy expensive values accidentally, especially `for (auto [k, v] : map)`.
+- C++20/23 features used without matching the declared standard and supported compiler/standard-library versions.
+- Blanket bans on loops, `printf`/C APIs, or inheritance without considering project interfaces, interoperability, formatting safety, and semantics.
+- `memcpy`/`memset` on unsuitable non-trivially-copyable objects, unsafe casts, or C varargs/format strings without type/format validation.
+- `volatile` used for synchronization, locks held across callbacks, or async work capturing unowned state.
+- Performance claims based on folklore, including claims that virtual value returns inherently allocate; measure relevant workloads and preserve correctness first.

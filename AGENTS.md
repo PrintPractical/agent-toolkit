@@ -8,7 +8,7 @@ This document is for contributors adding or modifying skills, shared refs, templ
 AgentToolkit/
   _shared/          Canonical shared references (authored once; synced into skills)
   _templates/       Canonical asset templates (synced into skills)
-  _idioms/          Language idioms packs: rust.md, c.md, cpp.md
+  _idioms/          Canonical language idioms packs (one lowercase kebab-case file per language)
   packages/build/   Canonical scripts + lib/ + build tooling (sync-shared.mjs) + __tests__/
   skills/           One folder per skill
     <name>/
@@ -82,10 +82,12 @@ CI: firm-seam test failure = hard block. Soft-prose staleness = warning + `Conte
 
 ## Adding an idioms pack
 
-1. Create `_idioms/<lang>.md` following the structure of existing packs (power-checklist + smell-list).
-2. Add it to `packages/build/sync-shared.mjs` for the skills that use it (`architect`, `specify`, `implement`).
+1. Create `_idioms/<lang>.md` following the structure of existing packs: applicability, core principle, power-checklist, and smell-list.
+2. Use a lowercase kebab-case filename. The build discovers packs automatically and syncs them to consuming skills.
 3. Update `README.md` to list the new language.
-4. `manifest.language` value should match the filename stem (e.g. `rust`, `c`, `cpp`).
+4. Add or update idiom structure/distribution tests when the pack introduces a new format requirement.
+5. Use the filename stem as `manifest.language` (for example, `rust`, `go`, or `typescript`).
+6. Run `npm run build`, `node packages/build/sync-shared.mjs --check`, and `npm test`.
 
 ## skills.sh.json
 

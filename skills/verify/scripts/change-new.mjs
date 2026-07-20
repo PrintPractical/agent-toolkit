@@ -36,12 +36,12 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language rust|c|cpp] [--parent <epic-id>]');
+  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
   process.exit(0);
 }
 
 if (!values.title) {
-  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language rust|c|cpp] [--parent <epic-id>]');
+  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
   process.exit(1);
 }
 

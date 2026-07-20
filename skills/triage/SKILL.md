@@ -33,6 +33,8 @@ If no active change, create one:
 node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" --class small|bug [--language <lang>]
 ```
 
+Load the active `manifest.yaml`. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the challenge and refactor passes. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+
 ## Phase 1: Classify
 
 Answer these questions before doing anything else:

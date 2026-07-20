@@ -9,7 +9,7 @@ id: YYYY-MM-DD-<slug>               # e.g. 2026-07-01-add-rate-limiter
 title: Short human-readable title
 class: feature | bug | small | epic
 stage: architect | specify | plan | implement | done
-language: rust | c | cpp | <other>  # selects idioms pack; omit for language-agnostic
+language: <idiom-pack-id>           # lowercase filename stem, e.g. rust, go, typescript; omit for language-agnostic
 
 # Epic parent/child linking (optional)
 parent: YYYY-MM-DD-<epic-slug>      # present only on child changes; points to the epic
