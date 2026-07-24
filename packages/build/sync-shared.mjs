@@ -46,6 +46,7 @@ const ALL_SHARED = [
   { src: '_shared/change-lifecycle.md',         dest: 'change-lifecycle.md' },
   { src: '_shared/drift-control.md',            dest: 'drift-control.md' },
   { src: '_shared/firm-change-protocol.md',     dest: 'firm-change-protocol.md' },
+  { src: '_shared/implementation-review.md',    dest: 'implementation-review.md' },
 ];
 
 const ALL_TEMPLATES = [
@@ -56,6 +57,7 @@ const ALL_TEMPLATES = [
   { src: '_templates/plan.md.tmpl',             dest: 'templates/plan.md.tmpl' },
   { src: '_templates/reforge-seed.md.tmpl',     dest: 'templates/reforge-seed.md.tmpl' },
   { src: '_templates/architect-seed.md.tmpl',   dest: 'templates/architect-seed.md.tmpl' },
+  { src: '_templates/refactor.md.tmpl',         dest: 'templates/refactor.md.tmpl' },
 ];
 
 const idiomFiles = fs.readdirSync(path.join(repoRoot, '_idioms'))
@@ -118,6 +120,12 @@ const SYNC_MAP = {
     { src: '_templates/CONTEXT.md.tmpl',      dest: 'templates/CONTEXT.md.tmpl' },
     ...ALL_IDIOMS,
   ],
+  refactor: [
+    ...ALL_SHARED,
+    { src: '_templates/refactor.md.tmpl',      dest: 'templates/refactor.md.tmpl' },
+    { src: '_templates/CONTEXT.md.tmpl',       dest: 'templates/CONTEXT.md.tmpl' },
+    ...ALL_IDIOMS,
+  ],
   verify: [
     ...ALL_SHARED,
     { src: '_templates/CONTEXT.md.tmpl',      dest: 'templates/CONTEXT.md.tmpl' },
@@ -144,6 +152,7 @@ const SCRIPT_FILES = [
   'context-verify.mjs',
   'kickback-log.mjs',
   'epic-split.mjs',
+  'implementation-checkpoint.mjs',
 ];
 
 const ALL_SKILLS = Object.keys(SYNC_MAP);
@@ -160,7 +169,8 @@ let skipped = 0;
  */
 function syncOne(srcPath, destPath, relLabel) {
   if (!fs.existsSync(srcPath)) {
-    console.error(`Warning: source not found, skipping: ${relLabel}`);
+    console.error(`ERROR: canonical source not found: ${srcPath} (needed for ${relLabel})`);
+    driftFound = true;
     skipped++;
     return;
   }
@@ -225,4 +235,5 @@ if (values.check) {
 } else {
   console.error(`\nSync complete: ${totalFiles} file(s) written.`);
   if (skipped > 0) console.error(`  Skipped: ${skipped} source(s) not found.`);
+  if (skipped > 0) process.exitCode = 1;
 }

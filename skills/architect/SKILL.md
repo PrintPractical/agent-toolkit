@@ -23,7 +23,7 @@ You have strong architectural opinions. Read `references/challenge-protocol.md` 
 - Challenge any proposal that deviates from idiomatic patterns for the active language. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 - Default stance toward existing code: **soft**. Existing patterns are not automatically correct. If a better solution exists — even one requiring a larger refactor — surface it. The user prefers a larger refactor that yields a better result over matching mediocre patterns.
 - Challenge any proposed `firm` designation until justified (see `references/challenge-protocol.md`). Default seam firmness is `soft`.
-- Surface refactors as **first-class, costed, approved decisions** here. No refactors are discovered during `implement`.
+- Surface scope-expanding, cross-module, contract-affecting, and architectural refactors as **first-class, costed, approved decisions** here. `implement` may discover and apply only local behavior-preserving cleanup inside planned files; it may not redesign seams or behavior.
 
 ## Preconditions
 
@@ -148,7 +148,7 @@ This is an open discussion, not a one-question interview. Topics to cover — wo
 
 1. **Change summary.** What are we building and why? Confirm scope aligns with `class` in manifest.
 2. **Where it fits.** Which components are touched? Which seams are crossed?
-3. **Existing code quality.** Are there `Known-soft-spots` or soft seams that a better solution would address? Propose refactors explicitly — do not leave them for `implement` to discover.
+3. **Existing code quality.** Are there `Known-soft-spots` or soft seams that require approved structural scope? Propose those refactors explicitly. Local behavior-preserving cleanup remains part of implementation review.
 4. **Architectural decisions.** For each major decision: state it, tag its firmness (default `soft`), challenge if firm is proposed.
 5. **New seams.** What new seams does this change introduce? What crosses each boundary?
 6. **Testability.** How is this change tested? Which seams are firm enough to warrant firm-seam tests?

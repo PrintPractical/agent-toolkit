@@ -39,7 +39,7 @@ Load `architecture.md` and `decisions.md` fully.
 Divide the implementation into logical sections. Rules:
 - Each section is independently executable. The implementer reads only the section they're working on.
 - Sections map to components, features, or layers — not to arbitrary line counts.
-- Each section ends with a refactor cycle + green test check.
+- Each section has a stable ID and ends with independent review, cleanup, tests, and fresh verification.
 - The final section is always docs reconciliation (non-negotiable).
 
 Present the proposed section breakdown to the user before writing the full plan. Get acknowledgment.
@@ -53,6 +53,7 @@ For each section, from `references/templates/plan.md.tmpl`:
 - Soft-seam test tasks as appropriate. Label: `[seam: internal, firmness: soft]`
 - Test tasks come **before** implementation tasks in each section (red-green discipline).
 - Include the specific assertion (what the test must verify) and the planned file path.
+- Identify firm and behavioral safety test paths that become `lockedTestFiles` after the green baseline. Structural soft tests remain editable files.
 
 ### Implementation tasks
 - Each task is one concrete action: create a file, add a function, modify a struct, implement a trait, etc.
@@ -60,10 +61,14 @@ For each section, from `references/templates/plan.md.tmpl`:
 - Include enough detail that a cheap model can execute it without context: what to add, what signature, what the function does, which error types to use.
 - Reference the decision or acceptance criterion being implemented: `(implements [SEAM-<id>])` or `(per decisions.md Q<n>)`.
 
-### Refactor cycle tasks (required for every section)
-- `[ ] Review <section> implementation: identify poor choices, repetitive code, deep functions, idioms violations`
-- `[ ] Apply refactors (soft-seam tests may be rewritten; firm-seam tests must remain green)`
-- `[ ] Run tests — must pass before moving to next section`
+### Checkpoint declaration and tasks (required for every section)
+- Stable unit ID such as `S-001`; never use a heading number as the only identity.
+- Exact editable files and locked test files as JSON arrays inside code spans, plus observable invariants, baseline command, and final command. These path arrays must match the canonical unit declaration exactly; a locked path cannot be moved into editable files later.
+- `[ ] Establish green snapshot with implementation-checkpoint`
+- `[ ] Independent read-only initial review accepted for the green snapshot`
+- `[ ] Apply behavior-preserving cleanup findings (or record substantive no-change rationale)`
+- `[ ] Final targeted and broader checks pass; locked tests unchanged`
+- `[ ] Fresh final review verifies behavior preservation for the tested snapshot`
 
 ## Phase 3: Traceability check
 
@@ -71,6 +76,7 @@ Before finalizing, verify:
 1. Every acceptance criterion in `architecture.md` and `decisions.md` traces to at least one task.
 2. Every firm seam has at least one firm-seam test task.
 3. Every approved refactor in `architecture.md` has explicit tasks.
+4. Every non-doc section has a complete checkpoint declaration and a unique stable ID.
 
 Fill the traceability table in `plan.md`. If any criterion is uncovered, add the missing task.
 

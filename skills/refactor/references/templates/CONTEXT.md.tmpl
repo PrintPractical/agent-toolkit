@@ -1,0 +1,85 @@
+# CONTEXT — {{COMPONENT_NAME}}
+
+> **Scope:** {{root (system-level) | component-level}}
+> **Last updated:** {{date}}
+
+## Purpose
+
+{{One paragraph describing what this component/system does and what it explicitly does NOT do.}}
+
+## Architecture & Seams
+
+{{Describe major structural divisions. Each seam requires a firmness tag. Default is `soft`.}}
+
+### Seam: {{seam-name}}  [firmness: soft]
+
+{{What crosses this boundary and what doesn't. How this seam is defined.}}
+
+<!--
+For firm seams, add:
+Criteria:
+  - [SEAM-{{component}}-{{name}}-01] {{behavioral assertion}} → enforced-by: {{test/path}}
+-->
+
+## Interfaces / Contracts
+
+{{Public API surface, message formats, file layouts, protocol definitions. Firm interfaces carry a seam ID and must have enforcing tests.}}
+
+## Glossary
+
+{{Domain terms with precise meanings in this codebase. One line per term. Consistent with other CONTEXT.md files.}}
+
+<!--
+Example:
+- **Token bucket**: A rate-limiting algorithm that allows burst up to capacity, refilling at a fixed rate.
+- **Upstream**: Any service this component sends requests to (distinct from callers/downstream).
+-->
+
+## Technical Requirements
+
+{{Hard constraints: performance budgets, platform targets, security requirements, regulatory obligations. All are firm by definition. State *why* where the reason is not obvious.}}
+
+<!--
+Example:
+- p99 response latency ≤ 50ms under sustained 10k rps  [why: SLA with customer contracts]
+- No external network calls from the hot path  [why: latency + reliability]
+-->
+
+## Acceptance / Behavioral Criteria
+
+{{The definition of done for this scope. Derived from firm seams. These are the source for firm-seam test generation.}}
+
+<!--
+Example:
+- [AC-{{component}}-01] {{scenario description}} → traces-to: [SEAM-{{component}}-{{name}}-01]
+-->
+
+## Observability
+
+{{What is instrumented, what traces exist, what metrics are emitted. Required fields for any component that handles requests or manages state.}}
+
+## Dependencies
+
+{{External services, libraries, sibling components this scope depends on. Used for blast-radius analysis during changes.}}
+
+## Known Soft Spots
+
+{{Explicit debt, areas known to be suboptimal, candidates for future refactor. This is the anti-anchoring surface — signals to agents that these areas are open for improvement.}}
+
+<!--
+Be specific. Vague entries ("refactor someday") are useless. Specify what is wrong and what a better solution would look like.
+-->
+
+{{#if root}}
+## Children
+
+{{Links to component-level CONTEXT.md files.}}
+
+<!--
+- [component-name](./path/to/CONTEXT.md): one-line description
+-->
+{{/if}}
+
+---
+
+Provenance: validated-at: {{git-sha}}

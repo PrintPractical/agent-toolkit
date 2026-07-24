@@ -49,10 +49,14 @@ To add a new shared file, add it to `_shared/` (or `_templates/` / `_idioms/`), 
 ```
 stages:   architect → specify → plan → implement → done
 gates:    architect | specify | plan | implement | docs
+
+refactor class: refactor → implement → done
+refactor gates: refactor | implement | docs
 ```
 
 - No skill auto-advances past a gate without `approved` status.
 - Each spine skill self-checks the prior gate before proceeding.
+- Resetting an upstream gate cascades downstream gates and invalidates checkpoint evidence.
 - `change-status.mjs` prints current stage + recommended next skill.
 
 ## Kickback types
@@ -73,6 +77,8 @@ gates:    architect | specify | plan | implement | docs
 - Tests at soft seams = disposable. Expected to churn with structural change.
 - `plan` labels every test task with its seam's firmness.
 - `implement` enforces the tripwire: firm-seam test failure during refactor = kickback, not a test edit.
+- Characterization tests may be cycle-locked from green baseline through final review without making their soft seam firm.
+- Standard, triage, and refactor implementation units require snapshot-bound independent review before the implement gate.
 
 ## CONTEXT.md provenance
 

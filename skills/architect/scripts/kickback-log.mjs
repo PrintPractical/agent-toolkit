@@ -59,6 +59,11 @@ try {
   process.exit(1);
 }
 
+if (manifest.class === 'refactor') {
+  console.error('Refactor changes do not enter the specification kickback spine. Reset the refactor gate to reselect behavior-preserving work, or create an architect change for behavior/contract changes.');
+  process.exit(1);
+}
+
 const entry = {
   type:       values.type,
   stage:      values.stage,
@@ -69,10 +74,14 @@ const entry = {
 
 manifest.kickbacks = manifest.kickbacks || [];
 manifest.kickbacks.push(entry);
+manifest.checkpoint_epoch = (Number.isInteger(manifest.checkpoint_epoch) ? manifest.checkpoint_epoch : 0) + 1;
 manifest.stage = 'specify';
 manifest.gates = manifest.gates || {};
 manifest.gates.specify = 'pending';
 manifest.gates.plan = 'pending';
+manifest.gates.implement = 'pending';
+manifest.gates.docs = 'pending';
+delete manifest.implementation_contract_digest;
 
 writeManifest(values.id, manifest, repoRoot);
 
@@ -102,5 +111,6 @@ process.stdout.write(JSON.stringify({
   total_defects: defectCount,
   frequency,
   stage: manifest.stage,
-  reset_gates: ['specify', 'plan'],
+  reset_gates: ['specify', 'plan', 'implement', 'docs'],
+  checkpoint_epoch: manifest.checkpoint_epoch,
 }) + '\n');

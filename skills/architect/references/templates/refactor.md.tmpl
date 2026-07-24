@@ -1,0 +1,234 @@
+# Refactor - {{title}}
+
+**Change ID:** {{id}}
+**Date:** {{date}}
+**Artifact status:** audit | selection-pending | selected | executing | blocked | verifying | docs | done
+**Baseline HEAD:** {{git-sha}}
+
+> This artifact is the source of truth for the maintenance workflow. Opportunity IDs are stable: never renumber or reuse them. No implementation or characterization-test edit is allowed before an explicit selection is recorded.
+
+## Scope
+
+**Requested scope:** {{user-supplied scope, or "omitted"}}
+**Effective scope:** {{concrete repository-relative paths; omitted means the whole first-party repository}}
+**First-party areas inspected:** {{paths}}
+**Exclusions:** {{generated, vendor/third-party, dependency caches, build/coverage outputs, archives, transient tool state, .changes/archive, repository-specific exclusions}}
+**Active changes considered:** {{IDs and overlap assessment}}
+**Initial worktree:** {{clean, or exact pre-existing changed paths}}
+
+## Context and seams
+
+**CONTEXT files read:**
+- `{{path}}` - {{relevance}}
+
+| Seam ID/name | Firmness | CONTEXT source | Enforced by | Relevance |
+|---|---|---|---|---|
+| {{seam}} | soft | `{{path}}` | n/a | {{reason}} |
+
+**Known Soft Spots considered:**
+- {{CONTEXT entry and disposition}}
+
+## Languages and idioms
+
+| Language | Evidence in scope | Idiom pack | Status |
+|---|---|---|---|
+| {{language}} | `{{paths/extensions}}` | `references/idioms/{{language}}.md` | loaded / missing |
+
+## Audit controls
+
+**Read-only audit confirmed:** {{yes/no and evidence}}
+**Pre-selection non-artifact edits:** {{none, otherwise this workflow is invalid}}
+**Audit conclusion:** opportunities-ranked | no-actionable-opportunities
+
+## Audit roles
+
+| Role | Reviewer/session | Scope | Status | Report reference |
+|---|---|---|---|---|
+| Scope and architecture mapper | {{identity}} | {{scope}} | pending | {{summary or link}} |
+| Behavior and contract guardian | {{identity}} | {{scope}} | pending | {{summary or link}} |
+| Structure and dependency reviewer | {{identity}} | {{scope}} | pending | {{summary or link}} |
+| Language-idiom reviewer: {{language}} | {{identity}} | {{scope}} | pending | {{summary or link}} |
+| Tests and coverage reviewer | {{identity}} | {{scope}} | pending | {{summary or link}} |
+| Runtime and operational-risk reviewer | {{identity or n/a}} | {{scope}} | pending | {{summary or link}} |
+
+## Ranked opportunities
+
+<!-- Repeat this complete block. IDs remain stable even when deferred, rejected, blocked, or escalated. -->
+
+### RF-001 - {{short title}}
+
+**Rank:** {{integer}}
+**Status:** proposed | selected | deferred | rejected | blocked | complete | escalated-architect
+**Scope:** {{path/component/layer/package}}
+**Languages:** {{all applicable languages}}
+**Evidence:** {{file:line, symbol, command output, or measured observation}}
+**Payoff:** {{specific maintainability, clarity, safety, or cost benefit}}
+**Behavior-preservation argument:** {{why outputs, errors, side effects, ordering, timing guarantees, persistence, protocols, and public contracts remain unchanged}}
+**Observable invariants:**
+- {{invariant}}
+
+**Seams touched:**
+- {{seam ID/name}} [firmness: soft|firm] - {{interaction; firm contract remains unchanged}}
+
+**Risk:** low | medium | high - {{reason}}
+**Effort:** small | medium | large - {{reason}}
+**Current coverage:** {{tests/checks and what they establish}}
+**Coverage gap:** {{none, or behavior needing characterization after selection}}
+**Proposed files:** `{{paths}}`
+**Verification:** `{{commands}}`
+**Dependencies:** {{RF IDs or external prerequisites}}
+**Conflicts:** {{RF IDs, active work, or none}}
+**Audit sources:** {{role names/report references}}
+**Disposition note:** {{selection, deferral, rejection, blocker, completion, or architect handoff reason}}
+
+## Selection gate
+
+**User response (verbatim):** {{exact response}}
+**Selected IDs:** `["{{RF-...}}"]` | audit-only
+**Dependency closure:** {{additional approved dependencies or none}}
+**Deferred IDs:** {{list and reason}}
+**Rejected IDs:** {{list and reason}}
+**Escalated IDs:** {{list and architect handoff reason}}
+**Selected at:** {{timestamp}}
+
+**Selection gate:** pending | audit-only | approved-for-exact-IDs
+**Selection gate command:** `node "$SKILL_DIR/scripts/manifest-gate.mjs" --id {{id}} --gate refactor --approve` | `node "$SKILL_DIR/scripts/manifest-gate.mjs" --id {{id}} --gate refactor --audit-only`
+
+<!-- Use --approve only after each exact selected RF ID has a complete ranked record with Status: selected, appears explicitly in the verbatim response, and is assigned once to the implementation-unit table and matching batch heading. The gate binds the full selected records and batch contract. Use --audit-only only after audit roles are complete, the ranked inventory or no-actionable-opportunities conclusion is recorded, and the verbatim audit-only selection is present. Audit-only may be recorded once; reset the refactor gate before reselection rather than replacing its repository baseline. -->
+
+## Existing baseline
+
+**Worktree at selection:** {{clean or exact paths, ownership, and overlap assessment}}
+**Relevant existing checks:**
+
+| Command | Scope | Result | Existing failure? | Evidence |
+|---|---|---|---|---|
+| `{{command}}` | {{scope}} | pass | no | {{summary}} |
+
+**Execution baseline:** ready | blocked
+**Blockers:** {{relevant failures, dirty overlap, ambiguity, or none}}
+
+## Characterization and cycle locks
+
+<!-- Add only after exact IDs are selected. Each test must pass against unchanged implementation before locking. -->
+
+| Test path/name | Selected ID | Behavior captured | Seam/firmness | Baseline result | Lock digest/reference | Status |
+|---|---|---|---|---|---|---|
+| `{{test}}` | RF-001 | {{observed behavior}} | {{seam}} / soft | pass | {{digest after green baseline}} | planned-lock / cycle-locked |
+
+## Implementation unit declarations
+
+<!-- Persist this data only as .changes/active/{{id}}/implementation-units.json. Selected IDs and file cells are JSON arrays inside code spans. Every row is one JSON object requiring id, exact files, lockedTestFiles, exact baselineCommand, and exact finalCommand. -->
+
+| Unit ID | Selected IDs | Editable files | Locked test files | Baseline command | Final command |
+|---|---|---|---|---|---|
+| B-001 | `["RF-001"]` | `["{{editable path}}"]` | `["{{characterization or firm-test path}}"]` | `{{exact command}}` | `{{exact command}}` |
+
+**Initialization command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --init --units .changes/active/{{id}}/implementation-units.json`
+**Initialization result:** not-needed | pending | passed | blocked
+**State file:** `.changes/active/{{id}}/implementation-state.json`
+**Checkpoint epoch:** {{manifest checkpoint_epoch}}
+**Declaration digest:** {{digest reported by checkpoint initialization}}
+
+## Execution batches
+
+<!-- Keep batches small and coherent. Batch heading IDs and the unit-table ID set must exactly match every canonical JSON declaration. Declare this block completely before changing batch files. -->
+
+### B-001 - {{batch title}}
+
+**Status:** planned | blocked | executing | tested | verified
+**Checkpoint phase:** building | green | reviewed | refactoring | tested | verified
+**Opportunity IDs:** {{selected RF IDs only}}
+**Declared files:**
+- `{{path}}`
+
+**Pre-batch worktree and overlap check:** {{exact result; unexplained overlap blocks}}
+**Observable invariants:**
+- {{invariant}}
+
+**Firm seams protected:** {{IDs and unchanged tests, or none}}
+**Cycle-locked tests:** {{paths/names or none}}
+**Lock-change rule:** restore any changed lock or stop and create an `architect` candidate; never rebaseline it
+**Dependencies:** {{batches/RF IDs or none}}
+**Rollback boundary:** {{how this batch is isolated}}
+
+**Baseline command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --unit B-001 --baseline-test --command "{{exact declared baselineCommand}}"`
+**Baseline result/snapshot:** {{result and SHA-256}}
+**Initial readiness reviewer:** {{stable nonempty reviewerId, self-declared identity, and independence}}
+**Initial review JSON:** `{{path}}` (`stage: initial`, `verdict: ready-for-refactor`)
+**Initial review command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --unit B-001 --initial-review --review {{path}}`
+**Start command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --unit B-001 --start-refactor`
+
+**Checks:**
+| Kind | Command | Result | Evidence |
+|---|---|---|---|
+| format/static | `{{command}}` | pending | {{summary}} |
+| firm/cycle-lock | `{{command}}` | pending | {{summary}} |
+| targeted tests | `{{command}}` | pending | {{summary}} |
+| broader tests | `{{command}}` | pending | {{summary}} |
+
+**Diff/invariant review:** {{result}}
+**Final-test command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --unit B-001 --final-test --command "{{exact declared finalCommand}}"`
+**Tested snapshot/result:** {{SHA-256 and result}}
+**Notes:** {{scope amendments, findings, or none}}
+
+## Full verification
+
+| Verification kind | Command | Result | Evidence |
+|---|---|---|---|
+| format | `{{command}}` | pending | {{summary}} |
+| lint/static analysis | `{{command}}` | pending | {{summary}} |
+| type check | `{{command}}` | pending | {{summary}} |
+| build | `{{command}}` | pending | {{summary}} |
+| tests | `{{command}}` | pending | {{summary}} |
+| integration/system | `{{command}}` | pending | {{summary}} |
+| supported runtimes | `{{command}}` | pending | {{summary}} |
+| firm + cycle-locked tests | `{{command}}` | pending | {{summary}} |
+
+**Skipped checks and justification:** {{none or explicit list}}
+
+## Fresh final review
+
+**Reviewer/session:** {{stable nonempty reviewerId and self-declared identity; reviewerId must differ from the unit's initial reviewer and reviewer must not have audited, readiness-reviewed, or implemented}}
+**Inputs reviewed:** {{baseline, selected IDs, full diff, CONTEXT, seams, idioms, invariants, tests}}
+**Verdict:** pending | pass | revise | architect
+
+| Finding ID | Severity | Category | Evidence | Behavior/firm impact | Required action | Status |
+|---|---|---|---|---|---|---|
+| FR-001 | {{severity}} | blocking / kickback / cleanup | `{{file:line}}` | {{none or impact}} | {{action}} | unresolved / resolved |
+
+**Residual risks:** {{none or explicit list}}
+**Re-review after changes:** {{reviewer/result or n/a}}
+
+**Per-unit final review JSON:** `{{path}}` (`stage: final`, `verdict: behavior-preserved`)
+**Per-unit final review command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --unit B-001 --final-review --review {{path}}`
+
+## Final checkpoint and implement gate
+
+**Checkpoint command:** `node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id {{id}} --check-all`
+**Checkpoint result:** pending | passed | blocked
+**Checkpoint evidence:** {{result}}
+**Implement-gate user response:** {{verbatim}}
+**Implement gate:** pending | approved
+
+## Documentation reconciliation
+
+**Context verification:** {{command and result}}
+**CONTEXT files changed:** {{paths and exact sections, or none}}
+**Other developer docs changed:** {{paths and reason, or none}}
+**Firm contracts/criteria changed:** none (otherwise this workflow must stop and route to architect)
+**Provenance stamps:** {{paths and SHA}}
+**Fresh docs reviewer:** {{identity, findings, resolution}}
+**Docs-gate user response:** {{verbatim}}
+**Docs gate:** pending | approved
+
+## Outcome and archive
+
+**Completed IDs:** {{list}}
+**Deferred/rejected IDs:** {{list}}
+**Blocked IDs:** {{list and reason}}
+**Architect handoffs:** {{IDs and concise handoff}}
+**Changed files:** {{complete list}}
+**Behavior-preservation conclusion:** {{evidence-backed summary}}
+**Archive command:** `node "$SKILL_DIR/scripts/change-archive.mjs" --id {{id}}`
+**Archive:** pending | `.changes/archive/{{id}}.zip`

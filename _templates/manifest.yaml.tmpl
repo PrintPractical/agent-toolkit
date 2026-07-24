@@ -1,13 +1,18 @@
 id: "{{id}}"
 title: "{{title}}"
-class: feature  # feature | bug | small | epic
-stage: architect  # architect | specify | plan | implement | done
+class: feature  # feature | bug | small | epic | refactor
+stage: architect  # refactor | architect | specify | plan | implement | done
 language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty for language-agnostic
+checkpoint_epoch: 0  # integer; kickbacks and upstream gate resets increment this
+# implementation_contract_digest: "<sha256>"  # normalized plan/refactor contract captured by gate approval
+# refactor_mode: execute | audit-only  # set by the refactor selection gate
+# refactor_selected_ids: [RF-001]  # execute mode only; exact approved inventory
 
 # parent: "{{epic-id}}"   # uncomment for child changes; set to the epic's change ID
 # children: []            # uncomment for epic manifests; populated by epic-split.mjs
 
 gates:
+  # refactor: pending  # pending | approved; use only for class: refactor
   architect:  pending
   specify:    pending
   plan:       pending
@@ -18,6 +23,7 @@ artifacts:
   architecture: architecture.md
   decisions:    decisions.md
   plan:         plan.md
+  # Class refactor instead uses: refactor.md, implementation-units.json, implementation-state.json, reviews/
 
 context_targets:
   - CONTEXT.md

@@ -7,9 +7,13 @@ Every change tracked by this toolkit has a `manifest.yaml` in `.changes/active/<
 ```yaml
 id: YYYY-MM-DD-<slug>               # e.g. 2026-07-01-add-rate-limiter
 title: Short human-readable title
-class: feature | bug | small | epic
-stage: architect | specify | plan | implement | done
+class: feature | bug | small | epic | refactor
+stage: refactor | architect | specify | plan | implement | done
 language: <idiom-pack-id>           # lowercase filename stem, e.g. rust, go, typescript; omit for language-agnostic
+checkpoint_epoch: 0                 # integer; incremented by kickbacks and upstream gate resets
+implementation_contract_digest: "" # normalized plan/refactor execution contract captured on gate approval
+refactor_mode: execute | audit-only # present only after the refactor selection gate
+refactor_selected_ids: [RF-001]     # execute mode only; exact user-approved inventory
 
 # Epic parent/child linking (optional)
 parent: YYYY-MM-DD-<epic-slug>      # present only on child changes; points to the epic
@@ -17,6 +21,7 @@ children:                           # present only on epic manifests
   - YYYY-MM-DD-<child-slug>
 
 gates:
+  refactor:   pending | approved  # refactor class only; refactor_mode records the branch
   architect:  pending | approved
   specify:    pending | approved
   plan:       pending | approved
@@ -27,6 +32,13 @@ artifacts:
   architecture: architecture.md     # relative to this directory
   decisions:    decisions.md
   plan:         plan.md
+
+# Refactor manifests use these artifacts instead:
+# artifacts:
+#   refactor:             refactor.md
+#   implementation_units: implementation-units.json
+#   implementation_state: implementation-state.json
+#   reviews:              reviews/
 
 context_targets:                    # CONTEXT.md files this change should reconcile
   - CONTEXT.md
@@ -48,13 +60,16 @@ Feature/bug/small:    architect → specify → plan → implement → done
 Epic:                 architect → specify → (decompose) → done
                                                   ↓
                                child architect → specify → plan → implement → done
+
+Refactor selected IDs: refactor (audit + selection) → implement (selected batches + docs) → done
+Refactor audit-only:   refactor (audit + verbatim audit-only gate) → docs → done
 ```
 
-- Stage advances only when the corresponding gate is `approved`.
+- Stage advances only when the corresponding gate is `approved`. Resetting a gate cascades all downstream gates to `pending` and restores the corresponding stage. Resetting `architect`, `specify`, `plan`, or `refactor` increments `checkpoint_epoch`, so stale implementation evidence cannot survive revoked authorization. `refactor --audit-only` approves the refactor gate with `refactor_mode: audit-only`, keeps the stage at `refactor`, and permits only the docs gate.
 - **No skill auto-advances past a gate.** Every gate transition requires explicit user approval in the session.
 - Each spine skill checks the prior gate on startup and refuses to proceed if it is not `approved`.
 - `change-status.mjs` prints the current stage and the recommended next skill.
-- A kickback from `plan` or `implement` returns the stage to `specify` and resets the `specify` and `plan` gates. Re-approving those gates advances through `plan` and back to `implement` without losing completed checklist work.
+- A kickback from `plan` or `implement` increments `checkpoint_epoch`, returns the stage to `specify`, clears the approved contract digest, and resets `specify`, `plan`, `implement`, and `docs`. Re-approving those gates advances through `plan` and back to `implement` without losing completed checklist work; checkpoint state is then reset from the amended canonical declarations.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs` to create child change manifests. The epic's `architecture.md` + `decisions.md` become parent context for each child's `architect` session.
 
@@ -67,6 +82,7 @@ Epic:                 architect → specify → (decompose) → done
 | `plan` | User, after traceability check | Every acceptance criterion traces to ≥1 task |
 | `implement` | User, after all tests pass | Implementation complete, all tasks checked |
 | `docs` | User, after reconciliation + verifier subagent | CONTEXT hierarchy updated and verified |
+| `refactor` | User, after ranked audit | Exact behavior-preserving opportunity IDs with complete selected records and batches are selected with `--approve`, or a verbatim audit-only selection is recorded once with `--audit-only` |
 
 ## Change classes
 
@@ -74,6 +90,17 @@ Epic:                 architect → specify → (decompose) → done
 - **`bug`** — Used by `triage`. Existing behavior being restored. No architect/specify required unless scope expands.
 - **`feature`** — Standard full pipeline.
 - **`epic`** — Runs `architect` (identify children + overall design) then `specify` (cross-cutting contracts), then decomposes into child changes via `epic-split`. The epic manifest never runs plan or implement — it tracks child change IDs and completion. Each child runs the full `architect → specify → plan → implement` spine independently, depth-first.
+- **`refactor`** — Standalone behavior-preserving maintenance. Audits a scope, requires exact user selection, then executes checkpointed batches. It cannot be an epic child; behavior or firm-contract changes become separate architect work.
+
+Standalone `bug` and `small` manifests created for `triage` begin at `stage: implement` with architect/specify/plan recorded as approved. Their single implementation unit still requires the full checkpoint cycle. Feature changes and epic children use the standard spine.
+
+## Implementation state
+
+Standard, triage, and executing refactor changes use exactly `.changes/active/<id>/implementation-units.json`. Each unit object requires `id`, exact `files`, `lockedTestFiles`, exact `baselineCommand`, and exact `finalCommand`; no alternate declaration path or inline JSON is valid, and every path has exactly one owning unit. Standard and triage plan markers include exact editable/locked JSON arrays and commands, all of which match the declarations. Refactor tables and headings match the units and assign the complete `refactor_selected_ids` set exactly once with no extras. The plan/refactor gate stores a normalized digest of this complete contract; checkpoint initialization and every later action require it unchanged.
+
+`implementation-state.json` binds `checkpoint_epoch`, the gate-approved contract digest, initialization HEAD/worktree, and a digest of the canonical declaration file. A refactor contract includes the full selected opportunity records, preventing semantic redefinition after approval. Manifest-backed state requires Git with a valid HEAD. Units progress `building → green → reviewed → refactoring → tested → verified`. `--check-all` rejects index/worktree divergence and undeclared changes whether they remain in the worktree or were committed after initialization. Review reports are versioned JSON under `reviews/` and bind a stable nonempty self-declared `reviewerId`, reviewer role, checks, file/line findings, disposition, verdict, and the exact content snapshot. Initial and final reviewer IDs differ; the permanent state registry prevents ID reuse across units, invalidation, and reset. A review cannot locally resolve a `kickback` finding.
+
+The first green snapshot makes its cycle-lock baseline immutable. If a locked test changes, restore it; standard implementation may kick back, while standalone refactor maintenance must stop and create an architect candidate. It cannot be accepted by rebaselining. After a resolved standard kickback and reapproved plan, or an explicitly approved refactor reselection, `implementation-checkpoint.mjs --id <id> --reset --units .changes/active/<id>/implementation-units.json` archives prior state/reviews and initializes state for the incremented epoch and amended declaration digest. Implement-gate approval rechecks its upstream plan/refactor gate, invokes `implementation-checkpoint.mjs --check-all`, and fails for missing, incomplete, stale, unlocked, unauthorized, or undeclared evidence.
 
 ## Epic parent/child model
 
@@ -96,6 +123,8 @@ An epic is a container for multiple related feature/bug/small changes that are t
 Kickback entries log times when `implement` had to stop and return to an upstream stage.
 
 An empty `resolution` means the kickback is unresolved. The targeted `specify` session replaces it with the actual decision before the specify gate is re-approved.
+
+Every logged kickback increments `checkpoint_epoch`, including amendments. This invalidates checkpoint state even when declaration text happens not to change.
 
 - **`defect`** — The upstream spec was incomplete; the dry-run in `specify` should have caught this. Counts against kickback frequency.
 - **`amendment`** — Legitimate external requirement change or new information. Does not count against kickback frequency.

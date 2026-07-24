@@ -61,6 +61,15 @@ Use this decision tree:
 
 **Child ordering:** If multiple children are unblocked (no dependency on an incomplete sibling), they may be worked in parallel — but each still runs its full spine start-to-finish. Say so explicitly.
 
+### Refactor maintenance (class: refactor)
+
+| State | What to tell the user |
+|---|---|
+| `refactor`, refactor gate pending | "Run `refactor` to audit the requested scope and select exact behavior-preserving opportunities." |
+| `implement`, implement pending | "Run `refactor` to execute or continue the selected checkpointed batches." |
+| `implement`, implement approved, docs pending | "Run `refactor` to reconcile maintenance context and approve the docs gate." |
+| `done` | "This refactor audit/change is complete and archived." |
+
 ### Multiple concurrent changes
 
 List all active changes in a table with their current stage and next action. Ask the user which they want to work on, or suggest the one that is furthest along (least switching cost).
@@ -82,8 +91,9 @@ Ask the user:
     > - "It's a new project or I have no CONTEXT.md files" → use `map` first, then `architect`
     > - "I have a PoC I want to rebuild properly" → use `reforge`
     > - "I have an early idea or I'm still comparing solutions" → use `brainstorm`
-    > - "I have a new feature or significant change" → use `architect`
+> - "I have a new feature or significant change" → use `architect`
 > - "I have a bug or small fix" → use `triage`
+> - "I want behavior-preserving cleanup or a technical-debt audit" → use `refactor`
 
 ## Reference files
 

@@ -36,24 +36,24 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
+  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic|refactor] [--language <idiom-pack-id>] [--parent <epic-id>]');
   process.exit(0);
 }
 
 if (!values.title) {
-  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
+  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic|refactor] [--language <idiom-pack-id>] [--parent <epic-id>]');
   process.exit(1);
 }
 
-const validClasses = ['feature', 'bug', 'small', 'epic'];
+const validClasses = ['feature', 'bug', 'small', 'epic', 'refactor'];
 if (!validClasses.includes(values.class)) {
   console.error(`Invalid class: ${values.class}. Must be one of: ${validClasses.join(', ')}`);
   process.exit(1);
 }
 
-// Children of an epic must be feature/bug/small, not another epic
-if (values.parent && values.class === 'epic') {
-  console.error('Error: an epic cannot be a child of another epic. Use class feature, bug, or small.');
+// Maintenance refactors and nested epics are never epic children.
+if (values.parent && ['epic', 'refactor'].includes(values.class)) {
+  console.error('Error: epic children must use class feature, bug, or small.');
   process.exit(1);
 }
 
@@ -79,26 +79,35 @@ const dir = changeDir(id, repoRoot);
 console.error(`Creating change: ${id}`);
 fs.mkdirSync(dir, { recursive: true });
 
-// Epics only use architect + specify gates. They never run plan/implement/docs.
+const isRefactor = values.class === 'refactor';
+const isTriage = ['bug', 'small'].includes(values.class) && !values.parent;
+
+// Epics and maintenance refactors have dedicated lifecycles. Standalone bug
+// and small changes enter triage's abbreviated implementation flow directly.
 const gates = values.class === 'epic'
   ? { architect: 'pending', specify: 'pending' }
-  : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' };
+  : isRefactor
+    ? { refactor: 'pending', implement: 'pending', docs: 'pending' }
+    : isTriage
+      ? { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending', docs: 'pending' }
+      : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' };
+
+const artifacts = isRefactor
+  ? { refactor: 'refactor.md', implementation_units: 'implementation-units.json', implementation_state: 'implementation-state.json', reviews: 'reviews/' }
+  : { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' };
 
 const manifest = {
   id,
   title: values.title,
   class: values.class,
-  stage: 'architect',
+  stage: isRefactor ? 'refactor' : isTriage ? 'implement' : 'architect',
   language: values.language,
   ...(values.parent ? { parent: values.parent } : {}),
   ...(values.class === 'epic' ? { children: [] } : {}),
   gates,
-  artifacts: {
-    architecture: 'architecture.md',
-    decisions:    'decisions.md',
-    plan:         'plan.md',
-  },
+  artifacts,
   context_targets: ['CONTEXT.md'],
+  checkpoint_epoch: 0,
   kickbacks: [],
 };
 
@@ -113,6 +122,10 @@ if (values.parent) {
 } else if (values.class === 'epic') {
   console.error(`Stage: architect — run the 'architect' skill next`);
   console.error(`  Epic flow: architect → specify → (auto-decompose into children)`);
+} else if (isRefactor) {
+  console.error(`Stage: refactor — run the 'refactor' skill to audit and select opportunities`);
+} else if (isTriage) {
+  console.error(`Stage: implement — continue the abbreviated 'triage' workflow`);
 } else {
   console.error(`Stage: architect — run the 'architect' skill next`);
 }

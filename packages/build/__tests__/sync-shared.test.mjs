@@ -8,12 +8,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
 const SYNC_SCRIPT = path.join(REPO_ROOT, 'packages/build/sync-shared.mjs');
 const IDIOMS_DIR = path.join(REPO_ROOT, '_idioms');
-const IDIOM_CONSUMERS = ['architect', 'specify', 'implement', 'triage', 'reforge'];
+const IDIOM_CONSUMERS = ['architect', 'specify', 'implement', 'triage', 'reforge', 'refactor'];
 
 describe('sync-shared.mjs', () => {
   it('runs without error in check mode when generated assets are current', () => {
@@ -121,10 +121,25 @@ describe('sync-shared.mjs', () => {
     }
   });
 
-  it('all 10 skills have a references/ directory after sync', () => {
+  it('fails when a declared canonical source is missing', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-sync-missing-'));
+    try {
+      fs.mkdirSync(path.join(root, 'packages', 'build'), { recursive: true });
+      fs.mkdirSync(path.join(root, '_idioms'));
+      const copiedScript = path.join(root, 'packages', 'build', 'sync-shared.mjs');
+      fs.copyFileSync(SYNC_SCRIPT, copiedScript);
+      const result = spawnSync(process.execPath, [copiedScript, '--check'], { cwd: root, encoding: 'utf8' });
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /canonical source not found/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('all 11 skills have a references/ directory after sync', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'refactor', 'verify', 'what-now'];
     for (const skill of skills) {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
@@ -134,17 +149,33 @@ describe('sync-shared.mjs', () => {
   it('every skill bundles its helper scripts + lib (self-contained)', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'refactor', 'verify', 'what-now'];
     const expectedScripts = [
       'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
       'manifest-gate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
       'context-verify.mjs', 'kickback-log.mjs', 'epic-split.mjs',
+      'implementation-checkpoint.mjs',
     ];
     for (const skill of skills) {
       for (const script of expectedScripts) {
         const p = path.join(REPO_ROOT, 'skills', skill, 'scripts', script);
         assert.ok(fs.existsSync(p), `Expected ${skill}/scripts/${script} to be bundled`);
       }
+    }
+  });
+
+  it('syncs the refactor template and implementation-review contract', () => {
+    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+
+    const pairs = [
+      ['_templates/refactor.md.tmpl', 'skills/refactor/references/templates/refactor.md.tmpl'],
+      ['_shared/implementation-review.md', 'skills/refactor/references/implementation-review.md'],
+    ];
+    for (const [source, destination] of pairs) {
+      assert.ok(
+        fs.readFileSync(path.join(REPO_ROOT, source)).equals(fs.readFileSync(path.join(REPO_ROOT, destination))),
+        `${destination} must match ${source}`,
+      );
     }
   });
 

@@ -34,6 +34,7 @@ Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads 
 | Existing repo with no CONTEXT.md files | `map` |
 | You have a PoC you want to rebuild from scratch | `reforge` |
 | Bug or small isolated fix | `triage` |
+| Behavior-preserving cleanup, technical debt audit, or accumulated sloppiness | `refactor` |
 | New feature, new project, or substantial change | `architect` |
 
 ---
@@ -97,8 +98,12 @@ plan
  └─ approves: plan gate
 
 implement
- └─ per section: write firm-seam tests (red) → implement (green) → refactor cycle
- └─ refactor cycle: poor choices, repetition, deep functions, idioms violations
+ └─ per section: implement → green baseline → independent read-only review
+ └─ applies bounded behavior-preserving cleanup, then runs final verification
+ └─ a distinct fresh reviewer verifies the tested snapshot before completion
+ └─ snapshot-bound checkpoints prevent bulk completion or stale review evidence
+ └─ plan fields and canonical units must agree on exact files, locks, and commands
+ └─ gate-approved contract digests, one-owner paths, and Git index checks prevent scope drift
  └─ firm-seam tests must stay green — failure = kickback, not a test edit
  └─ live checklist: checks off tasks as they complete
  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance
@@ -107,7 +112,7 @@ implement
 
 `brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or gate; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
 
-**Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops and logs a kickback to `manifest.yaml`. The logger returns the change to `specify` and resets the `specify` and `plan` gates, so both stages must be re-approved before implementation resumes. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
+**Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops and logs a kickback to `manifest.yaml`. The logger increments `checkpoint_epoch`, returns the change to `specify`, and resets the `specify`, `plan`, `implement`, and `docs` gates. After specify and plan are re-approved, checkpoint state is reset from the amended canonical unit declarations, archiving prior state and reviews. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
 
 ---
 
@@ -166,7 +171,7 @@ triage
  └─ classifies: is this actually small? (escalates to architect if not)
  └─ root cause analysis
  └─ writes failing test first (red), then fix (green)
- └─ quick refactor pass
+ └─ independent review → bounded cleanup → final test → fresh final review
  └─ updates CONTEXT.md if needed
  └─ archives
 ```
@@ -179,7 +184,29 @@ triage
 
 ---
 
-## Flow 5 — PoC to production
+## Flow 5 — Behavior-preserving cleanup
+
+**Use when:** several features have accumulated duplication, tangled control flow, weak naming, dead private paths, non-idiomatic code, or other technical debt. Scope may be a path, component, layer, package, or the whole first-party stack.
+
+```
+refactor
+ └─ read-only parallel audit across architecture, behavior, tests, and idioms
+ └─ produces a ranked inventory with stable RF-... opportunity IDs
+ └─ asks you to select exact IDs; audit approval alone never authorizes edits
+ └─ blocks on relevant failing baseline tests or overlapping active work
+ └─ adds minimal characterization tests when current behavior lacks coverage
+ └─ executes selected work in small snapshot-bound batches
+ └─ requires independent readiness review and a distinct fresh final review
+ └─ reconciles CONTEXT.md and archives the full audit and evidence
+```
+
+`refactor` preserves observable behavior. Bug fixes, product changes, public or firm contract changes, migrations, dependency upgrades, and cross-scope redesign are recorded as architect candidates and must follow the `architect` flow. Characterization tests are cycle-locked from the green baseline through final verification; firm-seam tests remain immutable.
+
+Audit-only is valid only after completed read-only audit roles and a ranked inventory or explicit no-actionable-opportunities conclusion. The one-time `manifest-gate.mjs --gate refactor --audit-only` transition captures a repository HEAD/content baseline that cannot be replaced without gate reset; the docs gate then permits only declared context-target changes while rejecting index/worktree divergence. Exact selected IDs use ordinary `--approve`; every ID must reference a complete ranked record marked selected and appear in the verbatim response, and the gate binds those records plus the complete batch contract before execution.
+
+---
+
+## Flow 6 — PoC to production
 
 **Use when:** you built a prototype and want to rebuild the production version from scratch with proper architecture.
 
@@ -200,7 +227,7 @@ reforge (run on the PoC repo)
 
 ---
 
-## Flow 6 — Keeping docs current (verify)
+## Flow 7 — Keeping docs current (verify)
 
 **Use when:** code changed outside the pipeline (hotfixes, external PRs, time has passed).
 
@@ -262,14 +289,20 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
     architecture.md     # architect output
     decisions.md        # specify output
     plan.md             # plan output (live checklist, updated by implement)
+    implementation-units.json # canonical exact files, locks, baseline/final commands
+    implementation-state.json # snapshot-bound section/batch phases
+    reviews/            # initial and final review reports bound to exact snapshots
+    refactor.md         # ranked audit, selection, batches, and evidence (refactor class)
   archive/<id>.zip      # zipped on completion — agent won't read; humans can
 ```
 
 `<id>` format: `YYYY-MM-DD-<slug>` (e.g. `2026-07-01-add-rate-limiter`).
 
+Checkpoint state binds `manifest.checkpoint_epoch`, the initialization HEAD/worktree, and the declaration digest. It rejects undeclared worktree or committed changes, and upstream gate resets invalidate downstream evidence. Plans bind exact editable/locked path arrays; refactor batches additionally cover every user-approved RF ID exactly once. Reviews require stable nonempty self-declared reviewer IDs, with different IDs for a unit's initial and final reviews. A cycle lock is immutable after its first green baseline; restore a changed lock or kick back rather than rebaselining it.
+
 ### Idioms packs
 
-Consulted by `architect`, `specify`, `implement`, `triage`, and `reforge` based on `manifest.language` or the selected target language. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
+Consulted by `architect`, `specify`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
 
 The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** To add a pack, create `_idioms/<lang>.md` using a lowercase kebab-case filename and run `npm run build`; the build discovers and distributes canonical packs automatically. The filename stem is the `manifest.language` value.
 

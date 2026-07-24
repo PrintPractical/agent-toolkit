@@ -316,8 +316,8 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
 
 // ── Stage ordering ─────────────────────────────────────────────────────────────
 
-export const STAGES = ['architect', 'specify', 'plan', 'implement', 'done'];
-export const GATES  = ['architect', 'specify', 'plan', 'implement', 'docs'];
+export const STAGES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'done'];
+export const GATES  = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
 
 export function stageIndex(stage) {
   return STAGES.indexOf(stage);
@@ -332,6 +332,15 @@ export function nextSkill(manifest) {
   // Epics: architect → specify → decompose → done (no plan/implement)
   if (manifest.class === 'epic') {
     return epicNextAction(manifest);
+  }
+
+  // Refactor changes audit, obtain selection approval, execute their own
+  // checkpointed batches, and reconcile docs without entering the spec spine.
+  if (manifest.class === 'refactor') {
+    if (stage === 'refactor' && gates.refactor !== 'approved') return 'refactor (audit and selection)';
+    if (stage === 'implement' && gates.implement !== 'approved') return 'refactor (execute selected batches)';
+    if (stage === 'implement' && gates.implement === 'approved' && gates.docs !== 'approved') return 'refactor (docs reconciliation)';
+    return null;
   }
 
   if (stage === 'architect' && gates.architect !== 'approved') return 'architect';
