@@ -43,7 +43,7 @@ node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --init \
   --units .changes/active/<id>/implementation-units.json
 ```
 
-Initialization requires Git with a valid HEAD and binds state to `manifest.checkpoint_epoch`, the plan-gate-approved contract digest, and a digest of the canonical declarations. Each path has one unit owner. The script rejects staged content that differs from the reviewed worktree and edits to another unit outside its cycle. On ordinary resume, use `--status`; never reinitialize or hand-edit `implementation-state.json`. A section is complete only when its unit is `verified`.
+Initialization requires Git with a valid HEAD and binds state to `manifest.checkpoint_epoch`, the plan-gate-approved contract digest, and a digest of the canonical declarations. A path may be shared across units (e.g., a central file modified per section). A file cannot be both editable and locked across units. The script rejects staged content that differs from the reviewed worktree and edits to another unit's unique paths outside its cycle. On ordinary resume, use `--status`; never reinitialize or hand-edit `implementation-state.json`. A section is complete only when its unit is `verified`.
 
 ## The checkpointed loop: per section
 

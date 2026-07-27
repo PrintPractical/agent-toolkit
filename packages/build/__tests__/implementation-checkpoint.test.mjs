@@ -156,7 +156,62 @@ describe('implementation-checkpoint.mjs', () => {
       { id: 'two', files: ['src/b.mjs'], lockedTestFiles: ['src/a.mjs'], baselineCommand: DEFAULT_COMMAND, finalCommand: DEFAULT_COMMAND },
     ])], cwd);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /owned by both/);
+    assert.match(result.stderr, /editable file in another unit but a locked test file/);
+
+    result = run(['--id', id, '--init', '--units', JSON.stringify([
+      { id: 'one', files: ['src/unused1.mjs'], lockedTestFiles: ['src/a.mjs'], baselineCommand: DEFAULT_COMMAND, finalCommand: DEFAULT_COMMAND },
+      { id: 'two', files: ['src/a.mjs'], lockedTestFiles: ['src/unused2.mjs'], baselineCommand: DEFAULT_COMMAND, finalCommand: DEFAULT_COMMAND },
+    ])], cwd);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /locked test file in another unit but an editable file/);
+  });
+
+  it('allows shared file paths across multiple units and tracks them in state', () => {
+    fs.writeFileSync(path.join(cwd, 'shared.mjs'), 'export const shared = true;\n');
+    const result = initialize(cwd, [
+      { id: 'unit-a', files: ['src/a.mjs', 'shared.mjs'], lockedTestFiles: ['test/a.test.mjs'] },
+      { id: 'unit-b', files: ['shared.mjs', 'src/b.mjs'], lockedTestFiles: [] },
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    fs.writeFileSync(path.join(cwd, 'src', 'b.mjs'), 'export const b = 1;\n');
+    const state = readState(cwd);
+    assert.deepEqual(state.sharedPaths.sort(), ['shared.mjs']);
+    assert.deepEqual(state.expectedUnitIds, ['unit-a', 'unit-b']);
+    assert.deepEqual(state.units['unit-a'].files, ['shared.mjs', 'src/a.mjs']);
+    assert.deepEqual(state.units['unit-b'].files, ['shared.mjs', 'src/b.mjs']);
+  });
+
+  it('handles sequential units sharing a file across the full checkpoint cycle', () => {
+    fs.writeFileSync(path.join(cwd, 'shared.mjs'), 'export const shared = true;\n');
+    fs.writeFileSync(path.join(cwd, 'src', 'b.mjs'), 'export const b = 1;\n');
+    initialize(cwd, [
+      { id: 'unit-a', files: ['src/a.mjs', 'shared.mjs'], lockedTestFiles: ['test/a.test.mjs'] },
+      { id: 'unit-b', files: ['shared.mjs', 'src/b.mjs'], lockedTestFiles: [] },
+    ]);
+    const state = readState(cwd);
+    assert.deepEqual(state.sharedPaths.sort(), ['shared.mjs']);
+
+    // Complete unit-a through the full cycle
+    assert.equal(baseline(cwd, 'unit-a').status, 0);
+    assert.equal(initialReview(cwd, 'unit-a').status, 0);
+    assert.equal(startRefactor(cwd, 'unit-a').status, 0);
+    fs.appendFileSync(path.join(cwd, 'shared.mjs'), '\n// unit-a refactor\n');
+    assert.equal(finalTest(cwd, 'unit-a', ['--no-change-rationale', 'Minor cleanup in shared file after review.']).status, 0);
+    assert.equal(finalReview(cwd, 'unit-a').status, 0);
+
+    // Complete unit-b through the full cycle (shared.mjs already changed by unit-a)
+    assert.equal(baseline(cwd, 'unit-b').status, 0);
+    assert.equal(initialReview(cwd, 'unit-b').status, 0);
+    assert.equal(startRefactor(cwd, 'unit-b').status, 0);
+    fs.appendFileSync(path.join(cwd, 'shared.mjs'), '\n// unit-b refactor\n');
+    assert.equal(finalTest(cwd, 'unit-b', ['--no-change-rationale', 'Additional cleanup in shared file after review.']).status, 0);
+    assert.equal(finalReview(cwd, 'unit-b').status, 0);
+
+    // --check-all should pass
+    const result = run(['--id', id, '--check-all'], cwd);
+    assert.equal(result.status, 0, result.stderr);
+    const parsed = parseResult(result);
+    assert.equal(parsed.valid, true);
   });
 
   it('runs baseline commands and advances only after success', () => {

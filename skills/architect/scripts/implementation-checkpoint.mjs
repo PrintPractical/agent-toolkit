@@ -167,10 +167,11 @@ function readState(file, changeId) {
   } catch (error) {
     fail(`Could not read implementation state: ${error.message}`);
   }
-  if (!isPlainObject(state) || state.version !== 2 || state.changeId !== changeId ||
+  if (!isPlainObject(state) || (state.version !== 2 && state.version !== 3) || state.changeId !== changeId ||
       !Array.isArray(state.expectedUnitIds) || !isPlainObject(state.units)) {
     fail(`Invalid implementation state: ${file}`);
   }
+  if (!state.sharedPaths) state.sharedPaths = [];
   return state;
 }
 
@@ -519,7 +520,7 @@ function substantiveRationale(value) {
   return trimmed.length >= 20 && words.length >= 4 && !/^(?:n\/?a|none|no changes?|not needed)\.?$/i.test(trimmed);
 }
 
-function healthForUnit(unit, repoRoot) {
+function healthForUnit(unit, repoRoot, sharedPaths) {
   let current;
   let lockedTestsCurrent = true;
   try {
@@ -534,12 +535,22 @@ function healthForUnit(unit, repoRoot) {
     : unit.phase === 'reviewed' ? unit.initialReview?.snapshot
       : (unit.phase === 'tested' || unit.phase === 'verified') ? unit.tested?.snapshot?.sha256
         : null;
+  const exclude = new Set(sharedPaths || []);
+  const storedFiles = boundSnapshotFiles(unit);
+  let filesCurrent = true;
+  if (storedFiles && exclude.size > 0) {
+    for (const fileInfo of storedFiles) {
+      if (exclude.has(fileInfo.path)) continue;
+      const currentFile = (current.files || []).find(f => f.path === fileInfo.path);
+      if (currentFile?.sha256 !== fileInfo.sha256) { filesCurrent = false; break; }
+    }
+  }
   return {
     id: unit.id,
     phase: unit.phase,
     snapshot: current.sha256,
     boundSnapshot,
-    current: lockedTestsCurrent && (boundSnapshot === null || boundSnapshot === current.sha256),
+    current: lockedTestsCurrent && (exclude.size > 0 ? filesCurrent : (boundSnapshot === null || boundSnapshot === current.sha256)),
     lockedTestsCurrent,
   };
 }
@@ -681,7 +692,8 @@ function initializeState(values, repoRoot, file, manifest, { reset = false, revi
   const declarations = loadJsonArgument(values.units, '--units', repoRoot);
   if (!Array.isArray(declarations) || declarations.length === 0) fail('--units must declare at least one implementation unit');
   const units = {};
-  const ownedPaths = new Map();
+  const pathCategory = new Map();
+  const sharedPaths = new Set();
   for (const [index, declaration] of declarations.entries()) {
     if (!isPlainObject(declaration)) fail(`Unit declaration ${index} must be an object`);
     if (typeof declaration.id !== 'string' || !UNIT_ID_PATTERN.test(declaration.id)) fail(`Unit declaration ${index} has an invalid stable id`);
@@ -690,9 +702,17 @@ function initializeState(values, repoRoot, file, manifest, { reset = false, revi
     const lockedTestFiles = normalizePathList(declaration.lockedTestFiles, `units[${index}].lockedTestFiles`, { allowEmpty: true });
     const overlap = files.find(item => lockedTestFiles.includes(item));
     if (overlap) fail(`Unit '${declaration.id}' declares '${overlap}' as both implementation and locked test file`);
-    for (const ownedPath of [...files, ...lockedTestFiles]) {
-      if (ownedPaths.has(ownedPath)) fail(`Path '${ownedPath}' is owned by both '${ownedPaths.get(ownedPath)}' and '${declaration.id}'`);
-      ownedPaths.set(ownedPath, declaration.id);
+    for (const ownedPath of files) {
+      const existing = pathCategory.get(ownedPath);
+      if (existing && existing !== 'files') fail(`Path '${ownedPath}' is a locked test file in another unit but an editable file in '${declaration.id}'`);
+      if (existing === 'files') sharedPaths.add(ownedPath);
+      else pathCategory.set(ownedPath, 'files');
+    }
+    for (const ownedPath of lockedTestFiles) {
+      const existing = pathCategory.get(ownedPath);
+      if (existing && existing !== 'lockedTestFiles') fail(`Path '${ownedPath}' is an editable file in another unit but a locked test file in '${declaration.id}'`);
+      if (existing === 'lockedTestFiles') sharedPaths.add(ownedPath);
+      else pathCategory.set(ownedPath, 'lockedTestFiles');
     }
     units[declaration.id] = {
       id: declaration.id,
@@ -751,6 +771,7 @@ function initializeState(values, repoRoot, file, manifest, { reset = false, revi
     initialHead,
     initialWorktree,
     reviewerIds: [...new Set(priorReviewerIds)].sort(),
+    sharedPaths: [...sharedPaths],
     reset,
   };
   writeState(file, state);
@@ -765,13 +786,35 @@ function expectedOwnershipSnapshot(unit) {
   return null;
 }
 
+function boundSnapshotFiles(unit) {
+  if (unit.initialSnapshot?.files) return unit.initialSnapshot.files;
+  if (unit.baseline?.snapshot?.files) return unit.baseline.snapshot.files;
+  if (unit.tested?.snapshot?.files) return unit.tested.snapshot.files;
+  return null;
+}
+
 function validateOtherUnitBoundaries(state, activeUnitId, repoRoot) {
+  const sharedPaths = new Set(state.sharedPaths || []);
+  const activeUnit = state.units[activeUnitId];
+  const activePaths = new Set([...activeUnit.files, ...activeUnit.lockedTestFiles]);
   for (const id of state.expectedUnitIds) {
     if (id === activeUnitId) continue;
     const unit = state.units[id];
-    const expected = expectedOwnershipSnapshot(unit);
-    if (!expected || unitSnapshot(unit, repoRoot).sha256 !== expected) {
-      fail(`Unit '${activeUnitId}' cannot proceed because path ownership for unit '${id}' changed outside its checkpoint cycle`);
+    const storedFiles = boundSnapshotFiles(unit);
+    if (!storedFiles) continue;
+    for (const fileInfo of storedFiles) {
+      if (sharedPaths.has(fileInfo.path)) continue;
+      if (activePaths.has(fileInfo.path)) continue;
+      const absolutePath = path.resolve(repoRoot, ...fileInfo.path.split('/'));
+      let currentSha = null;
+      try {
+        if (fs.existsSync(absolutePath)) {
+          currentSha = createHash('sha256').update(fs.readFileSync(absolutePath)).digest('hex');
+        }
+      } catch {}
+      if (currentSha !== fileInfo.sha256) {
+        fail(`Unit '${activeUnitId}' cannot proceed because path ownership for unit '${id}' changed outside its checkpoint cycle`);
+      }
     }
   }
 }
@@ -875,7 +918,7 @@ function main() {
   if (action === 'check-all') {
     const allowedDocs = values['allow-docs'] && manifest ? (manifest.context_targets || []).map(item => normalizeRelativePath(item, 'context target')) : [];
     validateGitIndex(state, repoRoot, allowedDocs);
-    const units = state.expectedUnitIds.map(id => healthForUnit(getUnit(state, id), repoRoot));
+    const units = state.expectedUnitIds.map(id => healthForUnit(getUnit(state, id), repoRoot, state.sharedPaths));
     const unexplainedFiles = unexplainedWorktreeChanges(state, repoRoot, allowedDocs);
     const valid = units.every(unit => unit.phase === 'verified' && unit.current && unit.lockedTestsCurrent) && unexplainedFiles.length === 0;
     output({ id: values.id, valid, units, unexplainedFiles });
@@ -887,7 +930,7 @@ function main() {
 
   if (action === 'status') {
     const selected = values.unit ? [getUnit(state, values.unit)] : state.expectedUnitIds.map(id => getUnit(state, id));
-    output({ id: values.id, units: selected.map(unit => healthForUnit(unit, repoRoot)) });
+    output({ id: values.id, units: selected.map(unit => healthForUnit(unit, repoRoot, state.sharedPaths)) });
     return;
   }
 

@@ -99,7 +99,7 @@ node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --init \
   --units .changes/active/<id>/implementation-units.json
 ```
 
-Initialization requires Git with a valid HEAD. Because triage begins with a preapproved plan gate, initialization captures and binds that plan's execution-contract digest, then binds the manifest's integer `checkpoint_epoch`, initialization HEAD/worktree, and canonical declaration digest. Each path has one unit owner. On resume, inspect `--status`; do not reinitialize or hand-edit checkpoint state.
+Initialization requires Git with a valid HEAD. Because triage begins with a preapproved plan gate, initialization captures and binds that plan's execution-contract digest, then binds the manifest's integer `checkpoint_epoch`, initialization HEAD/worktree, and canonical declaration digest. A path may be shared across units (e.g., a central file modified per section). A file cannot be both editable and locked across units. On resume, inspect `--status`; do not reinitialize or hand-edit checkpoint state.
 
 ## Phase 5: Execute + independent review + cleanup
 
