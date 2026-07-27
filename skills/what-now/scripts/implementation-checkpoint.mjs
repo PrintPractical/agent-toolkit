@@ -787,9 +787,9 @@ function expectedOwnershipSnapshot(unit) {
 }
 
 function boundSnapshotFiles(unit) {
-  if (unit.initialSnapshot?.files) return unit.initialSnapshot.files;
-  if (unit.baseline?.snapshot?.files) return unit.baseline.snapshot.files;
   if (unit.tested?.snapshot?.files) return unit.tested.snapshot.files;
+  if (unit.baseline?.snapshot?.files) return unit.baseline.snapshot.files;
+  if (unit.initialSnapshot?.files) return unit.initialSnapshot.files;
   return null;
 }
 
