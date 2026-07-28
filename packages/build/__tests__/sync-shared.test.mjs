@@ -121,10 +121,10 @@ describe('sync-shared.mjs', () => {
     }
   });
 
-  it('all 10 skills have a references/ directory after sync', () => {
+  it('all 11 skills have a references/ directory after sync', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
     for (const skill of skills) {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
@@ -134,11 +134,11 @@ describe('sync-shared.mjs', () => {
   it('every skill bundles its helper scripts + lib (self-contained)', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
     const expectedScripts = [
       'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
       'manifest-gate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
-      'context-verify.mjs', 'kickback-log.mjs', 'epic-split.mjs',
+      'context-verify.mjs', 'kickback-log.mjs', 'review-log.mjs', 'epic-split.mjs',
     ];
     for (const skill of skills) {
       for (const script of expectedScripts) {

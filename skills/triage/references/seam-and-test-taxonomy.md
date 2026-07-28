@@ -49,12 +49,16 @@ A plan must contain at least one firm-seam test task per firm seam in the accept
 
 ## Practical guidance for `implement`
 
-For each implementation section:
+Per section (L2), just reach a green baseline:
 1. Identify which seams are touched. Check `architecture.md` for firmness.
 2. If any touched seam is firm: write the firm-seam test first. Must be green before continuing.
-3. Implement to pass tests.
-4. Run refactor cycle. Firm-seam tests must remain green throughout.
-5. Rewrite soft-seam tests to match the refactored structure.
+3. Implement to pass tests. Move to the next section.
+
+Once every section is green, run the single behavior-preserving review-and-refactor pass over the whole change (L3, see `implementation-review.md`):
+4. A fresh auditor flags cleanup; apply behavior-preserving refactors. Firm-seam tests must remain green throughout.
+5. Rewrite soft-seam tests to match the refactored structure; a distinct fresh verifier confirms behavior is preserved.
+
+If cleanup needs behavior a firm-seam test would not yet catch, add a minimal passing **characterization test** to pin the current behavior before refactoring, then treat it as a firm-seam safety net for that pass.
 
 **The tripwire:** `implement` treats any firm-seam test modification as an automatic kickback signal. The implementer must STOP, explain why the firm contract changed, and kick back to `specify` (as an amendment or defect, as appropriate). The implementer never changes a firm-seam test unilaterally.
 

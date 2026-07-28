@@ -7,8 +7,8 @@ Every change tracked by this toolkit has a `manifest.yaml` in `.changes/active/<
 ```yaml
 id: YYYY-MM-DD-<slug>               # e.g. 2026-07-01-add-rate-limiter
 title: Short human-readable title
-class: feature | bug | small | epic
-stage: architect | specify | plan | implement | done
+class: feature | bug | small | epic | refactor
+stage: refactor | architect | specify | plan | implement | done
 language: <idiom-pack-id>           # lowercase filename stem, e.g. rust, go, typescript; omit for language-agnostic
 
 # Epic parent/child linking (optional)
@@ -16,7 +16,13 @@ parent: YYYY-MM-DD-<epic-slug>      # present only on child changes; points to t
 children:                           # present only on epic manifests
   - YYYY-MM-DD-<child-slug>
 
+# Refactor class only (optional)
+refactor_mode: execute | audit-only # execute applies selected cleanup; audit-only stops after the report
+refactor_selected_ids:              # user-approved opportunity IDs from refactor.md
+  - RF-001
+
 gates:
+  refactor:   pending | approved    # refactor class only: audit + selection approved
   architect:  pending | approved
   specify:    pending | approved
   plan:       pending | approved
@@ -27,6 +33,7 @@ artifacts:
   architecture: architecture.md     # relative to this directory
   decisions:    decisions.md
   plan:         plan.md
+  refactor:     refactor.md          # refactor class only (replaces architecture/decisions/plan)
 
 context_targets:                    # CONTEXT.md files this change should reconcile
   - CONTEXT.md
@@ -48,6 +55,9 @@ Feature/bug/small:    architect → specify → plan → implement → done
 Epic:                 architect → specify → (decompose) → done
                                                   ↓
                                child architect → specify → plan → implement → done
+
+Refactor:             refactor → implement → done
+                      (audit + selection) (execute + independent review)
 ```
 
 - Stage advances only when the corresponding gate is `approved`.
@@ -62,10 +72,11 @@ Epic:                 architect → specify → (decompose) → done
 
 | Gate | Approved by | What it certifies |
 |---|---|---|
+| `refactor` | User, after audit + explicit opportunity selection | Ranked opportunities recorded; user selected exact `RF-NNN` IDs to execute |
 | `architect` | User, after validity-check subagent passes | Architecture decisions are sound; no gaps found |
 | `specify` | User, after dry-run subagent passes | All ambiguities resolved; interfaces finalized |
 | `plan` | User, after traceability check | Every acceptance criterion traces to ≥1 task |
-| `implement` | User, after all tests pass | Implementation complete, all tasks checked |
+| `implement` | User, after all tests pass **and an approved independent review** | Implementation complete, all tasks checked, behavior-preserving cleanup verified by a distinct fresh reviewer |
 | `docs` | User, after reconciliation + verifier subagent | CONTEXT hierarchy updated and verified |
 
 ## Change classes
@@ -74,6 +85,7 @@ Epic:                 architect → specify → (decompose) → done
 - **`bug`** — Used by `triage`. Existing behavior being restored. No architect/specify required unless scope expands.
 - **`feature`** — Standard full pipeline.
 - **`epic`** — Runs `architect` (identify children + overall design) then `specify` (cross-cutting contracts), then decomposes into child changes via `epic-split`. The epic manifest never runs plan or implement — it tracks child change IDs and completion. Each child runs the full `architect → specify → plan → implement` spine independently, depth-first.
+- **`refactor`** — Used by the `refactor` skill for behavior-preserving cleanup. Skips the spec spine entirely: `refactor` (audit the scope, rank opportunities, record the user's explicit `RF-NNN` selection) → `implement` (apply the selected cleanup, keep tests green, obtain a distinct fresh independent review) → `docs`. Never changes observable behavior; anything that would is escalated to `architect`. With `refactor_mode: audit-only` the change stops after the report without executing.
 
 ## Epic parent/child model
 

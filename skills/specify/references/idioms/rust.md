@@ -31,12 +31,22 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - [ ] **PREFER the smallest useful visibility.** Public fields suit stable data records; private fields plus getters or domain methods suit invariants, evolution, computed values, and controlled mutation. Avoid reflexive getters and reflexive exposure alike.
 - [ ] **CONSIDER `#[non_exhaustive]` for externally consumed types expected to grow.** It imposes construction/matching costs on callers, so do not add it automatically to internal types or deliberately closed APIs.
 
+### Modules and Structure
+
+- [ ] **MUST decompose a crate by responsibility, not accumulate it in one file.** Each cohesive piece of functionality belongs in its own module (`src/<name>.rs` or `src/<name>/mod.rs`). Do not let `src/lib.rs` or `src/main.rs` grow into a grab-bag of unrelated types, functions, and logic. A single-file crate root that holds most of the implementation is a review-blocking structural finding, not a style preference.
+- [ ] **MUST keep the crate root thin.** `lib.rs`/`main.rs` should declare modules (`mod ...;`), re-export the public surface (`pub use ...`), and wire top-level composition or the binary entry point — not house the bulk of the logic. `main.rs` in particular should parse arguments/config and hand off to library code.
+- [ ] **PREFER a layered module tree.** Focused leaf modules each implement one concern; higher-level modules compose those leaves into features; the crate root ties features together. Depth should follow the domain's natural seams, not an arbitrary rule.
+- [ ] **PREFER module boundaries that match seams and testable units,** exposing the smallest useful visibility (`pub(crate)` for cross-module internals, `pub` only for the intended external surface). A module the rest of the crate reaches into freely has no boundary.
+- [ ] **CONSIDER splitting a module when it mixes unrelated responsibilities, grows past what a reader can hold at once, or forces unrelated changes to touch the same file.** Size alone is a signal, not a hard limit; responsibility count is the real test.
+
 ### Errors and Panics
 
 - [ ] **MUST distinguish recoverable errors from invariant violations.** Return `Result` for failures callers can handle; reserve panics for broken invariants, impossible states, or explicitly fail-fast application policy.
+- [ ] **MUST NOT panic on recoverable conditions in production paths.** `.unwrap()`, `.expect()`, `panic!`, `todo!`, `unreachable!`, `assert!`-on-input, slice/array indexing that can go out of bounds, and integer-overflow-prone arithmetic are prohibited for anything a caller could hit at runtime: I/O, parsing, user or config input, environment, time, locks (`PoisonError`), channels, and task joins. Return a `Result`, use `?`, provide a fallback, or validate first. This is a review-blocking finding.
+- [ ] **MUST justify every remaining `unwrap`/`expect`/panic in production code.** Permitted only when failure is impossible by construction (with `expect("<invariant that makes this infallible>")` stating why), or under a documented fail-fast policy. `unwrap()` with no invariant argument is not acceptable in non-test code. Tests, examples, and benches may panic freely.
 - [ ] **PREFER typed domain errors at reusable library/component boundaries and contextual reports at application boundaries.** `thiserror` and `anyhow` may coexist by layer: for example, a library exposes a typed `thiserror` enum while a binary adds `anyhow::Context`.
 - [ ] **PREFER `?` for propagation and add context where the underlying error does not identify the failed operation.** Match explicitly when recovery, translation, retry, or cleanup differs by variant.
-- [ ] **CONSIDER `unwrap`/`expect` when failure is impossible by construction, in tests/examples, or under a documented fail-fast policy.** Prefer `expect` with useful invariant context; do not use either for ordinary malformed input or environmental failure.
+- [ ] **MUST NOT silently discard a `Result` or `Option` that encodes a real failure.** Do not `let _ =` an operation whose failure matters, and do not `.ok()` away an error without a reason; handle, propagate, or log per policy.
 
 ### Traits, Types, and Collections
 
@@ -64,8 +74,9 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 ## Smell List
 
 - Broad `clone()` use that conceals an unclear ownership model or unexpectedly expensive work.
-- `unwrap()`/`expect()` on user input, I/O, synchronization, or task joins without a justified fail-fast policy.
+- `unwrap()`/`expect()` on user input, I/O, synchronization, or task joins without a justified fail-fast policy; `unwrap()` with no stated invariant; reachable `panic!`/`todo!`/`unreachable!`, panicking indexing, or overflow-prone arithmetic on runtime-reachable paths.
 - `String`, booleans, tuples, or untyped maps carrying domain states that a focused enum/newtype/struct would make safer.
+- A monolithic `src/lib.rs` or `src/main.rs` holding most of the crate's logic; very large multi-responsibility modules; a flat module stuffed with unrelated items; or logic living in the crate root that should sit behind a named module boundary.
 - `Box<dyn Trait>` everywhere despite a closed set of variants, or generics everywhere despite compile-time/code-size and API costs.
 - Public fields that permit invalid mutation, or boilerplate getters that provide no invariant, abstraction, or evolution benefit.
 - `#[non_exhaustive]`, `Clone`, `Default`, `Serialize`, or equality/order derives added without checking downstream and semantic consequences.
