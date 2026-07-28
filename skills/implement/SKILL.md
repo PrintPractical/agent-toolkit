@@ -1,11 +1,11 @@
 ---
 name: implement
-description: Use after plan gate approval to execute plan.md through snapshot-bound green, independent review, behavior-preserving cleanup, testing, and final verification checkpoints. Enforces firm and cycle-locked tests, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan gate is approved.
+description: Use after plan gate is approved to execute the task checklist in plan.md. Follows red-green-refactor discipline per section, enforces the firm-seam test tripwire, logs kickbacks on flaws, and reconciles CONTEXT.md files when done. Do not run unless the plan gate is approved.
 ---
 
 # Implement
 
-You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Execute `plan.md` faithfully. Product, contract, scope, and architectural decisions are kickbacks. Local behavior-preserving quality decisions inside declared section files are required.
+You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make **zero decisions** here. If something requires a decision, stop — that is a kickback.
 
 ## Running the helper scripts
 
@@ -19,35 +19,22 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-The implementer does not improvise observable behavior, public or firm contracts, persistence formats, dependencies, security/concurrency policy, or cross-scope design. It does make bounded behavior-preserving cleanup decisions such as internal naming, simplification, deduplication, local extraction, dead-code removal, and idiomatic expression. Read `references/implementation-review.md` for the exact boundary.
+The implementer follows the plan. It does not interpret, improvise, or "make reasonable assumptions." Any ambiguity encountered is a defect in the spec process and triggers a kickback. The plan was written to be detailed enough that you should never need to guess.
 
-The producer never certifies its own work. Every section is bound to a content snapshot and passes through a fresh read-only critic before cleanup and a fresh read-only verifier afterward.
+However: the refactor cycle is not optional. Code quality is part of your job. After implementing each section, you look critically at what you wrote and improve it using the idioms pack — before moving to the next section.
 
 ## Preconditions
 
-Load `manifest.yaml` and require integer `checkpoint_epoch`. There are two valid states:
-- Implementation: `stage: implement`, `gates.implement: pending`, plan gate approved, and `plan.md` exists.
-- Docs reconciliation re-entry: `stage: implement`, `gates.implement: approved`, and `gates.docs: pending`. Skip directly to docs reconciliation.
+Load `manifest.yaml`. Verify:
+- `stage` is `implement` (plan gate approved).
+- `gates.implement` is `pending`.
+- `plan.md` exists.
 
 If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the refactor cycles. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
-## Initialize section checkpoints
+## The loop: per section
 
-Before implementation edits, read every machine-readable `Checkpoint unit` marker in `plan.md`. Its complete ID set must exactly equal the declarations in `.changes/active/<id>/implementation-units.json`: no missing, extra, or duplicate section IDs. Editable and locked path fields are exact JSON arrays in `plan.md`; they and both commands must match the canonical declaration. This exact path is the only valid declaration source for a manifest-backed workflow; do not pass inline JSON or another file.
-
-Each JSON object requires `id`, exact `files`, `lockedTestFiles`, exact `baselineCommand`, and exact `finalCommand`, with the command values matching that plan section verbatim. Lock firm-seam tests and behavioral safety/regression tests that must not change during cleanup; leave intentionally disposable structural tests in editable `files`.
-
-Initialize once:
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --init \
-  --units .changes/active/<id>/implementation-units.json
-```
-
-Initialization requires Git with a valid HEAD and binds state to `manifest.checkpoint_epoch`, the plan-gate-approved contract digest, and a digest of the canonical declarations. A path may be shared across units (e.g., a central file modified per section). A file cannot be both editable and locked across units. The script rejects staged content that differs from the reviewed worktree and edits to another unit's unique paths outside its cycle. On ordinary resume, use `--status`; never reinitialize or hand-edit `implementation-state.json`. A section is complete only when its unit is `verified`.
-
-## The checkpointed loop: per section
-
-Work through `plan.md` one section at a time. Give each reviewer the section contract, completed code, tests, adjacent code needed to evaluate it, relevant CONTEXT seams, and idiom pack. Do not give it the producer's rationale or ask it to edit.
+Work through `plan.md` one section at a time. For each section:
 
 ### Step 1: Write firm-seam tests first
 
@@ -57,56 +44,32 @@ Find all test tasks labeled `[firmness: firm]` in this section. Write those test
 
 Write the implementation tasks from the plan. Work the checklist top to bottom. Check off each task in `plan.md` as you complete it (update the file with `[x]`). Goal: get firm-seam tests green.
 
-### Step 3: Write soft-seam tests and establish green
+### Step 3: Write soft-seam tests
 
-Write any test tasks labeled `[firmness: soft]` in this section. Run the section's declared baseline command through the checkpoint script:
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --unit <section-id> \
-  --baseline-test --command "<exact declared baselineCommand>"
-```
+Write any test tasks labeled `[firmness: soft]` in this section.
 
-The command must exactly match the declaration and pass. This binds the completed pre-cleanup implementation and locks declared safety tests. The first green lock snapshot is immutable for the epoch. If any locked test later changes, restore its baseline content or kick back; never run a new baseline to accept the changed lock.
+### Step 4: Refactor cycle
 
-### Step 4: Independent initial review
-
-Launch a fresh read-only critic. It must check correctness, contract adherence, repetition, naming, unnecessary abstractions, responsibility, control flow, error handling, comments, test quality, and applicable idioms. Persist versioned JSON matching `references/implementation-review.md`, including a stable nonempty self-declared `reviewerId`, reviewer role, checks performed, file/line findings, dispositions, and the exact green snapshot.
-
-- `blocking` correctness findings return the section to implementation. After any correction, rerun the green command and obtain a fresh review.
-- `kickback` findings stop the workflow and use `kickback-log.mjs`; the checkpoint rejects a kickback marked locally resolved in review JSON.
-- `cleanup` findings are carried into the refactor pass.
-- No findings is valid only with substantive checks and a concrete rationale.
-
-Bind the accepted review, then open cleanup as separate invocations:
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --unit <section-id> \
-  --initial-review --review <initial-review.json>
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --unit <section-id> --start-refactor
-```
-
-### Step 5: Behavior-preserving cleanup
-
-Resolve the initial cleanup findings and independently inspect for dead code, repetition, unclear responsibilities, obscured flow, idiom violations, poor error handling, and reachable placeholders. Change only declared files.
+This is mandatory. Review the section's implementation:
+- Dead code, unused variables, unused imports
+- Repetitive code that should be extracted into a named function
+- Functions or modules carrying multiple responsibilities that would become clearer with named boundaries
+- Control flow whose nesting or branching obscures invariants, error paths, or the main operation
+- Idioms violations from the idioms pack (if language is set)
+- Missing error handling for paths that can fail
+- Reachable placeholders, unconditional failures, or suppressed errors that are not part of an approved fail-fast policy
 
 Apply refactors. Rules during refactor:
 - **Firm-seam tests must remain green at all times.** If a firm-seam test fails after a refactor, STOP. This is not a test problem — the refactor changed behavior. That means it is not a pure refactor. Kickback (see below).
-- Cycle-locked tests are equally immutable until verification. Soft-seam tests not locked may be rewritten to match new structure.
-- Never force churn. If review proves no cleanup is warranted, record a substantive no-change rationale.
+- Soft-seam tests may be rewritten to match the new structure. This is expected.
 
-### Step 6: Final tests and fresh verification
+### Step 5: Run tests — must pass
 
-Run the section's exact declared targeted and broader checks through `--final-test`. Then launch a fresh read-only final reviewer, distinct from the producer and initial critic. Its stable nonempty self-declared `reviewerId` must differ from the unit's initial reviewer ID; identity is self-declared, but accidental reuse is blocked. It compares the tested snapshot to the section contract and green baseline and must return `behavior-preserved` with no unresolved blocking or kickback findings.
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --unit <section-id> \
-  --final-test --command "<exact declared finalCommand>" [--no-change-rationale "<why no edit was warranted>"]
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --unit <section-id> \
-  --final-review --review <final-review.json>
-```
+Run the full test suite (or the relevant subset if the project supports it). Tests must pass before moving to the next section. If they fail, fix them. If fixing requires a decision that's not in the plan, kickback.
 
-Any edit after final testing or review invalidates the snapshot. Correct local findings, retest, and obtain another fresh review. If fixing requires a decision, kick back.
+### Step 6: Mark section complete
 
-### Step 7: Mark section complete
-
-Only after the unit reaches `verified`, check off its independent review, cleanup, test, and final verification tasks in `plan.md`.
+Check off the refactor cycle and test run tasks in `plan.md`.
 
 Repeat for each section.
 
@@ -127,28 +90,15 @@ When you encounter:
 node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --stage implement \
   --missed "<what the spec didn't cover>"
 ```
-   This records an unresolved kickback, increments `manifest.checkpoint_epoch`, returns the stage to `specify`, and resets `specify`, `plan`, `implement`, and `docs` to `pending`. Existing checkpoint state and the old approved contract digest are now stale.
+   This records an unresolved kickback, returns the stage to `specify`, and resets the `specify` and `plan` gates to `pending`.
 4. Tell the user: **run `specify` to resolve this, then re-run `plan` to update the checklist, then resume `implement`.**
 5. Do not continue this session until the kickback is resolved.
-
-After the kickback has a resolution and the amended specify and plan gates are re-approved, ensure every amended `Checkpoint unit` marker matches the canonical declarations, then reset through the only supported recovery path:
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --reset \
-  --units .changes/active/<id>/implementation-units.json
-```
-
-`--reset` archives prior checkpoint state and reviews and initializes amended state bound to the incremented epoch and new declaration digest. Never delete, overwrite, or hand-edit state/reviews to resume. A cycle lock changed before the kickback cannot be rebaselined as ordinary cleanup; restore it unless the approved amendment explicitly changes its declaration.
 
 ## After all sections complete
 
 ### Implement gate
 
-Require script-backed evidence before asking for approval:
-```
-node "$SKILL_DIR/scripts/implementation-checkpoint.mjs" --id <id> --check-all
-```
-
-When all non-reconciliation tasks are checked off and every unit is verified and current:
+When all non-reconciliation tasks are checked off and tests pass:
 
 > "All implementation sections are complete and tests pass. Do you approve the implement gate?"
 
@@ -184,8 +134,6 @@ On approval:
 node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate docs --approve
 ```
 
-The docs gate reruns checkpoint freshness and permits post-implementation changes only to manifest `context_targets`. Any source, lock, index, or undeclared-file drift must return to the implementation cycle.
-
 ### Archive
 
 ```
@@ -207,5 +155,4 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 - `references/change-lifecycle.md` — docs reconciliation + archive
 - `references/firm-change-protocol.md` — if a firm seam must change
 - `references/drift-control.md` — CONTEXT.md update rules
-- `references/implementation-review.md` — checkpoint phases, reviewer roles, and report schema
 - `references/idioms/<lang>.md` — refactor cycle guidance

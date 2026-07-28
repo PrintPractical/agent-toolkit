@@ -6,8 +6,6 @@
 **Date:** {{date}}
 
 > This plan is the single source of truth for implementation. Each task is a checkbox. `implement` marks tasks complete in real time. Do not add tasks during implementation — if new work is discovered, kick back to `specify`.
->
-> Every non-doc section has one machine-readable `Checkpoint unit` marker. Those IDs must exactly match all objects in `.changes/active/{{id}}/implementation-units.json`; each object requires `id`, exact `files`, `lockedTestFiles`, exact `baselineCommand`, and exact `finalCommand` matching the section fields below. File fields are JSON arrays inside code spans so locks cannot be reclassified by the declaration file.
 
 ## Traceability check
 
@@ -26,12 +24,6 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 > **Scope:** {{What this section covers. Files and modules touched. Decisions implemented.}}
 > **Decisions implemented:** {{list of decision references from decisions.md}}
 > **Seams touched:** {{list of seam IDs, with firmness}}
-> **Checkpoint unit:** S-001
-> **Editable files:** `["{{implementation path}}", "{{disposable soft-test path}}"]`
-> **Locked test files:** `["{{firm test path}}", "{{behavioral safety-test path}}"]`
-> **Observable invariants:** {{behavior that cleanup must preserve}}
-> **Baseline command:** `{{targeted tests proving completed implementation is green}}`
-> **Final command:** `{{targeted plus broader tests/static checks}}`
 
 ### Tests
 
@@ -50,25 +42,17 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 - [ ] {{specific task}} — `{{target file}}`
 
-### Independent review and cleanup checkpoint
+### Refactor cycle
 
-- [ ] Establish green snapshot with `implementation-checkpoint.mjs --baseline-test`
-- [ ] Fresh read-only critic accepts an initial snapshot-bound review
-- [ ] Apply behavior-preserving cleanup findings, or record a substantive no-change rationale
-- [ ] Run declared final checks; firm and cycle-locked tests remain unchanged
-- [ ] Fresh final reviewer verifies behavior preservation for the tested snapshot
+- [ ] Review section 1 implementation: identify poor choices, repetitive code, deep functions
+- [ ] Apply refactors (soft-seam tests may be rewritten; firm-seam tests must remain green)
+- [ ] Run tests — must pass before moving to section 2
 
 ---
 
 ## Section 2: {{section-name}}
 
 > **Scope:** {{description}}
-> **Checkpoint unit:** S-002
-> **Editable files:** `["{{path}}"]`
-> **Locked test files:** `[]`
-> **Observable invariants:** {{invariants}}
-> **Baseline command:** `{{command}}`
-> **Final command:** `{{command}}`
 
 ### Tests
 
@@ -78,17 +62,15 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 - [ ] {{task}}
 
-### Independent review and cleanup checkpoint
+### Refactor cycle
 
-- [ ] Establish green snapshot
-- [ ] Accept independent initial review
-- [ ] Apply behavior-preserving cleanup or document no-change rationale
-- [ ] Run final checks with locked tests unchanged
-- [ ] Accept fresh final behavior-preservation review
+- [ ] Review section 2 implementation
+- [ ] Apply refactors
+- [ ] Run tests — must pass before moving to section 3
 
 ---
 
-<!-- Add sections as needed. The complete Checkpoint unit ID set must equal the canonical implementation-units.json declaration set. -->
+<!-- Add sections as needed. Each section must end with its own refactor cycle and green tests. -->
 
 ---
 

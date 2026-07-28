@@ -20,11 +20,11 @@ A firm-seam test asserts a contract. It tests *what the system does*, not how it
 **Rules for firm-seam tests:**
 - Written before implementation (red-green discipline).
 - Located at the level of the seam they pin (integration, system, or behavioral — not unit internals).
-- Never modified to make a refactor pass. A failing firm-seam test is evidence that behavior changed, not a test problem. Standard implementation uses a kickback; standalone refactor maintenance stops and creates an architect candidate. Neither edits the test locally.
+- Never modified to make a refactor pass. A failing firm-seam test during a refactor is not a test problem — it is evidence that the refactor changed behavior, which means it is not a pure refactor. **This triggers a kickback, not a test edit.**
 - Carry the seam ID in a comment: `// [SEAM-gw-rl-01]`.
 - Cited in CONTEXT.md under `enforced-by`.
 
-**Green baseline rule:** Before any refactor execution begins, all relevant existing tests must be green, including every touched firm-seam test. A relevant pre-existing failure blocks execution because the workflow cannot distinguish baseline failure from regression. Unrelated failures may be recorded and excluded only with concrete scope evidence. Any new characterization tests must also pass against the unchanged implementation before they are cycle-locked.
+**Green baseline rule:** Before any refactor begins, all firm-seam tests must be green. A refactor without a green baseline has no safety net.
 
 ## Soft-seam tests (disposable)
 
@@ -32,24 +32,9 @@ A soft-seam test is coupled to implementation structure. It tests internal units
 
 **Rules for soft-seam tests:**
 - Written alongside implementation.
-- May be rewritten or deleted during a refactor cycle unless cycle-locked. No approval needed after an applicable lock expires.
+- May be rewritten or deleted during a refactor cycle. No approval needed.
 - Should NOT be written for trivial getter/setter mechanics — only for non-trivial logic.
 - Do NOT cite seam IDs (they don't pin a contract).
-
-## Characterization tests and cycle locks
-
-A characterization test records **observed current behavior** so a selected refactor can prove it preserved that behavior. It does not declare that the behavior is desirable, fix a bug, or make a soft seam firm.
-
-Characterization tests follow these rules:
-- During a refactor audit, identify coverage gaps but do not create or edit tests. Characterization tests may be added only after the user selects exact refactor opportunities.
-- Run each new characterization test against the unchanged implementation. It must pass before implementation starts; otherwise the claimed baseline is not established.
-- Classify the seam normally. A characterization test at a soft/internal seam remains a soft-seam test. If it enforces an existing firm criterion, it follows all firm-seam rules and carries that seam ID.
-- After its passing baseline is recorded, **cycle-lock** the test for the selected refactor cycle. A cycle lock is a temporary immutability rule: the test may not be edited, weakened, or deleted to make that refactor pass.
-- In the refactor maintenance workflow, list the test in an implementation unit's `lockedTestFiles`; the `implementation-checkpoint.mjs` green baseline snapshot records and enforces the lock.
-- A cycle-locked test failure is evidence of behavior drift. Stop and correct the implementation or route an intended behavior change to `architect`; do not change the test.
-- The lock lasts through every selected batch, full verification, and final review. After the workflow is archived, an underlying soft-seam test again has normal disposable durability; a firm-seam test remains a permanent safety net.
-
-Cycle lock is orthogonal to firmness. Firmness describes contract durability; cycle lock protects the evidence for one behavior-preserving maintenance cycle.
 
 ## Practical guidance for `plan`
 

@@ -15,7 +15,7 @@
     {
       "title": "Maintenance",
       "description": "On-demand tools for keeping specs and code in sync.",
-      "skills": ["refactor", "verify", "what-now"]
+      "skills": ["verify", "what-now"]
     }
   ]
 }
