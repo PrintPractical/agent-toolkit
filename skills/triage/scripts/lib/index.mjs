@@ -253,6 +253,79 @@ export function listActiveChanges(repoRoot = process.cwd()) {
   });
 }
 
+// ── Independent review log ──────────────────────────────────────────────────
+// A deliberately small, snapshot-free record of the independent review/fix
+// cycle. Each change stores an append-only list of review entries. There is no
+// content hashing, file locking, epoch, or Git-index inspection here: the entry
+// is an attestation that a distinct reviewer looked at the work and reached a
+// verdict. The gate reads the latest entry per stage to decide readiness.
+
+export const REVIEW_STAGES = ['implement', 'refactor'];
+export const REVIEW_ROLES = ['auditor', 'verifier'];
+export const REVIEW_VERDICTS = ['approved', 'changes-requested'];
+
+export function reviewsPath(id, repoRoot = process.cwd()) {
+  return path.join(changeDir(id, repoRoot), 'reviews.json');
+}
+
+/**
+ * Read the review entries for a change. Returns [] when none exist.
+ */
+export function readReviews(id, repoRoot = process.cwd()) {
+  const rp = reviewsPath(id, repoRoot);
+  if (!fs.existsSync(rp)) return [];
+  const parsed = JSON.parse(fs.readFileSync(rp, 'utf8'));
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Corrupt reviews file (expected an array): ${rp}`);
+  }
+  return parsed;
+}
+
+/**
+ * Append a review entry and persist. Returns the written entry.
+ */
+export function appendReview(id, entry, repoRoot = process.cwd()) {
+  const reviews = readReviews(id, repoRoot);
+  reviews.push(entry);
+  const rp = reviewsPath(id, repoRoot);
+  fs.mkdirSync(path.dirname(rp), { recursive: true });
+  fs.writeFileSync(rp, JSON.stringify(reviews, null, 2) + '\n', 'utf8');
+  return entry;
+}
+
+/**
+ * The most recent review entry for a stage, or null.
+ */
+export function latestReview(id, stage, repoRoot = process.cwd()) {
+  const reviews = readReviews(id, repoRoot).filter(r => r.stage === stage);
+  return reviews.length ? reviews[reviews.length - 1] : null;
+}
+
+/**
+ * Whether a stage's review gate is satisfied.
+ *
+ * Ready requires: the latest entry for the stage is an `approved` `verifier`
+ * verdict, AND a prior `auditor` entry exists in the same stage whose reviewer
+ * label differs from that verifier. This encodes the two-fresh-reviewer
+ * separation (an auditor found work; a distinct verifier approved it) without
+ * any file tracking. Returns { ready, reason }.
+ */
+export function reviewGateReady(id, stage, repoRoot = process.cwd()) {
+  const staged = readReviews(id, repoRoot).filter(r => r.stage === stage);
+  if (staged.length === 0) {
+    return { ready: false, reason: `no ${stage} review recorded` };
+  }
+  const latest = staged[staged.length - 1];
+  if (latest.verdict !== 'approved' || latest.role !== 'verifier') {
+    return { ready: false, reason: `latest ${stage} review is not an approved verifier verdict (got ${latest.role}/${latest.verdict})` };
+  }
+  const auditor = staged.find(r => r.role === 'auditor' && r.reviewer && r.reviewer !== latest.reviewer);
+  if (!auditor) {
+    return { ready: false, reason: `no auditor review from a reviewer distinct from the approving verifier '${latest.reviewer}'` };
+  }
+  return { ready: true, reason: `approved by verifier '${latest.reviewer}'` };
+}
+
 // ── Git utilities ─────────────────────────────────────────────────────────────
 
 /**
@@ -316,8 +389,8 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
 
 // ── Stage ordering ─────────────────────────────────────────────────────────────
 
-export const STAGES = ['architect', 'specify', 'plan', 'implement', 'done'];
-export const GATES  = ['architect', 'specify', 'plan', 'implement', 'docs'];
+export const STAGES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'done'];
+export const GATES  = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
 
 export function stageIndex(stage) {
   return STAGES.indexOf(stage);
@@ -332,6 +405,16 @@ export function nextSkill(manifest) {
   // Epics: architect → specify → decompose → done (no plan/implement)
   if (manifest.class === 'epic') {
     return epicNextAction(manifest);
+  }
+
+  // Refactor changes audit, obtain selection approval, execute the selected
+  // cleanup with independent review, and reconcile docs without entering the
+  // spec spine.
+  if (manifest.class === 'refactor') {
+    if (stage === 'refactor' && gates.refactor !== 'approved') return 'refactor (audit and selection)';
+    if (stage === 'implement' && gates.implement !== 'approved') return 'refactor (execute selected batches)';
+    if (stage === 'implement' && gates.implement === 'approved' && gates.docs !== 'approved') return 'refactor (docs reconciliation)';
+    return null;
   }
 
   if (stage === 'architect' && gates.architect !== 'approved') return 'architect';

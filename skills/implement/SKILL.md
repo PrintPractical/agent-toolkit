@@ -1,11 +1,11 @@
 ---
 name: implement
-description: Use after plan gate is approved to execute the task checklist in plan.md. Follows red-green-refactor discipline per section, enforces the firm-seam test tripwire, logs kickbacks on flaws, and reconciles CONTEXT.md files when done. Do not run unless the plan gate is approved.
+description: Use after plan gate is approved to execute the task checklist in plan.md. Implements each section to a green test baseline, then runs one independent review-and-refactor pass (fresh auditor + verifier subagents) over the whole change before the implement gate. Enforces the firm-seam test tripwire, logs kickbacks on flaws, and reconciles CONTEXT.md files when done. Do not run unless the plan gate is approved.
 ---
 
 # Implement
 
-You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make **zero decisions** here. If something requires a decision, stop — that is a kickback.
+You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make **zero product/contract/scope decisions** here. If something requires such a decision, stop — that is a kickback. Local, behavior-preserving quality decisions during the review-and-refactor pass are part of the job.
 
 ## Running the helper scripts
 
@@ -19,9 +19,9 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-The implementer follows the plan. It does not interpret, improvise, or "make reasonable assumptions." Any ambiguity encountered is a defect in the spec process and triggers a kickback. The plan was written to be detailed enough that you should never need to guess.
+The implementer follows the plan. It does not interpret, improvise, or "make reasonable assumptions" about behavior, contracts, or scope. Any such ambiguity is a defect in the spec process and triggers a kickback.
 
-However: the refactor cycle is not optional. Code quality is part of your job. After implementing each section, you look critically at what you wrote and improve it using the idioms pack — before moving to the next section.
+Code quality is still your job, but it is **not** done per section. Each section is implemented to a green test baseline; the single behavior-preserving review-and-refactor pass happens once, after all sections are green, driven by fresh independent reviewers (see `references/implementation-review.md`).
 
 ## Preconditions
 
@@ -30,9 +30,9 @@ Load `manifest.yaml`. Verify:
 - `gates.implement` is `pending`.
 - `plan.md` exists.
 
-If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the refactor cycles. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the review-and-refactor pass. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
-## The loop: per section
+## The loop: per section (implement → tests green)
 
 Work through `plan.md` one section at a time. For each section:
 
@@ -44,41 +44,59 @@ Find all test tasks labeled `[firmness: firm]` in this section. Write those test
 
 Write the implementation tasks from the plan. Work the checklist top to bottom. Check off each task in `plan.md` as you complete it (update the file with `[x]`). Goal: get firm-seam tests green.
 
-### Step 3: Write soft-seam tests
+### Step 3: Write soft-seam tests and reach a green baseline
 
-Write any test tasks labeled `[firmness: soft]` in this section.
+Write any test tasks labeled `[firmness: soft]` in this section. Run the tests; the section must reach a green baseline before you move on. Do **not** refactor here — that happens once, below. Check off the section's verify task and repeat for the next section.
 
-### Step 4: Refactor cycle
+## After all sections complete
 
-This is mandatory. Review the section's implementation:
-- Dead code, unused variables, unused imports
-- Repetitive code that should be extracted into a named function
-- Functions or modules carrying multiple responsibilities that would become clearer with named boundaries
-- Control flow whose nesting or branching obscures invariants, error paths, or the main operation
-- Idioms violations from the idioms pack (if language is set)
-- Missing error handling for paths that can fail
-- Reachable placeholders, unconditional failures, or suppressed errors that are not part of an approved fail-fast policy
+### Independent review & behavior-preserving refactor (L3)
 
-Apply refactors. Rules during refactor:
-- **Firm-seam tests must remain green at all times.** If a firm-seam test fails after a refactor, STOP. This is not a test problem — the refactor changed behavior. That means it is not a pure refactor. Kickback (see below).
-- Soft-seam tests may be rewritten to match the new structure. This is expected.
+This runs **once**, over the whole change, and gates the implement gate. Full detail is in `references/implementation-review.md`.
 
-### Step 5: Run tests — must pass
+1. **Fresh auditor subagent.** Launch a read-only subagent in a separate context (not you, the implementer). Give it the diff, the relevant CONTEXT/seams, and instruct it to load `references/idioms/<lang>.md` for every language in scope and review against it. It must actively hunt for:
+   - unsafe / panic-prone code (e.g. Rust `.unwrap()`/`.expect()`/`panic!` on I/O, parsing, input, locks, task joins; swallowed errors),
+   - idiom-pack violations,
+   - oversized / monolithic modules and other structural bloat,
+   - hygiene issues (dead code, debug prints, stray TODOs).
 
-Run the full test suite (or the relevant subset if the project supports it). Tests must pass before moving to the next section. If they fail, fix them. If fixing requires a decision that's not in the plan, kickback.
+   Record its findings:
+   ```
+   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --role auditor \
+     --reviewer "<auditor label>" --verdict changes-requested \
+     --finding "<file:line> [safety|idioms|structure|hygiene] <required action>"
+   ```
+   If the work genuinely needs no cleanup, the auditor may record `--verdict approved` with a stated rationale.
 
-### Step 6: Mark section complete
+2. **Apply behavior-preserving cleanup** for the findings. Change only implementation and soft-seam tests. **Firm-seam tests must stay green at all times** — a firm-seam failure means behavior changed: STOP and kick back (it is not a pure refactor). Soft-seam tests may be rewritten to match the new structure.
 
-Check off the refactor cycle and test run tasks in `plan.md`.
+3. **Full green run.** Run the full test suite (or relevant subset). It must pass after the refactor.
 
-Repeat for each section.
+4. **Fresh verifier subagent.** Launch a *distinct* read-only subagent (not you and not the auditor). It re-loads the idiom packs, confirms the auditor's findings are resolved or explicitly deferred, and confirms behavior is preserved. Its reviewer label must differ from the auditor's:
+   ```
+   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --role verifier \
+     --reviewer "<distinct verifier label>" --verdict approved
+   ```
+   A `changes-requested` verdict returns to step 2 with a new fresh reviewer.
+
+### Implement gate
+
+When all sections are green, the review-and-refactor pass is done, and an approved verifier review is recorded:
+
+> "All implementation sections are complete, tests pass, and the independent review is approved. Do you approve the implement gate?"
+
+```
+node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate implement --approve
+```
+
+The gate refuses unless an approved verifier review (backed by a distinct auditor review) exists for this change.
 
 ## Kickback protocol
 
 When you encounter:
 - An ambiguity the plan did not cover
 - A decision you'd have to make (any non-trivial choice)
-- A firm-seam test that fails during a refactor (behavior change)
+- A firm-seam test that fails during the refactor pass (behavior change)
 - A conflict between the plan and reality that requires resolving
 
 **STOP IMMEDIATELY.** Do not proceed. Do not improvise.
@@ -93,18 +111,6 @@ node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --s
    This records an unresolved kickback, returns the stage to `specify`, and resets the `specify` and `plan` gates to `pending`.
 4. Tell the user: **run `specify` to resolve this, then re-run `plan` to update the checklist, then resume `implement`.**
 5. Do not continue this session until the kickback is resolved.
-
-## After all sections complete
-
-### Implement gate
-
-When all non-reconciliation tasks are checked off and tests pass:
-
-> "All implementation sections are complete and tests pass. Do you approve the implement gate?"
-
-```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate implement --approve
-```
 
 ### Docs reconciliation (docs gate)
 
@@ -150,9 +156,10 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 
 ## Reference files
 
+- `references/implementation-review.md` — the independent review-and-refactor model, roles, and review record
 - `references/seam-and-test-taxonomy.md` — firm/soft test rules, tripwire
 - `references/manifest-schema.md` — kickback types
 - `references/change-lifecycle.md` — docs reconciliation + archive
 - `references/firm-change-protocol.md` — if a firm seam must change
 - `references/drift-control.md` — CONTEXT.md update rules
-- `references/idioms/<lang>.md` — refactor cycle guidance
+- `references/idioms/<lang>.md` — review-and-refactor guidance

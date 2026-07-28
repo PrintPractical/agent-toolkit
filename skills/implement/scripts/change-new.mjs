@@ -31,29 +31,35 @@ const { values } = parseArgs({
     class:    { type: 'string', default: 'feature' },
     language: { type: 'string', default: '' },
     parent:   { type: 'string', default: '' },  // epic change ID
+    mode:     { type: 'string', default: 'execute' }, // refactor: execute | audit-only
   },
   strict: true,
 });
 
 if (values.help) {
-  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
+  console.log('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic|refactor] [--language <idiom-pack-id>] [--parent <epic-id>] [--mode execute|audit-only]');
   process.exit(0);
 }
 
 if (!values.title) {
-  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic] [--language <idiom-pack-id>] [--parent <epic-id>]');
+  console.error('Usage: change-new.mjs --title "<title>" [--class feature|bug|small|epic|refactor] [--language <idiom-pack-id>] [--parent <epic-id>] [--mode execute|audit-only]');
   process.exit(1);
 }
 
-const validClasses = ['feature', 'bug', 'small', 'epic'];
+const validClasses = ['feature', 'bug', 'small', 'epic', 'refactor'];
 if (!validClasses.includes(values.class)) {
   console.error(`Invalid class: ${values.class}. Must be one of: ${validClasses.join(', ')}`);
   process.exit(1);
 }
 
-// Children of an epic must be feature/bug/small, not another epic
-if (values.parent && values.class === 'epic') {
-  console.error('Error: an epic cannot be a child of another epic. Use class feature, bug, or small.');
+// Children of an epic must be feature/bug/small, not another epic or a refactor
+if (values.parent && (values.class === 'epic' || values.class === 'refactor')) {
+  console.error(`Error: a ${values.class} cannot be a child of an epic. Use class feature, bug, or small.`);
+  process.exit(1);
+}
+
+if (values.class === 'refactor' && !['execute', 'audit-only'].includes(values.mode)) {
+  console.error(`Invalid --mode: ${values.mode}. Must be execute or audit-only.`);
   process.exit(1);
 }
 
@@ -80,24 +86,32 @@ console.error(`Creating change: ${id}`);
 fs.mkdirSync(dir, { recursive: true });
 
 // Epics only use architect + specify gates. They never run plan/implement/docs.
+// Refactors skip the spec spine: refactor (audit + selection) → implement → docs.
 const gates = values.class === 'epic'
   ? { architect: 'pending', specify: 'pending' }
+  : values.class === 'refactor'
+  ? { refactor: 'pending', implement: 'pending', docs: 'pending' }
   : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' };
+
+const isRefactor = values.class === 'refactor';
 
 const manifest = {
   id,
   title: values.title,
   class: values.class,
-  stage: 'architect',
+  stage: isRefactor ? 'refactor' : 'architect',
   language: values.language,
   ...(values.parent ? { parent: values.parent } : {}),
   ...(values.class === 'epic' ? { children: [] } : {}),
+  ...(isRefactor ? { refactor_mode: values.mode, refactor_selected_ids: [] } : {}),
   gates,
-  artifacts: {
-    architecture: 'architecture.md',
-    decisions:    'decisions.md',
-    plan:         'plan.md',
-  },
+  artifacts: isRefactor
+    ? { refactor: 'refactor.md' }
+    : {
+        architecture: 'architecture.md',
+        decisions:    'decisions.md',
+        plan:         'plan.md',
+      },
   context_targets: ['CONTEXT.md'],
   kickbacks: [],
 };
@@ -113,6 +127,9 @@ if (values.parent) {
 } else if (values.class === 'epic') {
   console.error(`Stage: architect — run the 'architect' skill next`);
   console.error(`  Epic flow: architect → specify → (auto-decompose into children)`);
+} else if (isRefactor) {
+  console.error(`Stage: refactor — run the 'refactor' skill next`);
+  console.error(`  Refactor flow: refactor (audit + selection) → implement (execute + review) → docs`);
 } else {
   console.error(`Stage: architect — run the 'architect' skill next`);
 }

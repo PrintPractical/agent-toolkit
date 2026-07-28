@@ -22,7 +22,9 @@ plan     → plan.md (live checklist)
     ↓
 plan gate approved
     ↓
-implement → code + tests green, live checklist updated
+implement → per section: code + tests green, live checklist updated
+    ↓         then once, over the whole change: independent review →
+    ↓         behavior-preserving refactor → tests still green → fresh verifier approves
     ↓
 implement gate approved
     ↓
@@ -89,6 +91,22 @@ The reconciliation process:
 6. Present summary to user. User approves (docs gate → approved) or requests corrections.
 
 Only after docs gate is approved does `change-archive.mjs` run.
+
+## Independent implementation review (implement gate)
+
+Before the implement gate can be approved, every change (standard, triage, and refactor) passes one independent review-and-refactor pass over the finished work — described in full in `implementation-review.md`:
+
+1. Bring all implementation to a green test baseline (standard changes do this per plan section; a refactor's selected cleanup is the work itself).
+2. A **fresh auditor subagent** reviews the whole change against the language idiom packs, flagging unsafe/panic-prone code, non-idiomatic patterns, oversized/monolithic modules, and hygiene issues, and records findings with `review-log.mjs`.
+3. Apply behavior-preserving cleanup for those findings. Firm-seam tests stay green throughout; a firm-seam failure is a kickback, never a test edit.
+4. Run the full suite green, then a **distinct fresh verifier subagent** confirms behavior is preserved and approves with `review-log.mjs`.
+5. `manifest-gate.mjs --gate implement --approve` refuses until that approved verifier review exists.
+
+This is intentionally snapshot-free: the review record in `.changes/active/<id>/reviews.json` is an attestation, with no per-file hashing, locking, or index checks.
+
+## Refactor class lifecycle
+
+A `class: refactor` change skips the spec spine: `refactor` (audit the scope, rank opportunities in `refactor.md`, record the user's explicit `RF-NNN` selection) → `implement` (apply the selected cleanup with the independent review above) → `docs`. It never changes observable behavior; anything that would is escalated to `architect`. See `implementation-review.md` for the audit roles, opportunity schema, and boundaries.
 
 ## Tracking multiple concurrent changes
 

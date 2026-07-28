@@ -19,7 +19,31 @@ import {
   GATES,
   STAGES,
   nextSkill,
+  reviewGateReady,
 } from './lib/index.mjs';
+
+// Which gates are meaningful for each change class. A refactor never enters the
+// spec spine; an epic never plans or implements directly.
+const ALLOWED_GATES = {
+  refactor: ['refactor', 'implement', 'docs'],
+  epic:     ['architect', 'specify', 'docs'],
+};
+
+function allowedGatesFor(manifest) {
+  return ALLOWED_GATES[manifest.class] || ['architect', 'specify', 'plan', 'implement', 'docs'];
+}
+
+// The independent-review stage a gate depends on. Only the implement gate is
+// review-gated, and only for the classes that run the full review-and-refactor
+// pass: a refactor records under 'refactor', a feature under 'implement'. The
+// lightweight triage classes (small, bug) and epics are exempt. Returns null
+// when the gate needs no review.
+function reviewStageForGate(manifest, gate) {
+  if (gate !== 'implement') return null;
+  if (manifest.class === 'refactor') return 'refactor';
+  if (manifest.class === 'feature') return 'implement';
+  return null;
+}
 
 const { values } = parseArgs({
   options: {
@@ -81,6 +105,12 @@ if (!GATES.includes(values.gate)) {
   process.exit(1);
 }
 
+const allowedGates = allowedGatesFor(manifest);
+if (!allowedGates.includes(values.gate)) {
+  console.error(`Gate '${values.gate}' does not apply to a '${manifest.class || 'feature'}' change. Allowed: ${allowedGates.join(', ')}`);
+  process.exit(1);
+}
+
 if (values.approve && values.reset) {
   console.error('Cannot use --approve and --reset together');
   process.exit(1);
@@ -90,17 +120,44 @@ const currentStatus = manifest.gates?.[values.gate] ?? 'pending';
 
 if (values.approve) {
   manifest.gates = manifest.gates || {};
+
+  // ── Approval preconditions (no file tracking; ordering + review only) ──
+
+  // Ordering: for classes that implement, docs cannot precede implement.
+  if (values.gate === 'docs' && allowedGates.includes('implement') && manifest.gates.implement !== 'approved') {
+    console.error(`Cannot approve the docs gate before the implement gate is approved for '${values.id}'.`);
+    process.exit(1);
+  }
+
+  // Implement (or a refactor's execution) requires an approved independent review.
+  const reviewStage = reviewStageForGate(manifest, values.gate);
+  if (reviewStage) {
+    const gate = reviewGateReady(values.id, reviewStage, repoRoot);
+    if (!gate.ready) {
+      console.error(`Cannot approve the ${values.gate} gate: independent review not satisfied — ${gate.reason}.`);
+      console.error(`Record a fresh auditor review and a distinct verifier approval with review-log.mjs (stage ${reviewStage}).`);
+      process.exit(1);
+    }
+  }
+
   manifest.gates[values.gate] = 'approved';
 
   // Auto-advance stage when a gate is approved.
   // Epics follow a different progression: architect → specify → (decompose) → done
   // They never advance to plan or implement.
   const isEpic = manifest.class === 'epic';
+  const isRefactor = manifest.class === 'refactor';
 
   const gateToStageMap = isEpic
     ? {
         architect: 'specify',
         specify:   'specify', // epics stay at specify until decomposed; epic-split drives done
+        docs:      'done',
+      }
+    : isRefactor
+    ? {
+        refactor:  'implement', // audit/selection approved → execute
+        implement: 'implement', // stays implement until docs also approved
         docs:      'done',
       }
     : {

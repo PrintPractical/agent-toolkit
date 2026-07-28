@@ -90,12 +90,14 @@ Save to `.changes/active/<id>/plan.md` if using the full change workspace.
 
 ## Phase 5: Execute + refactor
 
-Implement the tasks. Then do a quick refactor pass:
+Implement the tasks. Then do a quick refactor pass (triage is the lightweight ramp — no formal independent-review gate):
 - Did the fix introduce any new debt?
 - Is there a cleaner way to express this?
-- Check the idioms pack for anything relevant.
+- Check the idioms pack for anything relevant — especially unsafe/panic-prone code (e.g. Rust `.unwrap()`/`.expect()` on I/O), swallowed errors, and oversized modules.
 
 Run tests — must pass.
+
+If the fix grows beyond a small isolated change, stop and route it to the full `architect` spine or the `refactor` skill instead.
 
 ## Phase 6: Docs (if needed)
 

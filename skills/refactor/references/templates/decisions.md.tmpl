@@ -1,0 +1,65 @@
+# Decisions — {{change-title}}
+
+**Change ID:** {{id}}
+**Architecture ref:** architecture.md
+**Date:** {{date}}
+
+## Interface Changes
+
+{{Explicit list of every interface added, removed, or modified by this change. This is the contract surface — must be complete before plan runs.}}
+
+### Interface: {{interface-name}}
+
+**Change type:** new | modified | removed
+**Definition:**
+```
+{{type signature, message format, protocol definition, file schema — whatever is appropriate for the language/stack}}
+```
+**Notes:** {{Any non-obvious semantics, error conditions, or migration notes.}}
+
+<!-- Repeat for each interface change. If none, state "None." -->
+
+## Interview Log
+
+{{One entry per Q&A from the one-question-at-a-time disambiguation interview. Includes challenges raised and their resolutions.}}
+
+### Q{{n}}: {{question}}
+
+**Answer:** {{what was decided}}
+**Challenge raised:** {{yes: what was challenged | no}}
+**Challenge resolution:** {{accepted | override (user approved) | alternative chosen}}
+**Override note (if any):** {{what the agent recommended vs. what the user decided}}
+
+<!-- Repeat for each interview question -->
+
+## Dry-Run Findings
+
+{{Results from the "implement-as-if" dry-run subagent. Ambiguities found and how they were resolved before plan was written.}}
+
+**Dry-run status:** clean | had-ambiguities (resolved)
+
+{{#if ambiguities}}
+### Ambiguity {{n}}: {{description}}
+
+**Found by:** dry-run subagent
+**Iteration:** {{which dry-run pass: 1, 2, …}}
+**Resolution:** {{what was decided}}
+**Interview questions added:** {{list of Q&As added to resolve this, or "n/a"}}
+{{/if}}
+
+## Architecture Reconciliation
+
+{{Notes on any disparities found between this decisions document and architecture.md, and how they were resolved. If architecture.md was updated, note what changed.}}
+
+**Disparities found:** {{0 | list}}
+**architecture.md updated:** {{yes | no}}
+
+## Acceptance Criteria Confirmed
+
+{{Confirmation that every seam in architecture.md with firmness: firm has at least one AC entry in CONTEXT.md or architecture.md, and that each AC will be covered by a test task in plan.md.}}
+
+| Seam ID | AC ID | Covered in plan | Test type |
+|---|---|---|---|
+| SEAM-{{id}}-01 | AC-{{id}}-01 | yes | firm-seam / behavioral |
+
+<!-- Fill after plan is complete. -->

@@ -251,16 +251,23 @@ describe('nextSkill', () => {
     const m = { stage: 'done', gates: {} };
     assert.equal(nextSkill(m), null);
   });
+
+  it('routes a refactor class through audit → execute → docs', () => {
+    assert.match(nextSkill({ class: 'refactor', stage: 'refactor', gates: { refactor: 'pending' } }), /refactor \(audit/);
+    assert.match(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'pending' } }), /execute/);
+    assert.match(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'approved', docs: 'pending' } }), /docs/);
+    assert.equal(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), null);
+  });
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 describe('constants', () => {
   it('STAGES contains expected values in order', () => {
-    assert.deepEqual(STAGES, ['architect', 'specify', 'plan', 'implement', 'done']);
+    assert.deepEqual(STAGES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'done']);
   });
 
   it('GATES contains expected values', () => {
-    assert.deepEqual(GATES, ['architect', 'specify', 'plan', 'implement', 'docs']);
+    assert.deepEqual(GATES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs']);
   });
 });

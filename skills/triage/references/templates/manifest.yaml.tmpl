@@ -1,11 +1,16 @@
 id: "{{id}}"
 title: "{{title}}"
-class: feature  # feature | bug | small | epic
-stage: architect  # architect | specify | plan | implement | done
+class: feature  # feature | bug | small | epic | refactor
+stage: architect  # refactor | architect | specify | plan | implement | done
 language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty for language-agnostic
 
 # parent: "{{epic-id}}"   # uncomment for child changes; set to the epic's change ID
 # children: []            # uncomment for epic manifests; populated by epic-split.mjs
+
+# Refactor class only (use change-new.mjs --class refactor to scaffold):
+# refactor_mode: execute        # execute | audit-only
+# refactor_selected_ids: []     # user-approved RF-NNN opportunity IDs from refactor.md
+# For a refactor, gates are { refactor, implement, docs } and artifacts is { refactor: refactor.md }.
 
 gates:
   architect:  pending

@@ -43,6 +43,7 @@ const ALL_SHARED = [
   { src: '_shared/context-schema.md',           dest: 'context-schema.md' },
   { src: '_shared/manifest-schema.md',          dest: 'manifest-schema.md' },
   { src: '_shared/seam-and-test-taxonomy.md',   dest: 'seam-and-test-taxonomy.md' },
+  { src: '_shared/implementation-review.md',    dest: 'implementation-review.md' },
   { src: '_shared/change-lifecycle.md',         dest: 'change-lifecycle.md' },
   { src: '_shared/drift-control.md',            dest: 'drift-control.md' },
   { src: '_shared/firm-change-protocol.md',     dest: 'firm-change-protocol.md' },
@@ -54,6 +55,7 @@ const ALL_TEMPLATES = [
   { src: '_templates/architecture.md.tmpl',     dest: 'templates/architecture.md.tmpl' },
   { src: '_templates/decisions.md.tmpl',        dest: 'templates/decisions.md.tmpl' },
   { src: '_templates/plan.md.tmpl',             dest: 'templates/plan.md.tmpl' },
+  { src: '_templates/refactor.md.tmpl',         dest: 'templates/refactor.md.tmpl' },
   { src: '_templates/reforge-seed.md.tmpl',     dest: 'templates/reforge-seed.md.tmpl' },
   { src: '_templates/architect-seed.md.tmpl',   dest: 'templates/architect-seed.md.tmpl' },
 ];
@@ -101,6 +103,11 @@ const SYNC_MAP = {
     { src: '_templates/plan.md.tmpl',         dest: 'templates/plan.md.tmpl' },
     ...ALL_IDIOMS,
   ],
+  refactor: [
+    ...ALL_SHARED,
+    ...ALL_TEMPLATES,
+    ...ALL_IDIOMS,
+  ],
   triage: [
     ...ALL_SHARED,
     { src: '_templates/manifest.yaml.tmpl',   dest: 'templates/manifest.yaml.tmpl' },
@@ -143,6 +150,7 @@ const SCRIPT_FILES = [
   'context-discover.mjs',
   'context-verify.mjs',
   'kickback-log.mjs',
+  'review-log.mjs',
   'epic-split.mjs',
 ];
 

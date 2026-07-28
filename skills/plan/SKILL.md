@@ -39,8 +39,8 @@ Load `architecture.md` and `decisions.md` fully.
 Divide the implementation into logical sections. Rules:
 - Each section is independently executable. The implementer reads only the section they're working on.
 - Sections map to components, features, or layers — not to arbitrary line counts.
-- Each section ends with a refactor cycle + green test check.
-- The final section is always docs reconciliation (non-negotiable).
+- Each section ends at a green test baseline (no per-section refactor).
+- After the last implementation section, the plan has one **review section** (independent review + behavior-preserving refactor over the whole change), then docs reconciliation (non-negotiable).
 
 Present the proposed section breakdown to the user before writing the full plan. Get acknowledgment.
 
@@ -60,10 +60,14 @@ For each section, from `references/templates/plan.md.tmpl`:
 - Include enough detail that a cheap model can execute it without context: what to add, what signature, what the function does, which error types to use.
 - Reference the decision or acceptance criterion being implemented: `(implements [SEAM-<id>])` or `(per decisions.md Q<n>)`.
 
-### Refactor cycle tasks (required for every section)
-- `[ ] Review <section> implementation: identify poor choices, repetitive code, deep functions, idioms violations`
-- `[ ] Apply refactors (soft-seam tests may be rewritten; firm-seam tests must remain green)`
-- `[ ] Run tests — must pass before moving to next section`
+### Verify task (every section)
+- `[ ] Run tests — section reaches a green baseline`
+
+### Review section tasks (once, after all sections)
+- `[ ] Fresh auditor subagent reviews the change against the idiom packs (safety/unsafe, idioms, structure, hygiene); record with review-log.mjs`
+- `[ ] Apply behavior-preserving cleanup for the findings (firm-seam tests stay green)`
+- `[ ] Full test suite green after refactor`
+- `[ ] Distinct fresh verifier subagent approves with review-log.mjs`
 
 ## Phase 3: Traceability check
 

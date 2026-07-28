@@ -42,11 +42,9 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 - [ ] {{specific task}} — `{{target file}}`
 
-### Refactor cycle
+### Verify
 
-- [ ] Review section 1 implementation: identify poor choices, repetitive code, deep functions
-- [ ] Apply refactors (soft-seam tests may be rewritten; firm-seam tests must remain green)
-- [ ] Run tests — must pass before moving to section 2
+- [ ] Run tests — section reaches a green baseline before the next section
 
 ---
 
@@ -62,15 +60,27 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 - [ ] {{task}}
 
-### Refactor cycle
+### Verify
 
-- [ ] Review section 2 implementation
-- [ ] Apply refactors
-- [ ] Run tests — must pass before moving to section 3
+- [ ] Run tests — section reaches a green baseline
 
 ---
 
-<!-- Add sections as needed. Each section must end with its own refactor cycle and green tests. -->
+<!-- Add sections as needed. Each section ends at a green test baseline. There is NO per-section refactor: the single behavior-preserving review-and-refactor pass runs once, below, after all sections are green. -->
+
+---
+
+## Review section: Independent review & behavior-preserving refactor
+
+> **Triggered by:** all implementation sections green.
+> **Goal:** one review-and-refactor pass over the whole change (see `references/implementation-review.md`). Gates the implement gate.
+
+- [ ] Launch a **fresh auditor subagent** (separate context, not the implementer). It loads the idiom pack(s) for every language in scope and flags unsafe/panic-prone code, idiom violations, oversized/monolithic modules, and hygiene issues.
+- [ ] Record auditor findings: `review-log.mjs record --id {{id}} --stage implement --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding "<file:line> [category] <action>"`
+- [ ] Apply behavior-preserving cleanup for the findings (or record a substantive no-change rationale). Firm-seam tests stay green; a firm-seam failure is a kickback, not a test edit.
+- [ ] Run the full test suite — must be green after refactor.
+- [ ] Launch a **distinct fresh verifier subagent** (not the implementer or auditor). It confirms findings resolved and behavior preserved: `review-log.mjs record --id {{id}} --stage implement --role verifier --reviewer "<distinct label>" --verdict approved`
+- [ ] User approves → implement gate → approved (blocked until the verifier approval is recorded)
 
 ---
 

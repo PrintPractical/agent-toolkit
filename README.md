@@ -9,7 +9,7 @@ Opinionated, spec-driven planning and development skills for greenfield and brow
 ## Install
 
 ```bash
-# All skills (recommended)
+# All skills (recommended) 
 npx skills add PrintPractical/agent-toolkit --all
 
 # Single skill
@@ -34,6 +34,7 @@ Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads 
 | Existing repo with no CONTEXT.md files | `map` |
 | You have a PoC you want to rebuild from scratch | `reforge` |
 | Bug or small isolated fix | `triage` |
+| Behavior-preserving cleanup, technical debt audit, or accumulated sloppiness | `refactor` |
 | New feature, new project, or substantial change | `architect` |
 
 ---
@@ -97,9 +98,11 @@ plan
  └─ approves: plan gate
 
 implement
- └─ per section: write firm-seam tests (red) → implement (green) → refactor cycle
- └─ refactor cycle: poor choices, repetition, deep functions, idioms violations
+ └─ per section: write firm-seam tests (red) → implement (green) → verify green baseline
+ └─ after full implementation: fresh auditor reviews → behavior-preserving refactor → tests stay green → distinct fresh verifier
+ └─ refactor targets: unsafe/panic-prone code, idiom violations, oversized modules, repetition, deep functions
  └─ firm-seam tests must stay green — failure = kickback, not a test edit
+ └─ independent review recorded via review-log.mjs (no per-file snapshot tracking)
  └─ live checklist: checks off tasks as they complete
  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance
  └─ approves: implement gate → docs gate → archives change
@@ -179,7 +182,27 @@ triage
 
 ---
 
-## Flow 5 — PoC to production
+## Flow 5 — Behavior-preserving cleanup (refactor)
+
+**Use when:** several features have accumulated duplication, tangled control flow, weak naming, dead private paths, unsafe/panic-prone code, non-idiomatic code, or oversized modules. Scope may be a path, component, layer, package, or the whole first-party stack.
+
+```
+refactor
+ └─ read-only parallel audit across architecture, behavior, tests, and idioms
+ └─ produces a ranked inventory with stable RF-... opportunity IDs
+ └─ asks you to select exact IDs; audit approval alone never authorizes edits
+ └─ blocks on relevant failing baseline tests or overlapping active work
+ └─ adds minimal characterization tests when current behavior lacks coverage
+ └─ executes selected work in small batches: baseline green → apply → tests stay green
+ └─ fresh auditor records findings, then a distinct fresh verifier confirms (review-log.mjs)
+ └─ reconciles CONTEXT.md and archives the full audit and evidence
+```
+
+`refactor` preserves observable behavior. Bug fixes, product changes, public or firm contract changes, migrations, dependency upgrades, and cross-scope redesign are recorded as architect candidates and must follow the `architect` flow. Firm-seam tests remain immutable; a firm-seam failure during cleanup is a kickback, not a test edit. The independent review is recorded via `review-log.mjs` — no per-file snapshot tracking.
+
+---
+
+## Flow 6 — PoC to production
 
 **Use when:** you built a prototype and want to rebuild the production version from scratch with proper architecture.
 
@@ -200,7 +223,7 @@ reforge (run on the PoC repo)
 
 ---
 
-## Flow 6 — Keeping docs current (verify)
+## Flow 7 — Keeping docs current (verify)
 
 **Use when:** code changed outside the pipeline (hotfixes, external PRs, time has passed).
 
@@ -262,6 +285,8 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
     architecture.md     # architect output
     decisions.md        # specify output
     plan.md             # plan output (live checklist, updated by implement)
+    refactor.md         # ranked audit, selection, batches, and evidence (refactor class)
+    reviews.json        # independent review records (auditor + verifier verdicts)
   archive/<id>.zip      # zipped on completion — agent won't read; humans can
 ```
 
@@ -269,7 +294,7 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
 
 ### Idioms packs
 
-Consulted by `architect`, `specify`, `implement`, `triage`, and `reforge` based on `manifest.language` or the selected target language. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
+Consulted by `architect`, `specify`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
 
 The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** To add a pack, create `_idioms/<lang>.md` using a lowercase kebab-case filename and run `npm run build`; the build discovers and distributes canonical packs automatically. The filename stem is the `manifest.language` value.
 
