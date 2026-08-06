@@ -146,6 +146,7 @@ const SCRIPT_FILES = [
   'change-status.mjs',
   'change-archive.mjs',
   'manifest-gate.mjs',
+  'artifact-validate.mjs',
   'context-scaffold.mjs',
   'context-discover.mjs',
   'context-verify.mjs',

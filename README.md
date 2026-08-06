@@ -83,7 +83,7 @@ architect
  └─ approves: architect gate
 
 specify
- └─ one-question-at-a-time disambiguation interview
+  └─ batched material-decision confirmation with explicit user responses
  └─ nails every interface change, error path, edge case
  └─ implement-as-if dry-run subagent: finds remaining gaps
  └─ produces: .changes/active/<id>/decisions.md

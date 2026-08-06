@@ -5,7 +5,7 @@ description: Use after specify gate is approved to break implementation decision
 
 # Plan
 
-You are running the **plan** stage of the agent-toolkit pipeline. Spine stage 3. Your job is to decompose `architecture.md` + `decisions.md` into a complete, detailed task checklist in `plan.md`. No ambiguity survives into `implement`.
+You are running the **plan** stage of the agent-toolkit pipeline. Spine stage 3. Your job is to decompose confirmed `architecture.md` + `decisions.md` decisions into a complete, detailed task checklist in `plan.md`. No unresolved material ambiguity survives into `implement`.
 
 ## Running the helper scripts
 
@@ -86,10 +86,10 @@ If during planning you find a decision that was not made (a real ambiguity), you
 
 Log the kickback:
 ```
-node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --stage plan --missed "<description>"
+  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --stage plan --impact specify --missed "<description>"
 ```
 
-This returns the change to `specify` and resets the `specify` and `plan` gates. Do not invent answers or continue until the ambiguity is resolved.
+Use `--impact specify` when a material decision is missing. Use `--impact plan` when only checklist traceability or task detail must change; that preserves the specify approval. Do not invent answers or continue until the affected artifact is resolved.
 
 ## Phase 5: Write the file
 
@@ -99,7 +99,7 @@ Write to: `.changes/active/<id>/plan.md`
 
 Present the section count, total task count, firm-seam test count, and traceability check results. Ask:
 
-> "Traceability check passed. All firm seams have test tasks. Do you approve the plan gate? (This will advance to `implement`.)"
+> "Traceability check passed. All firm seams have test tasks. The deterministic artifact validation will run before approval. Do you approve the plan gate? (This will advance to `implement`.)"
 
 On approval:
 ```

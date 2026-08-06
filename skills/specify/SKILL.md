@@ -1,6 +1,6 @@
 ---
 name: specify
-description: Use after architect gate is approved to run the specification stage. Conducts a systematic one-question-at-a-time disambiguation interview, challenges answers, nails all interface changes, then runs an adversarial implement-as-if dry-run subagent to surface remaining ambiguities. Emits decisions.md and reconciles architecture.md. Do not run unless the architect gate is approved.
+description: Use after architect gate is approved to run the specification stage. Batches material decisions with recommendations, requires explicit confirmation of each, finalizes interface changes, then runs an adversarial implement-as-if dry run for unresolved blockers. Emits decisions.md and reconciles architecture.md. Do not run unless the architect gate is approved.
 ---
 
 # Specify
@@ -21,7 +21,7 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-Same adversarial posture as `architect`. Re-read `references/challenge-protocol.md`. Here you are drilling down from architectural decisions to implementation specifics. Challenge every vague answer. The user may override; record it. One question at a time — never pile questions.
+Same adversarial posture as `architect`. Re-read `references/challenge-protocol.md`. Here you are drilling down from architectural decisions to implementation specifics. Recommend the best solution for every material decision, including the rationale. The user makes every material decision explicitly; silence, omission, or an ambiguous grouped reply is never acceptance.
 
 ## Preconditions
 
@@ -44,15 +44,16 @@ Before the interview, extract from `architecture.md`:
 - All interfaces mentioned in the decisions
 - All refactors in scope
 
-List them. These are the ambiguity sources. Each will need at least one interview question.
+List them. These are the ambiguity sources. Ask only about material decisions: contracts, behavior, compatibility, safety, configuration, observability, and firm seams. Use repository conventions for implementation details unless they conflict with a confirmed decision.
 
-## Phase 2: One-question-at-a-time interview
+## Phase 2: Batched decision confirmation
 
-Conduct a systematic disambiguation interview. Rules:
-- One question per message. Wait for the answer before proceeding.
-- After each answer: challenge if it's vague, introduces a smell, or conflicts with the idioms pack. Accept the answer only when it is precise enough to write code from.
-- If the user overrides a challenge: record the override explicitly (challenge raised, user decision, reasoning if given).
-- Stop asking when you genuinely believe zero ambiguities remain.
+Conduct a systematic confirmation interview in concise numbered batches. Rules:
+- Each item states the material question, the agent's recommendation, its rationale, and meaningful alternatives.
+- Require an explicit response for every item: `accept`, choose an alternative, or provide a decision. The user may respond compactly by item number.
+- A missing, vague, or ambiguous answer stays `unresolved`. Follow up only on unresolved items; never infer acceptance from silence.
+- Challenge an answer only when it is vague, introduces a smell, or conflicts with the idioms pack. If the user overrides a challenge, record the recommendation, user decision, and reasoning if given.
+- Stop when every material item is explicitly confirmed. Do not create user questions for implementation details governed by repository convention.
 
 Question categories (cover all that apply):
 1. **Interface definitions** — exact signatures, types, error conditions, edge cases
@@ -65,26 +66,32 @@ Question categories (cover all that apply):
 8. **Observability specifics** — exact metric names, trace spans, log levels
 9. **Refactor scope** — for each approved refactor: exact files/modules, what changes
 
-Keep a running tally of resolved questions. You'll need them for `decisions.md`.
+Keep a confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status. You'll need it for `decisions.md`.
 
 ## Phase 3: Implement-as-if dry run
 
-When you believe the interview is complete, spin off a subagent to act as an implementer and attempt to implement the change *without writing any code* — only describe what they would do and where they get stuck.
+When every material item is confirmed, spin off a subagent to act as an implementer and attempt to implement the change *without writing any code* — only describe what they would do and where they get stuck.
 
 Subagent prompt:
 > "You are implementing the following change. You have architecture.md and decisions.md. Walk through the implementation step by step. At each step, describe what you would write. Flag any ambiguity, missing information, conflicting requirement, or decision you'd have to make on your own. Do not write code — only describe and flag."
 
 Hand the subagent: `architecture.md` + the interview log so far.
 
-**If the dry run finds ambiguities:** add them to the interview queue. Return to Phase 2. Record the iteration number.
+Classify every dry-run finding as one of:
+- `blocker` — cannot implement without a material decision. If it is not already covered by a confirmed choice, add it to the next confirmation batch.
+- `assumption` — a documented implementation assumption that does not change a confirmed decision. Record its disposition; do not reopen the interview.
+- `implementation-detail` — governed by repository convention or implementer judgment. Record its disposition; do not reopen the interview.
+
+If a finding contradicts a confirmed choice, present the conflict explicitly and obtain a new explicit confirmation before replacing that choice. Only unresolved blockers return to Phase 2. Record the iteration number.
 
 **If the dry run is clean:** proceed.
 
 ## Phase 4: Write decisions.md
 
 Fill `decisions.md` from `references/templates/decisions.md.tmpl`. Include:
+- A complete confirmation ledger before the prose decisions
 - All interface changes (complete, exact)
-- Full interview log (Q → resolution, challenges, overrides)
+- Full decision log (batch item → recommendation → explicit resolution, challenges, overrides)
 - Dry-run iteration results
 - Architecture reconciliation notes (any disparities found in architecture.md and how they were fixed)
 
@@ -100,9 +107,9 @@ Compare `decisions.md` against `architecture.md`. If any decision changes, clari
 
 ## Phase 6: Gate
 
-Present a summary: interfaces finalized, questions resolved, dry-run clean. Ask:
+Present the confirmation ledger, interfaces finalized, and dry-run findings. Ask the user to confirm the ledger accurately represents their choices. Then ask:
 
-> "The dry-run passed with no ambiguities. Do you approve the specify gate? (This will advance to `plan`.)"
+> "Every material decision is explicitly confirmed and the dry-run has no unresolved blockers. Do you approve the specify gate? (This will advance to `plan`.)"
 
 On approval:
 ```
@@ -116,13 +123,12 @@ Tell the user: **run `plan` next.**
 If you are running `specify` because `implement` kicked back (not a fresh session), treat it as an amendment session:
 - Load the kickback entry from `manifest.yaml`.
 - Address only the gap identified in the kickback.
-- Run a targeted dry-run covering just that gap.
+- Run a targeted dry-run covering just that gap. Classify findings; only unresolved blockers reopen confirmation.
 - Update `decisions.md` with the new resolution.
 - Reconcile `architecture.md` if needed.
 - Set the latest kickback entry's `resolution` in `manifest.yaml` to the actual decision. Do not leave it empty or use a placeholder such as `pending`.
-- Re-approve the specify gate.
-- Confirm that approval advanced the manifest to `stage: plan`.
-- Remind the user to run `plan` and re-approve its gate after `plan.md` is updated. Do not tell them to resume `implement` while the current stage is `plan`.
+- Re-approve only the invalidated gate(s). A specify-impacting kickback requires specify then plan; a plan-only kickback requires only plan.
+- Confirm the manifest's recommended next stage before telling the user to resume implementation.
 
 ## Reference files
 

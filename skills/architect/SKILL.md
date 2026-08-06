@@ -178,13 +178,13 @@ The subagent should check:
 - Does the observability plan cover the change adequately?
 - Are there dependencies on firm seams of other components that aren't called out?
 
-Present the subagent's findings. Any gaps must be resolved in discussion before proceeding. Record resolutions in the `Validity Check Results` section of `architecture.md`.
+Classify every finding as `blocker`, `assumption`, or `implementation-detail`. Resolve only blockers before proceeding. Record assumptions and implementation details with their disposition; do not reopen architectural discussion for non-blocking findings. Record all findings in the `Validity Check Results` section of `architecture.md`.
 
 ### Phase 5: Gate
 
 Present a summary of decisions, seams, and any approved refactors. Ask the user explicitly:
 
-> "The validity check passed. Do you approve the architect gate? (This will advance the change to `specify`.)"
+> "The validity check has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
 
 On approval:
 ```

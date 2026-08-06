@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node kickback-log.mjs --id <id> --type defect|amendment --stage specify|plan|implement \
- *     --missed "What the spec should have caught" --resolution "What was decided"
+ *     --impact specify|plan|implementation --missed "What the spec should have caught"
  *
  * Output (stdout): JSON { id, kickback, total_defects, frequency }
  * Progress (stderr): human-readable
@@ -15,6 +15,7 @@ import {
   readManifest,
   writeManifest,
   listActiveChanges,
+  kickbackImpact,
 } from './lib/index.mjs';
 
 const { values } = parseArgs({
@@ -25,17 +26,18 @@ const { values } = parseArgs({
     stage:      { type: 'string' },   // specify | plan | implement
     missed:     { type: 'string' },
     resolution: { type: 'string', default: '' },
+    impact:     { type: 'string', default: 'specify' },
   },
   strict: true,
 });
 
 if (values.help) {
-  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --missed "<text>" [--resolution "<text>"]');
+  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
   process.exit(0);
 }
 
 if (!values.id || !values.type || !values.stage || !values.missed) {
-  console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --missed "<text>" [--resolution "<text>"]');
+  console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
   process.exit(1);
 }
 
@@ -59,20 +61,30 @@ try {
   process.exit(1);
 }
 
+let impact;
+try {
+  impact = kickbackImpact(values.impact);
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
 const entry = {
   type:       values.type,
   stage:      values.stage,
   at:         new Date().toISOString(),
   missed:     values.missed,
   resolution: values.resolution || '',
+  impact: impact.impact,
+  invalidated_gates: impact.invalidatedGates.join(','),
+  restart_stage: impact.restartStage,
 };
 
 manifest.kickbacks = manifest.kickbacks || [];
 manifest.kickbacks.push(entry);
-manifest.stage = 'specify';
 manifest.gates = manifest.gates || {};
-manifest.gates.specify = 'pending';
-manifest.gates.plan = 'pending';
+for (const gate of impact.invalidatedGates) manifest.gates[gate] = 'pending';
+manifest.stage = impact.restartStage;
 
 writeManifest(values.id, manifest, repoRoot);
 
@@ -86,14 +98,15 @@ console.error(`  Stage:      ${values.stage}`);
 console.error(`  Missed:     ${values.missed}`);
 if (values.resolution) console.error(`  Resolution: ${values.resolution}`);
 console.error(`  Total defect kickbacks this change: ${defectCount}`);
-console.error(`  Stage:      specify (specify and plan gates reset to pending)`);
+console.error(`  Impact:     ${impact.impact}`);
+console.error(`  Stage:      ${impact.restartStage} (${impact.invalidatedGates.length ? `${impact.invalidatedGates.join(', ')} gate(s) reset` : 'no upstream gates reset'})`);
 
 if (values.type === 'defect') {
   console.error(`\nThis is a DEFECT kickback — the spec process should have caught this.`);
-  console.error(`Run 'specify', then 'plan', before resuming 'implement'.`);
+  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
 } else {
   console.error(`\nThis is an AMENDMENT kickback — legitimate requirement evolution.`);
-  console.error(`Run 'specify', then 'plan', before resuming 'implement'.`);
+  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
 }
 
 process.stdout.write(JSON.stringify({
@@ -102,5 +115,5 @@ process.stdout.write(JSON.stringify({
   total_defects: defectCount,
   frequency,
   stage: manifest.stage,
-  reset_gates: ['specify', 'plan'],
+  reset_gates: impact.invalidatedGates,
 }) + '\n');

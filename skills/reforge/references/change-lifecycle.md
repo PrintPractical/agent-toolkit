@@ -68,15 +68,12 @@ Humans can unzip any archive to understand historical context.
 
 When `implement` discovers a gap the spec didn't anticipate:
 1. Stop immediately. Do not improvise.
-2. Run `kickback-log.mjs` — appends an unresolved entry to `manifest.yaml`, sets `stage` to `specify`, and resets the `specify` and `plan` gates to `pending`.
-3. Run a targeted `specify` amendment session covering only the gap.
-4. `specify` updates `decisions.md`, reconciles `architecture.md` if needed, and records the actual resolution in the kickback entry.
-5. The user re-approves the `specify` gate, which advances the stage to `plan`.
-6. `plan` amends `plan.md` to cover the new decisions without discarding completed checklist items.
-7. The user re-approves the `plan` gate, which advances the stage to `implement`.
-8. `implement` resumes from the checkpoint.
+2. Run `kickback-log.mjs` with an impact: `specify` for a material decision, `plan` for a stale checklist, or `implementation` when no upstream artifact is stale.
+3. Amend only the affected artifact at the recorded restart stage and record the actual resolution in the kickback entry.
+4. Re-approve only invalidated gates; `plan.md` retains completed unaffected checklist items.
+5. `implement` resumes from the checkpoint.
 
-Kickback does not mean restart. It means stop-fix-continue. The checklist survives; already-completed tasks are not re-done.
+Kickback does not mean restart. It means stop-classify-fix-continue. Record `specify`, `plan`, or `implementation` impact; amend only affected artifacts and re-approve only invalidated gates. The checklist survives; already-completed unaffected tasks are not re-done.
 
 ## Docs reconciliation (docs gate)
 

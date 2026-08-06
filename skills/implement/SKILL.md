@@ -105,11 +105,11 @@ When you encounter:
 2. Classify: is this a `defect` (spec should have caught it) or `amendment` (legitimate new info)?
 3. Log the kickback:
 ```
-node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --stage implement \
+  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --stage implement --impact specify|plan|implementation \
   --missed "<what the spec didn't cover>"
 ```
-   This records an unresolved kickback, returns the stage to `specify`, and resets the `specify` and `plan` gates to `pending`.
-4. Tell the user: **run `specify` to resolve this, then re-run `plan` to update the checklist, then resume `implement`.**
+   Choose `specify` when a material decision changes, `plan` when only the checklist is stale, and `implementation` when no upstream artifact is invalidated. The script records the precise restart stage and invalidated gates.
+4. Tell the user to resume at the recorded restart stage and re-approve only invalidated gates.
 5. Do not continue this session until the kickback is resolved.
 
 ### Docs reconciliation (docs gate)
@@ -151,8 +151,8 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 ## Firm-seam tripwire (summary)
 
 **Never edit a firm-seam test to make a refactor pass.** That is the tripwire. It means:
-- The refactor is not a pure refactor (behavior changed) → kickback to `specify`.
-- Or the firm seam itself needs to change → this requires the full firm-change protocol (see `references/firm-change-protocol.md`), a `Firm-Change:` kickback, and re-approval of the specify + plan gates.
+- The refactor is not a pure refactor (behavior changed) → kickback with `--impact specify`.
+- Or the firm seam itself needs to change → this requires the full firm-change protocol (see `references/firm-change-protocol.md`), a `Firm-Change:` kickback, and scoped re-approval of affected gates.
 
 ## Reference files
 

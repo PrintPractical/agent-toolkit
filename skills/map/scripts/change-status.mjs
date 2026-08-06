@@ -57,6 +57,7 @@ for (const id of ids) {
   const skill = nextSkill(manifest);
   const defectKickbacks = (manifest.kickbacks || []).filter(k => k.type === 'defect').length;
   const totalKickbacks = (manifest.kickbacks || []).length;
+  const unresolvedKickback = [...(manifest.kickbacks || [])].reverse().find(k => !k.resolution);
   const isEpic = manifest.class === 'epic';
 
   const status = {
@@ -68,6 +69,7 @@ for (const id of ids) {
     gates: manifest.gates,
     next_skill: skill,
     kickbacks: { defect: defectKickbacks, amendment: totalKickbacks - defectKickbacks, total: totalKickbacks },
+    ...(unresolvedKickback ? { unresolved_kickback: unresolvedKickback } : {}),
     ...(manifest.parent ? { parent: manifest.parent } : {}),
     ...(isEpic ? { epic_status: epicStatus(manifest, repoRoot) } : {}),
   };
@@ -113,6 +115,12 @@ for (const id of ids) {
 
   if (totalKickbacks > 0) {
     console.error(`  Kickbacks:  ${defectKickbacks} defect, ${totalKickbacks - defectKickbacks} amendment`);
+  }
+  if (unresolvedKickback) {
+    const invalidated = Array.isArray(unresolvedKickback.invalidated_gates)
+      ? unresolvedKickback.invalidated_gates
+      : (unresolvedKickback.invalidated_gates || 'specify,plan').split(',');
+    console.error(`  Restart:    ${unresolvedKickback.restart_stage || 'specify'} (${invalidated.join(', ')})`);
   }
 }
 

@@ -4,6 +4,16 @@
 **Architecture ref:** architecture.md
 **Date:** {{date}}
 
+## Confirmation Ledger
+
+Every material decision must have an explicit user response. `unresolved` rows block the specify gate; missing responses are never inferred as acceptance.
+
+| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
+|---|---|---|---|---|---|---|
+| D-001 | {{question}} | {{recommended decision and why}} | {{meaningful alternatives}} | {{accept | selected alternative | supplied decision}} | confirmed | {{selected decision}} |
+
+<!-- Repeat for each material decision. Use `unresolved` until explicitly confirmed. If none, write one row with D-000 and status confirmed. -->
+
 ## Interface Changes
 
 {{Explicit list of every interface added, removed, or modified by this change. This is the contract surface — must be complete before plan runs.}}
@@ -19,32 +29,35 @@
 
 <!-- Repeat for each interface change. If none, state "None." -->
 
-## Interview Log
+## Decision Log
 
-{{One entry per Q&A from the one-question-at-a-time disambiguation interview. Includes challenges raised and their resolutions.}}
+{{One entry per batched decision item. Includes the recommendation, explicit user response, challenges, and overrides.}}
 
-### Q{{n}}: {{question}}
+### D-{{n}}: {{question}}
 
-**Answer:** {{what was decided}}
+**Recommendation:** {{agent's recommended decision and rationale}}
+**Explicit user response:** {{accept | selected alternative | supplied decision}}
+**Decision:** {{what was decided}}
 **Challenge raised:** {{yes: what was challenged | no}}
 **Challenge resolution:** {{accepted | override (user approved) | alternative chosen}}
 **Override note (if any):** {{what the agent recommended vs. what the user decided}}
 
-<!-- Repeat for each interview question -->
+<!-- Repeat for each material decision -->
 
 ## Dry-Run Findings
 
-{{Results from the "implement-as-if" dry-run subagent. Ambiguities found and how they were resolved before plan was written.}}
+{{Results from the "implement-as-if" dry-run subagent. Only unresolved blockers require a new confirmation batch.}}
 
-**Dry-run status:** clean | had-ambiguities (resolved)
+**Dry-run status:** clean | blockers-resolved
 
 {{#if ambiguities}}
-### Ambiguity {{n}}: {{description}}
+### Finding {{n}}: {{description}}
 
 **Found by:** dry-run subagent
 **Iteration:** {{which dry-run pass: 1, 2, …}}
-**Resolution:** {{what was decided}}
-**Interview questions added:** {{list of Q&As added to resolve this, or "n/a"}}
+**Classification:** blocker | assumption | implementation-detail
+**Disposition:** resolved | accepted-assumption | follow-repository-convention
+**Linked decision:** D-{{n}} | n/a
 {{/if}}
 
 ## Architecture Reconciliation
