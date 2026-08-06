@@ -71,7 +71,7 @@ Read any selected architect or reforge seed and treat it as provisional context.
 
 ### Epic Phase 3: High-level architectural discussion
 
-Discuss the overall shape with the user. The goal of this phase is the big picture — not implementation details (those are per-child). Cover:
+Discuss the overall shape with the user in concise numbered batches. The goal of this phase is the big picture — not implementation details (those are per-child). For every material topic, state the recommendation, rationale, and alternatives, then require an explicit response: `accept`, choose an alternative, or provide a decision. A missing, vague, or ambiguous answer stays `unresolved`; never infer acceptance from silence. Cover:
 
 1. **What the epic delivers.** What is the end state? What capabilities exist after all children are done that don't exist today?
 2. **Overall seams.** What are the major structural divisions this epic introduces or modifies?
@@ -79,6 +79,8 @@ Discuss the overall shape with the user. The goal of this phase is the big pictu
 4. **Cross-cutting concerns.** What interfaces, protocols, or data contracts will multiple children need to agree on? These are NOT resolved here — they are identified for `specify` to nail down.
 5. **Idioms check.** Does the overall design use the language's own power? Load the idioms pack if `manifest.language` is set.
 6. **Refactors in scope.** Any structural improvements that span the whole epic (e.g., a shared module that doesn't yet exist). Enumerate and get approval.
+
+Keep an architecture confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status.
 
 ### Epic Phase 4: Identify child changes
 
@@ -104,6 +106,8 @@ Write `architecture.md` from `references/templates/architecture.md.tmpl`. Includ
 - A **Proposed Child Changes** section listing each child with its title, class, dependencies, and a 2-3 sentence description of its scope
 - **Cross-cutting concerns to resolve in specify** — a list of the shared interfaces and contracts that specify must nail down before children begin
 
+Put the complete confirmation ledger before the prose decisions. Every proposed child change must be explicitly confirmed in the ledger.
+
 Write to: `.changes/active/<id>/architecture.md`
 
 ### Epic Phase 6: Validity check
@@ -114,6 +118,8 @@ Same adversarial subagent as the standard path. Additional checks for epics:
 - Are the cross-cutting concerns properly identified for specify?
 
 ### Epic Phase 7: Architect gate
+
+Present the confirmation ledger and ask the user to confirm it accurately represents their choices. Then ask: **"Every material architectural topic is explicitly confirmed and the validity check has no unresolved blockers. Do you approve the architect gate?"**
 
 ```
 node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate architect --approve
@@ -142,9 +148,16 @@ Read:
 
 Note any `firm` seams the change must interact with. Note any `Known-soft-spots` that this change could address (these are explicitly open for improvement).
 
-### Phase 2: Adversarial architectural discussion
+### Phase 2: Batched architectural confirmation
 
-This is an open discussion, not a one-question interview. Topics to cover — work through each:
+Conduct a systematic confirmation discussion in concise numbered batches. This is not a one-question interview. For every material architectural topic:
+- State the question, the agent's recommendation, its rationale, and meaningful alternatives.
+- Require an explicit response: `accept`, choose an alternative, or provide a decision. The user may respond compactly by item number.
+- A missing, vague, or ambiguous answer stays `unresolved`. Follow up only on unresolved items; never infer acceptance from silence.
+- Challenge an answer only when it is vague, introduces a smell, or conflicts with the idioms pack. If the user overrides a challenge, record the recommendation, user decision, and reasoning if given.
+- Stop when every material item is explicitly confirmed. Use repository conventions for nonmaterial implementation details unless they conflict with a confirmed decision.
+
+Topics to cover — include every applicable material topic:
 
 1. **Change summary.** What are we building and why? Confirm scope aligns with `class` in manifest.
 2. **Where it fits.** Which components are touched? Which seams are crossed?
@@ -156,11 +169,11 @@ This is an open discussion, not a one-question interview. Topics to cover — wo
 8. **Idioms check.** Does the proposed design use the language's own power? Check against the idioms pack. Call out any transliteration smells.
 9. **Refactors in scope.** Enumerate, justify, and get explicit approval for each. Record in `architecture.md`.
 
-Work one topic at a time. Resolve before moving on.
+Keep an architecture confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status. You will include it in `architecture.md`.
 
 ### Phase 3: Draft architecture.md
 
-When discussion converges, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Fill all sections. Be precise about seam IDs, firmness tags, and refactors.
+When every material item is confirmed, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Put the complete confirmation ledger before the prose decisions. Fill all sections. Be precise about seam IDs, firmness tags, and refactors.
 
 Write to: `.changes/active/<id>/architecture.md`
 
@@ -182,9 +195,9 @@ Classify every finding as `blocker`, `assumption`, or `implementation-detail`. R
 
 ### Phase 5: Gate
 
-Present a summary of decisions, seams, and any approved refactors. Ask the user explicitly:
+Present the confirmation ledger, a summary of decisions, seams, and any approved refactors. Ask the user to confirm that the ledger accurately represents their choices. Then ask explicitly:
 
-> "The validity check has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
+> "Every material architectural topic is explicitly confirmed and the validity check has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
 
 On approval:
 ```

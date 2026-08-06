@@ -443,8 +443,16 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
 
   if (gate === 'architect') {
     const architecture = readArtifact(manifest, 'architecture', repoRoot, errors);
-    for (const section of ['## Summary', '## Architectural Decisions', '## Seams', '## Validity Check Results']) {
+    for (const section of ['## Summary', '## Architecture Confirmation Ledger', '## Architectural Decisions', '## Seams', '## Validity Check Results']) {
       if (architecture && !architecture.includes(section)) errors.push(`architecture.md missing required section: ${section}`);
+    }
+    const ledger = architecture.match(/## Architecture Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
+    const rows = ledger.split('\n').filter(line => /^\|\s*A-\d+/i.test(line));
+    if (architecture && rows.length === 0) errors.push('architecture.md confirmation ledger needs at least one decision row');
+    for (const row of rows) {
+      const cells = row.split('|').map(cell => cell.trim());
+      if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`architecture confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
+      if (!cells[5]) errors.push(`architecture confirmation ledger row has no explicit user response: ${cells[1] || row}`);
     }
     if (architecture && !/\*\*Status:\*\* passed(?:-after-resolution)?\b/i.test(architecture)) {
       errors.push('architecture.md validity status must be passed or passed-after-resolution');

@@ -36,6 +36,32 @@ describe('validateGateArtifacts', () => {
     assert.match(result.errors.join('\n'), /not explicitly confirmed/);
   });
 
+  it('rejects an unconfirmed architecture ledger row', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none |  | unresolved |  |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    const result = validateGateArtifacts(manifest, 'architect', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /architecture confirmation ledger row is not explicitly confirmed/);
+  });
+
+  it('accepts an explicitly confirmed architecture ledger', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none | accept | confirmed | yes |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+  });
+
   it('allows non-blocking dry-run findings after explicit confirmation', () => {
     const dir = path.join(cwd, '.changes', 'active', manifest.id);
     fs.writeFileSync(path.join(dir, 'decisions.md'), [

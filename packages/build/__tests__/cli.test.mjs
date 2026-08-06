@@ -19,7 +19,11 @@ function runScript(script, args, cwd) {
 function writeApprovedArtifacts(id, cwd) {
   const dir = path.join(cwd, '.changes', 'active', id);
   fs.writeFileSync(path.join(dir, 'architecture.md'), [
-    '## Summary', 'x', '## Architectural Decisions', 'x', '## Seams', 'x',
+    '## Summary', 'x', '## Architecture Confirmation Ledger',
+    '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+    '|---|---|---|---|---|---|---|',
+    '| A-001 | q | recommendation | none | accept | confirmed | yes |',
+    '## Architectural Decisions', 'x', '## Seams', 'x',
     '## Validity Check Results', '**Status:** passed',
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'decisions.md'), [
@@ -162,6 +166,16 @@ describe('kickback flow', () => {
     manifest.gates.specify = 'pending';
     writeManifest(id, manifest, cwd);
     const res = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'specify', '--approve'], cwd);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /artifact validation failed/);
+  });
+
+  it('refuses architect approval when the architecture confirmation ledger is absent', () => {
+    const manifest = readManifest(id, cwd);
+    manifest.stage = 'architect';
+    manifest.gates.architect = 'pending';
+    writeManifest(id, manifest, cwd);
+    const res = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
     assert.equal(res.status, 1);
     assert.match(res.stderr, /artifact validation failed/);
   });
