@@ -89,4 +89,52 @@ describe('validateGateArtifacts', () => {
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /unresolved dry-run blocker/);
   });
+
+  it('accepts a detailed functional plan without source code', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'plan.md'), [
+      '## Traceability check',
+      '| AC ID | Task(s) | Firm-seam test task |',
+      '|---|---|---|',
+      '| AC-001 | Section 1, Task 1 | Section 1, Task 1 |',
+      '## Section 1: Import records',
+      '- [ ] Add `import_records` to `src/import.rs`',
+      '  - Behavior: 1. Validate the request. 2. Normalize every record. 3. Persist valid records. 4. Map rejected records to `ImportError::InvalidRecord`.',
+      '  - Errors and invariants: Do not persist any record when validation fails.',
+    ].join('\n'));
+
+    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+  });
+
+  it('rejects a fenced source-code function in a plan', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'plan.md'), [
+      '## Traceability check',
+      '| AC ID | Task(s) | Firm-seam test task |',
+      '|---|---|---|',
+      '| AC-001 | Section 1, Task 1 | Section 1, Task 1 |',
+      '```rust',
+      'fn import_records(records: Vec<Record>) -> Result<(), ImportError> {',
+      '    Ok(())',
+      '}',
+      '```',
+    ].join('\n'));
+
+    const result = validateGateArtifacts(manifest, 'plan', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /fenced source-code block/);
+  });
+
+  it('accepts an inline one-line signature in a plan', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'plan.md'), [
+      '## Traceability check',
+      '| AC ID | Task(s) | Firm-seam test task |',
+      '|---|---|---|',
+      '| AC-001 | Section 1, Task 1 | Section 1, Task 1 |',
+      '- [ ] Add `import_records(records: Vec<Record>) -> Result<(), ImportError>` to `src/import.rs`.',
+    ].join('\n'));
+
+    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+  });
 });

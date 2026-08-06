@@ -433,6 +433,10 @@ function unresolvedBlockers(content) {
   return /\*\*Classification:\*\* blocker[\s\S]{0,240}\*\*Disposition:\*\* unresolved/i.test(content);
 }
 
+function hasFencedSourceCode(content) {
+  return /^```(?:bash|c|cpp|csharp|css|go|html|java|javascript|js|jsx|kotlin|python|py|ruby|rs|rust|scala|sh|shell|sql|swift|toml|ts|tsx|typescript|yaml|yml)\b/im.test(content);
+}
+
 /**
  * Check only structural evidence required before a gate is approved. Semantic
  * design review remains the responsibility of the user and review subagents.
@@ -485,6 +489,9 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
     const firmSeams = [...plan.matchAll(/\[firmness:\s*firm\]/gi)].length;
     const firmTasks = [...plan.matchAll(/\[seam:[^\]]+firmness:\s*firm\]/gi)].length;
     if (firmSeams > firmTasks) errors.push('plan.md has firm seams without matching firm-seam test tasks');
+    if (plan && hasFencedSourceCode(plan)) {
+      errors.push('plan.md contains a fenced source-code block; replace it with a concise functional specification');
+    }
     if (plan && unresolvedBlockers(plan)) errors.push('plan.md has an unresolved blocker');
   }
 

@@ -23,6 +23,8 @@ No architectural decisions are made here. If you encounter an ambiguity that sho
 
 The plan must be detailed enough for a cost-optimized model (smaller, cheaper) to execute correctly without any additional context. Assume the implementer will read *only* the section they're working on.
 
+The plan is a functional specification, not an implementation artifact. Describe behavior precisely in concise prose, including ordered steps, inputs, outputs, state changes, validation, error paths, invariants, and call ordering. Do **not** write source-code function bodies, language-shaped pseudocode, control-flow implementations, or fenced source-code blocks. Name symbols freely and include an inline, one-line signature only when it removes interface ambiguity; never include its body.
+
 ## Preconditions
 
 Load `manifest.yaml`. Verify:
@@ -57,8 +59,10 @@ For each section, from `references/templates/plan.md.tmpl`:
 ### Implementation tasks
 - Each task is one concrete action: create a file, add a function, modify a struct, implement a trait, etc.
 - Include the target file path.
-- Include enough detail that a cheap model can execute it without context: what to add, what signature, what the function does, which error types to use.
+- Include enough detail that a cheap model can execute it without context: what to add, relevant signature, functional behavior as concise ordered prose, inputs and outputs, state changes, validation and error behavior, and invariants.
 - Reference the decision or acceptance criterion being implemented: `(implements [SEAM-<id>])` or `(per decisions.md Q<n>)`.
+
+For example, a task for a seven-step Rust operation lists the seven required behaviors as prose bullets (such as validate the request, normalize the input, resolve dependencies, persist the result, and map failures to the approved error type). It does not include a Rust `fn` body that performs those steps. The task tells `implement` what to build and verify; `implement` decides the source-code expression.
 
 ### Verify task (every section)
 - `[ ] Run tests — section reaches a green baseline`
