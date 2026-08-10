@@ -45,6 +45,9 @@ kickbacks:
     at:         2026-07-01T14:32:00Z
     missed:     "What the upstream spec should have caught"
     resolution: "What was decided to resolve it"
+    impact: specify | plan | implementation
+    invalidated_gates: "specify,plan"
+    restart_stage: specify
 ```
 
 ## Stage machine
@@ -64,7 +67,7 @@ Refactor:             refactor → implement → done
 - **No skill auto-advances past a gate.** Every gate transition requires explicit user approval in the session.
 - Each spine skill checks the prior gate on startup and refuses to proceed if it is not `approved`.
 - `change-status.mjs` prints the current stage and the recommended next skill.
-- A kickback from `plan` or `implement` returns the stage to `specify` and resets the `specify` and `plan` gates. Re-approving those gates advances through `plan` and back to `implement` without losing completed checklist work.
+- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream gate. Re-approve only invalidated gates without losing unaffected checklist work.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs` to create child change manifests. The epic's `architecture.md` + `decisions.md` become parent context for each child's `architect` session.
 
@@ -73,9 +76,9 @@ Refactor:             refactor → implement → done
 | Gate | Approved by | What it certifies |
 |---|---|---|
 | `refactor` | User, after audit + explicit opportunity selection | Ranked opportunities recorded; user selected exact `RF-NNN` IDs to execute |
-| `architect` | User, after validity-check subagent passes | Architecture decisions are sound; no gaps found |
-| `specify` | User, after dry-run subagent passes | All ambiguities resolved; interfaces finalized |
-| `plan` | User, after traceability check | Every acceptance criterion traces to ≥1 task |
+| `architect` | User, after classified validity review and deterministic artifact validation | No unresolved blockers |
+| `specify` | User, after explicit confirmation ledger, dry run, and deterministic artifact validation | Every material decision explicitly confirmed; no unresolved blockers |
+| `plan` | User, after traceability and deterministic artifact validation | Every acceptance criterion traces to >=1 task |
 | `implement` | User, after all tests pass **and an approved independent review** | Implementation complete, all tasks checked, behavior-preserving cleanup verified by a distinct fresh reviewer |
 | `docs` | User, after reconciliation + verifier subagent | CONTEXT hierarchy updated and verified |
 
@@ -107,7 +110,7 @@ An epic is a container for multiple related feature/bug/small changes that are t
 
 Kickback entries log times when `implement` had to stop and return to an upstream stage.
 
-An empty `resolution` means the kickback is unresolved. The targeted `specify` session replaces it with the actual decision before the specify gate is re-approved.
+An empty `resolution` means the kickback is unresolved. Resolve only the affected artifact at its recorded `restart_stage` before re-approving invalidated gates.
 
 - **`defect`** — The upstream spec was incomplete; the dry-run in `specify` should have caught this. Counts against kickback frequency.
 - **`amendment`** — Legitimate external requirement change or new information. Does not count against kickback frequency.

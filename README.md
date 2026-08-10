@@ -76,14 +76,15 @@ brainstorm (optional)
   → architect challenges and formalizes the direction
 
 architect
- └─ gathers relevant CONTEXT.md files
- └─ adversarial discussion: seams, decisions, refactors, idioms
+  └─ gathers relevant CONTEXT.md files
+  └─ batched architectural-topic confirmation with explicit user responses
+  └─ adversarial discussion: seams, decisions, refactors, idioms
  └─ validity-check subagent hunts for gaps
  └─ produces: .changes/active/<id>/architecture.md
  └─ approves: architect gate
 
 specify
- └─ one-question-at-a-time disambiguation interview
+  └─ batched material-decision confirmation with explicit user responses
  └─ nails every interface change, error path, edge case
  └─ implement-as-if dry-run subagent: finds remaining gaps
  └─ produces: .changes/active/<id>/decisions.md

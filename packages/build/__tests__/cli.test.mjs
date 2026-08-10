@@ -16,12 +16,36 @@ function runScript(script, args, cwd) {
   });
 }
 
+function writeApprovedArtifacts(id, cwd) {
+  const dir = path.join(cwd, '.changes', 'active', id);
+  fs.writeFileSync(path.join(dir, 'architecture.md'), [
+    '## Summary', 'x', '## Architecture Confirmation Ledger',
+    '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+    '|---|---|---|---|---|---|---|',
+    '| A-001 | q | recommendation | none | accept | confirmed | yes |',
+    '## Architectural Decisions', 'x', '## Seams', 'x',
+    '## Validity Check Results', '**Status:** passed',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'decisions.md'), [
+    '## Confirmation Ledger',
+    '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+    '|---|---|---|---|---|---|---|',
+    '| D-001 | q | recommendation | none | accept | confirmed | yes |',
+    '## Interface Changes', 'None.', '## Decision Log', 'None.', '## Dry-Run Findings', '**Dry-run status:** clean',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'plan.md'), [
+    '## Traceability check', '| AC ID | Task(s) | Firm-seam test task |',
+    '|---|---|---|', '| none | n/a | n/a |',
+  ].join('\n'));
+}
+
 describe('CLI help', () => {
   const scripts = [
     'change-new.mjs',
     'change-status.mjs',
     'change-archive.mjs',
     'manifest-gate.mjs',
+    'artifact-validate.mjs',
     'context-scaffold.mjs',
     'context-discover.mjs',
     'context-verify.mjs',
@@ -81,7 +105,7 @@ describe('kickback flow', () => {
     fs.rmSync(cwd, { recursive: true, force: true });
   });
 
-  it('returns through specify and plan before implementation resumes', () => {
+  it('returns through specify and plan before implementation resumes for a specify-impacting kickback', () => {
     const kickback = runScript('kickback-log.mjs', [
       '--id', id,
       '--type', 'defect',
@@ -98,6 +122,9 @@ describe('kickback flow', () => {
     assert.equal(manifest.gates.implement, 'pending');
     assert.equal(manifest.kickbacks[0].stage, 'implement');
     assert.equal(manifest.kickbacks[0].resolution, '');
+    assert.equal(manifest.kickbacks[0].invalidated_gates, 'specify,plan');
+
+    writeApprovedArtifacts(id, cwd);
 
     const specifyApproval = runScript('manifest-gate.mjs', [
       '--id', id,
@@ -117,8 +144,40 @@ describe('kickback flow', () => {
     manifest = readManifest(id, cwd);
     assert.equal(manifest.stage, 'implement');
 
-    const planPath = path.join(cwd, '.changes', 'active', id, 'plan.md');
-    assert.equal(fs.readFileSync(planPath, 'utf8'), '- [x] completed task\n- [ ] remaining task\n');
+  });
+
+  it('resets only plan for a plan-impacting kickback', () => {
+    const kickback = runScript('kickback-log.mjs', [
+      '--id', id, '--type', 'defect', '--stage', 'implement', '--impact', 'plan',
+      '--missed', 'Missing checklist task',
+    ], cwd);
+    assert.equal(kickback.status, 0, kickback.stderr);
+
+    const manifest = readManifest(id, cwd);
+    assert.equal(manifest.stage, 'plan');
+    assert.equal(manifest.gates.specify, 'approved');
+    assert.equal(manifest.gates.plan, 'pending');
+    assert.equal(manifest.kickbacks[0].invalidated_gates, 'plan');
+  });
+
+  it('refuses specify approval when the confirmation ledger is absent', () => {
+    const manifest = readManifest(id, cwd);
+    manifest.stage = 'specify';
+    manifest.gates.specify = 'pending';
+    writeManifest(id, manifest, cwd);
+    const res = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'specify', '--approve'], cwd);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /artifact validation failed/);
+  });
+
+  it('refuses architect approval when the architecture confirmation ledger is absent', () => {
+    const manifest = readManifest(id, cwd);
+    manifest.stage = 'architect';
+    manifest.gates.architect = 'pending';
+    writeManifest(id, manifest, cwd);
+    const res = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /artifact validation failed/);
   });
 });
 

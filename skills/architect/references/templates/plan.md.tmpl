@@ -6,6 +6,8 @@
 **Date:** {{date}}
 
 > This plan is the single source of truth for implementation. Each task is a checkbox. `implement` marks tasks complete in real time. Do not add tasks during implementation — if new work is discovered, kick back to `specify`.
+>
+> Write functional specifications, not source code. Tasks may use precise ordered prose for behavior, inputs, outputs, state changes, validation, errors, invariants, and call ordering. Do not include function bodies, language-shaped pseudocode, control-flow implementations, or fenced source-code blocks. Inline one-line signatures are allowed only when needed to remove interface ambiguity.
 
 ## Traceability check
 
@@ -38,7 +40,10 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 ### Implementation
 
 - [ ] {{specific task}} — `{{target file}}`
-  - {{concrete detail: what to add/change/delete. Complete enough for a cheap model to execute.}}
+  - Symbol/interface: `{{optional one-line signature or symbol name; no body}}`
+  - Behavior: 1. {{first functional step}} 2. {{next functional step}} 3. {{observable result}}
+  - Errors and invariants: {{validation, error mapping, and constraints}}
+  - {{concrete detail: what to add/change/delete. Complete enough for a cheap model to execute, expressed as prose rather than source code.}}
 
 - [ ] {{specific task}} — `{{target file}}`
 

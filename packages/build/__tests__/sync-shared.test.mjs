@@ -137,7 +137,7 @@ describe('sync-shared.mjs', () => {
     const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
     const expectedScripts = [
       'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
-      'manifest-gate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
+      'manifest-gate.mjs', 'artifact-validate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
       'context-verify.mjs', 'kickback-log.mjs', 'review-log.mjs', 'epic-split.mjs',
     ];
     for (const skill of skills) {

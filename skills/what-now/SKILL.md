@@ -45,7 +45,7 @@ Use this decision tree:
 
 **If there are kickbacks logged:**
 - Read the kickback entries from the manifest.
-- If the most recent kickback has an empty `resolution`, it is unresolved. Tell the user: "There's an unresolved kickback at the `[stage]` stage: [missed]. You need to run `specify` to resolve this before resuming `implement`."
+- If the most recent kickback has an empty `resolution`, it is unresolved. Tell the user: "There's an unresolved kickback at the `[stage]` stage: [missed]. Resume at `[restart_stage]` and re-approve only `[invalidated_gates]` before continuing."
 
 ### Epic change (class: epic)
 
@@ -69,7 +69,7 @@ List all active changes in a table with their current stage and next action. Ask
 
 **Extra plan/implement/docs gates on an epic:** These are harmless leftovers from a pre-fix manifest. They are never read for epics. Mention this and reassure the user they can ignore them.
 
-**Gate approved but stage not advanced:** The manifest may have been edited manually. Run `manifest-gate.mjs --id <id> --stage <correct-stage>` to fix the stage field.
+**Gate approved but stage not advanced:** The manifest may have been edited manually. Do not force the stage; reset and re-approve the affected gate so the state machine advances it.
 
 **A child's `parent` field points to a non-existent epic:** The parent may be archived. Confirm with the user and proceed with the child independently.
 

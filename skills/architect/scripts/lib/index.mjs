@@ -391,9 +391,111 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
 
 export const STAGES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'done'];
 export const GATES  = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
+export const KICKBACK_IMPACTS = ['specify', 'plan', 'implementation'];
 
 export function stageIndex(stage) {
   return STAGES.indexOf(stage);
+}
+
+export function gateStage(manifest, gate) {
+  if (gate === 'docs') return 'implement';
+  return gate;
+}
+
+export function artifactPath(manifest, artifact, repoRoot = process.cwd()) {
+  const file = manifest.artifacts?.[artifact] || `${artifact}.md`;
+  return path.join(changeDir(manifest.id, repoRoot), file);
+}
+
+export function kickbackImpact(impact) {
+  if (!KICKBACK_IMPACTS.includes(impact)) {
+    throw new Error(`impact must be one of: ${KICKBACK_IMPACTS.join(', ')}`);
+  }
+  if (impact === 'specify') {
+    return { impact, invalidatedGates: ['specify', 'plan'], restartStage: 'specify' };
+  }
+  if (impact === 'plan') {
+    return { impact, invalidatedGates: ['plan'], restartStage: 'plan' };
+  }
+  return { impact, invalidatedGates: [], restartStage: 'implement' };
+}
+
+function readArtifact(manifest, artifact, repoRoot, errors) {
+  const file = artifactPath(manifest, artifact, repoRoot);
+  if (!fs.existsSync(file)) {
+    errors.push(`missing ${artifact} artifact: ${file}`);
+    return '';
+  }
+  return fs.readFileSync(file, 'utf8');
+}
+
+function unresolvedBlockers(content) {
+  return /\*\*Classification:\*\* blocker[\s\S]{0,240}\*\*Disposition:\*\* unresolved/i.test(content);
+}
+
+function hasFencedSourceCode(content) {
+  return /^```(?:bash|c|cpp|csharp|css|go|html|java|javascript|js|jsx|kotlin|python|py|ruby|rs|rust|scala|sh|shell|sql|swift|toml|ts|tsx|typescript|yaml|yml)\b/im.test(content);
+}
+
+/**
+ * Check only structural evidence required before a gate is approved. Semantic
+ * design review remains the responsibility of the user and review subagents.
+ */
+export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) {
+  const errors = [];
+  if (!['architect', 'specify', 'plan'].includes(gate)) return { valid: true, errors };
+
+  if (gate === 'architect') {
+    const architecture = readArtifact(manifest, 'architecture', repoRoot, errors);
+    for (const section of ['## Summary', '## Architecture Confirmation Ledger', '## Architectural Decisions', '## Seams', '## Validity Check Results']) {
+      if (architecture && !architecture.includes(section)) errors.push(`architecture.md missing required section: ${section}`);
+    }
+    const ledger = architecture.match(/## Architecture Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
+    const rows = ledger.split('\n').filter(line => /^\|\s*A-\d+/i.test(line));
+    if (architecture && rows.length === 0) errors.push('architecture.md confirmation ledger needs at least one decision row');
+    for (const row of rows) {
+      const cells = row.split('|').map(cell => cell.trim());
+      if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`architecture confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
+      if (!cells[5]) errors.push(`architecture confirmation ledger row has no explicit user response: ${cells[1] || row}`);
+    }
+    if (architecture && !/\*\*Status:\*\* passed(?:-after-resolution)?\b/i.test(architecture)) {
+      errors.push('architecture.md validity status must be passed or passed-after-resolution');
+    }
+    if (architecture && unresolvedBlockers(architecture)) errors.push('architecture.md has an unresolved blocker');
+  }
+
+  if (gate === 'specify') {
+    const decisions = readArtifact(manifest, 'decisions', repoRoot, errors);
+    for (const section of ['## Confirmation Ledger', '## Interface Changes', '## Decision Log', '## Dry-Run Findings']) {
+      if (decisions && !decisions.includes(section)) errors.push(`decisions.md missing required section: ${section}`);
+    }
+    const ledger = decisions.match(/## Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
+    const rows = ledger.split('\n').filter(line => /^\|\s*D-\d+/i.test(line));
+    if (decisions && rows.length === 0) errors.push('decisions.md confirmation ledger needs at least one decision row');
+    for (const row of rows) {
+      const cells = row.split('|').map(cell => cell.trim());
+      if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
+      if (!cells[5]) errors.push(`confirmation ledger row has no explicit user response: ${cells[1] || row}`);
+    }
+    if (decisions && unresolvedBlockers(decisions)) errors.push('decisions.md has an unresolved dry-run blocker');
+  }
+
+  if (gate === 'plan') {
+    const plan = readArtifact(manifest, 'plan', repoRoot, errors);
+    if (plan && !plan.includes('## Traceability check')) errors.push('plan.md missing required section: ## Traceability check');
+    if (plan && !/^\|\s*AC ID\s*\|\s*Task\(s\)\s*\|\s*Firm-seam test task\s*\|/mi.test(plan)) {
+      errors.push('plan.md missing traceability table');
+    }
+    const firmSeams = [...plan.matchAll(/\[firmness:\s*firm\]/gi)].length;
+    const firmTasks = [...plan.matchAll(/\[seam:[^\]]+firmness:\s*firm\]/gi)].length;
+    if (firmSeams > firmTasks) errors.push('plan.md has firm seams without matching firm-seam test tasks');
+    if (plan && hasFencedSourceCode(plan)) {
+      errors.push('plan.md contains a fenced source-code block; replace it with a concise functional specification');
+    }
+    if (plan && unresolvedBlockers(plan)) errors.push('plan.md has an unresolved blocker');
+  }
+
+  return { valid: errors.length === 0, errors };
 }
 
 export function nextSkill(manifest) {

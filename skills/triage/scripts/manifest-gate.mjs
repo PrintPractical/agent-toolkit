@@ -6,9 +6,8 @@
  *   node manifest-gate.mjs --id <id> --gate <gate>                   # read gate status
  *   node manifest-gate.mjs --id <id> --gate <gate> --approve         # approve gate
  *   node manifest-gate.mjs --id <id> --gate <gate> --reset           # reset to pending
- *   node manifest-gate.mjs --id <id> --stage <stage>                 # advance stage
  *
- * Output (stdout): JSON { id, gate, status } or { id, stage }
+ * Output (stdout): JSON { id, gate, status }
  * Progress (stderr): human-readable status
  */
 
@@ -20,6 +19,8 @@ import {
   STAGES,
   nextSkill,
   reviewGateReady,
+  gateStage,
+  validateGateArtifacts,
 } from './lib/index.mjs';
 
 // Which gates are meaningful for each change class. A refactor never enters the
@@ -59,13 +60,11 @@ const { values } = parseArgs({
 
 if (values.help) {
   console.log('Usage: manifest-gate.mjs --id <id> --gate <gate> [--approve|--reset]');
-  console.log('       manifest-gate.mjs --id <id> --stage <stage>');
   process.exit(0);
 }
 
 if (!values.id) {
   console.error('Usage: manifest-gate.mjs --id <id> --gate <gate> [--approve|--reset]');
-  console.error('       manifest-gate.mjs --id <id> --stage <stage>');
   process.exit(1);
 }
 
@@ -79,15 +78,18 @@ try {
   process.exit(1);
 }
 
-// Stage update mode
+// Stage query mode. Stage transitions are gate-driven.
 if (values.stage) {
   if (!STAGES.includes(values.stage)) {
     console.error(`Invalid stage: ${values.stage}. Must be one of: ${STAGES.join(', ')}`);
     process.exit(1);
   }
-  manifest.stage = values.stage;
+  if (values.stage !== manifest.stage) {
+    console.error('Direct stage changes are not supported. Approve or reset the corresponding gate instead.');
+    process.exit(1);
+  }
   writeManifest(values.id, manifest, repoRoot);
-  console.error(`Stage set to '${values.stage}' for change '${values.id}'`);
+  console.error(`Stage is '${values.stage}' for change '${values.id}'`);
   const skill = nextSkill(manifest);
   if (skill) console.error(`Next skill: ${skill}`);
   process.stdout.write(JSON.stringify({ id: values.id, stage: values.stage }) + '\n');
@@ -122,6 +124,19 @@ if (values.approve) {
   manifest.gates = manifest.gates || {};
 
   // ── Approval preconditions (no file tracking; ordering + review only) ──
+
+  const expectedStage = gateStage(manifest, values.gate);
+  if (manifest.stage !== expectedStage) {
+    console.error(`Cannot approve the ${values.gate} gate while stage is '${manifest.stage}'; expected '${expectedStage}'.`);
+    process.exit(1);
+  }
+
+  const validation = validateGateArtifacts(manifest, values.gate, repoRoot);
+  if (!validation.valid) {
+    console.error(`Cannot approve the ${values.gate} gate: artifact validation failed.`);
+    validation.errors.forEach(error => console.error(`  - ${error}`));
+    process.exit(1);
+  }
 
   // Ordering: for classes that implement, docs cannot precede implement.
   if (values.gate === 'docs' && allowedGates.includes('implement') && manifest.gates.implement !== 'approved') {
