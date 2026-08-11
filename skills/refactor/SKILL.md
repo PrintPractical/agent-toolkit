@@ -27,13 +27,14 @@ The review is **snapshot-free**: `review-log.mjs` records auditor findings and v
 
 ## Non-negotiable boundary
 
-Read `references/implementation-review.md` and `references/seam-and-test-taxonomy.md` before starting.
+Read `references/challenge-protocol.md`, `references/adversarial-review.md`, `references/implementation-review.md`, `references/engineering-fundamentals.md`, and `references/seam-and-test-taxonomy.md` before starting.
 
 - Preserve outputs, errors, side effects, ordering, timing guarantees, persistence, protocols, public types, supported inputs, and operational behavior.
 - Preserve every firm seam and its tests unchanged. Firm means protected, not merely inconvenient.
 - A desired behavior change, bug fix, firm-contract change, or change to a firm-seam test is not refactoring. Record it as `escalated-architect`, exclude it from selection, and hand it to `architect`.
 - If the current behavior cannot be established, do not guess. Mark the opportunity blocked or route the ambiguity to `architect`.
 - Structural soft-seam changes are allowed only when their behavior-preservation argument is explicit and verification can support it.
+- Auto-select conventional idiomatic local/private/reversible mechanics. User authority is required only for public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs; those leave this workflow rather than becoming refactor questions.
 
 ## Phase 0: Establish scope and workspace
 
@@ -69,7 +70,7 @@ Run the specialized roles from `references/implementation-review.md` in parallel
 - Tests and coverage reviewer
 - Runtime and operational-risk reviewer when the scope has persistence, concurrency, resources, networking, or deployment behavior
 
-Actively surface unsafe / panic-prone code (e.g. Rust `.unwrap()`/`.expect()`/`panic!` on I/O, parsing, input, locks, task joins; swallowed errors), non-idiomatic patterns, oversized/monolithic modules and other structural bloat, and hygiene issues. Require file-and-symbol evidence, not generic advice. Roles report candidates independently; they do not edit or approve one another's proposals.
+Review deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. Actively surface unsafe/panic-prone recoverable paths, swallowed errors, structural bloat, and hygiene issues. Require file-and-symbol evidence, concrete impact, and a bounded alternative, not generic advice. Do not require `N/A` boilerplate. Roles report candidates independently into one opportunity inventory; they do not edit or approve one another's proposals.
 
 ## Phase 2: Synthesize and rank
 
@@ -110,24 +111,25 @@ Execute one batch at a time, each small enough to localize a regression and touc
 
 Any invariant violation or firm-seam/characterization failure is evidence of behavior change: do not edit the protecting test. Back out this batch if safe; otherwise stop with the exact diff and failure and route the desired change to `architect`. If a selected batch turns out to be a no-op, record why in `refactor.md`; do not manufacture churn.
 
-## Phase 5: Independent review (auditor + verifier)
+## Phase 5: Bounded independent review (auditor + verifier)
 
-After all selected batches are green, run the two-fresh-reviewer pass from `references/implementation-review.md`:
+After all selected batches are green, run exactly one `RV-*` cycle from `references/adversarial-review.md` and `references/implementation-review.md`. The pre-selection `RF-*` opportunity audit is not this post-execution review.
 
-1. **Fresh auditor subagent** (separate context; not the implementer) re-loads the idiom packs and reviews the complete diff for safety/unsafe, idioms, structure, and hygiene. Record findings:
-   ```bash
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage refactor --role auditor \
-     --reviewer "<auditor label>" --verdict changes-requested \
-     --finding "<file:line> [safety|idioms|structure|hygiene] <required action>"
-   ```
-2. Apply behavior-preserving fixes for the findings; keep every test green. Behavior/firm-contract findings go to `architect`, not a local fix.
+1. A **fresh auditor subagent** makes one broad discovery pass over the complete diff, loading all idiom packs and covering every applicable review dimension. Consolidate all blocker/major findings into one batch in `refactor.md`; each needs stable `RV-NNN`, severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and alternative. Record the attestation:
+    ```bash
+    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage refactor --cycle refactor-1 --role auditor \
+      --reviewer "<auditor label>" --verdict changes-requested \
+      --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
+    ```
+   If clean, record an approved auditor attestation and an evidence-based rationale in `refactor.md`.
+2. Apply one behavior-preserving remediation for the complete batch; keep every test green. Select local/private/reversible idiomatic fixes automatically. Material or firm-contract findings go to `architect`, not a local fix.
 3. Run the complete project verification for the effective scope (format, lint/static, type check, build, tests, firm-seam and characterization tests).
-4. **Fresh verifier subagent** (distinct from the implementer and auditor) confirms findings resolved and behavior preserved:
-   ```bash
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage refactor --role verifier \
-     --reviewer "<distinct verifier label>" --verdict approved
-   ```
-   A `changes-requested` verdict returns to step 2 with a new fresh reviewer.
+4. A **distinct fresh verifier subagent** checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
+    ```bash
+    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage refactor --cycle refactor-1 --role verifier \
+      --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
+    ```
+    A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or broad review is needed, stop and route upstream rather than extending the cycle.
 
 Present selected/completed/deferred/escalated IDs, changed files, invariant evidence, and test results. Ask explicitly for implement-gate approval; never self-approve it:
 
@@ -170,6 +172,8 @@ Preserve the artifact and report the blocker. Do not improvise around a gate.
 ## Reference files
 
 - `references/implementation-review.md` - audit roles, review model, report schema, and escalation boundary
+- `references/adversarial-review.md` - bounded cycle, dimensions, and `RV-*` finding contract
+- `references/challenge-protocol.md` - materiality and agent-owned local decisions
 - `references/seam-and-test-taxonomy.md` - firmness, characterization tests, and the tripwire
 - `references/context-schema.md` - CONTEXT structure and seam records
 - `references/firm-change-protocol.md` - explains why firm changes leave this workflow

@@ -25,6 +25,7 @@ function writeApprovedArtifacts(id, cwd) {
     '| A-001 | q | recommendation | none | accept | confirmed | yes |',
     '## Architectural Decisions', 'x', '## Seams', 'x',
     '## Validity Check Results', '**Status:** passed',
+    '## Review Cycle Reference', 'Cycle: architect-1',
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'decisions.md'), [
     '## Confirmation Ledger',
@@ -32,11 +33,25 @@ function writeApprovedArtifacts(id, cwd) {
     '|---|---|---|---|---|---|---|',
     '| D-001 | q | recommendation | none | accept | confirmed | yes |',
     '## Interface Changes', 'None.', '## Decision Log', 'None.', '## Dry-Run Findings', '**Dry-run status:** clean',
+    '## Review Cycle Reference', 'Cycle: specify-1',
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'plan.md'), [
     '## Traceability check', '| AC ID | Task(s) | Firm-seam test task |',
     '|---|---|---|', '| none | n/a | n/a |',
   ].join('\n'));
+}
+
+function recordEmptyCycle(id, stage, cycle, cwd) {
+  const audit = runScript('review-log.mjs', [
+    'record', '--id', id, '--stage', stage, '--cycle', cycle, '--role', 'auditor',
+    '--reviewer', `${stage}-auditor`, '--verdict', 'approved',
+  ], cwd);
+  assert.equal(audit.status, 0, audit.stderr);
+  const verify = runScript('review-log.mjs', [
+    'record', '--id', id, '--stage', stage, '--cycle', cycle, '--role', 'verifier',
+    '--reviewer', `${stage}-verifier`, '--verdict', 'approved',
+  ], cwd);
+  assert.equal(verify.status, 0, verify.stderr);
 }
 
 describe('CLI help', () => {
@@ -125,6 +140,7 @@ describe('kickback flow', () => {
     assert.equal(manifest.kickbacks[0].invalidated_gates, 'specify,plan');
 
     writeApprovedArtifacts(id, cwd);
+    recordEmptyCycle(id, 'specify', 'specify-1', cwd);
 
     const specifyApproval = runScript('manifest-gate.mjs', [
       '--id', id,
@@ -201,10 +217,14 @@ describe('implement gate review enforcement', () => {
     assert.equal(blocked.status, 1);
     assert.match(blocked.stderr, /independent review not satisfied/);
 
-    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'implement', '--role', 'auditor',
-      '--reviewer', 'critic-a', '--verdict', 'changes-requested', '--finding', 'a.rs:1 [idioms] x'], cwd);
-    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'implement', '--role', 'verifier',
-      '--reviewer', 'critic-b', '--verdict', 'approved'], cwd);
+    const finding = JSON.stringify({
+      id: 'RV-001', severity: 'major', category: 'idioms', location: 'a.rs:1',
+      impact: 'violates the language pattern', alternative: 'use the established idiom',
+    });
+    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'implement', '--cycle', 'implement-1', '--role', 'auditor',
+      '--reviewer', 'critic-a', '--verdict', 'changes-requested', '--finding', finding], cwd);
+    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'implement', '--cycle', 'implement-1', '--role', 'verifier',
+      '--reviewer', 'critic-b', '--verdict', 'approved', '--resolution', 'RV-001=resolved'], cwd);
 
     const ok = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'implement', '--approve'], cwd);
     assert.equal(ok.status, 0, ok.stderr);
@@ -215,6 +235,55 @@ describe('implement gate review enforcement', () => {
     const res = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'docs', '--approve'], cwd);
     assert.equal(res.status, 1);
     assert.match(res.stderr, /before the implement gate/);
+  });
+});
+
+describe('architect and specify review enforcement', () => {
+  let cwd;
+  const id = '2026-08-11-spine-review-gate';
+
+  beforeEach(() => {
+    cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-spine-review-'));
+    writeManifest(id, {
+      id, title: 'Spine review', class: 'feature', stage: 'architect',
+      gates: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
+      artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
+      context_targets: [], kickbacks: [],
+    }, cwd);
+    writeApprovedArtifacts(id, cwd);
+  });
+
+  afterEach(() => fs.rmSync(cwd, { recursive: true, force: true }));
+
+  it('requires bounded cycles for feature architect and specify gates', () => {
+    const blockedArchitect = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
+    assert.equal(blockedArchitect.status, 1);
+    assert.match(blockedArchitect.stderr, /independent review not satisfied/);
+
+    recordEmptyCycle(id, 'architect', 'architect-1', cwd);
+    const architect = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
+    assert.equal(architect.status, 0, architect.stderr);
+
+    const blockedSpecify = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'specify', '--approve'], cwd);
+    assert.equal(blockedSpecify.status, 1);
+    recordEmptyCycle(id, 'specify', 'specify-1', cwd);
+    const specify = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'specify', '--approve'], cwd);
+    assert.equal(specify.status, 0, specify.stderr);
+  });
+
+  it('applies architect review to epics but exempts bug changes', () => {
+    let manifest = readManifest(id, cwd);
+    manifest.class = 'epic';
+    writeManifest(id, manifest, cwd);
+    const epic = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
+    assert.equal(epic.status, 1);
+    assert.match(epic.stderr, /independent review not satisfied/);
+
+    manifest = readManifest(id, cwd);
+    manifest.class = 'bug';
+    writeManifest(id, manifest, cwd);
+    const bug = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'architect', '--approve'], cwd);
+    assert.equal(bug.status, 0, bug.stderr);
   });
 });
 
@@ -274,10 +343,14 @@ describe('refactor class gating', () => {
     assert.equal(blocked.status, 1);
     assert.match(blocked.stderr, /stage refactor/);
 
-    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'refactor', '--role', 'auditor',
-      '--reviewer', 'r-a', '--verdict', 'changes-requested', '--finding', 'x.rs:1 [structure] y'], cwd);
-    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'refactor', '--role', 'verifier',
-      '--reviewer', 'r-b', '--verdict', 'approved'], cwd);
+    const finding = JSON.stringify({
+      id: 'RV-001', severity: 'major', category: 'maintainability', location: 'x.rs:1',
+      impact: 'duplicates domain behavior', alternative: 'centralize the behavior',
+    });
+    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'refactor', '--cycle', 'refactor-1', '--role', 'auditor',
+      '--reviewer', 'r-a', '--verdict', 'changes-requested', '--finding', finding], cwd);
+    runScript('review-log.mjs', ['record', '--id', id, '--stage', 'refactor', '--cycle', 'refactor-1', '--role', 'verifier',
+      '--reviewer', 'r-b', '--verdict', 'approved', '--resolution', 'RV-001=resolved'], cwd);
 
     const ok = runScript('manifest-gate.mjs', ['--id', id, '--gate', 'implement', '--approve'], cwd);
     assert.equal(ok.status, 0, ok.stderr);

@@ -254,15 +254,23 @@ export function listActiveChanges(repoRoot = process.cwd()) {
 }
 
 // ── Independent review log ──────────────────────────────────────────────────
-// A deliberately small, snapshot-free record of the independent review/fix
-// cycle. Each change stores an append-only list of review entries. There is no
-// content hashing, file locking, epoch, or Git-index inspection here: the entry
-// is an attestation that a distinct reviewer looked at the work and reached a
-// verdict. The gate reads the latest entry per stage to decide readiness.
+// Each change stores an append-only list of review entries. Version 1 entries
+// retain their original attestation semantics. Version 2 entries form bounded,
+// structured cycles that the gate validates independently of the recording CLI.
 
-export const REVIEW_STAGES = ['implement', 'refactor'];
+export const REVIEW_STAGES = ['architect', 'specify', 'implement', 'refactor'];
 export const REVIEW_ROLES = ['auditor', 'verifier'];
 export const REVIEW_VERDICTS = ['approved', 'changes-requested'];
+export const REVIEW_SEVERITIES = ['blocker', 'major'];
+export const REVIEW_CATEGORIES = ['correctness', 'security', 'simplicity', 'maintainability', 'idioms'];
+export const REVIEW_RESOLUTION_STATUSES = ['resolved', 'unresolved'];
+
+const REVIEW_PREFIXES = {
+  architect: 'AV',
+  specify: 'SV',
+  implement: 'RV',
+  refactor: 'RV',
+};
 
 export function reviewsPath(id, repoRoot = process.cwd()) {
   return path.join(changeDir(id, repoRoot), 'reviews.json');
@@ -301,14 +309,159 @@ export function latestReview(id, stage, repoRoot = process.cwd()) {
   return reviews.length ? reviews[reviews.length - 1] : null;
 }
 
+function validateStructuredFinding(finding, stage, regression = false) {
+  const errors = [];
+  const prefix = REVIEW_PREFIXES[stage];
+  if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
+    return ['finding must be a JSON object'];
+  }
+  if (typeof finding.id !== 'string' || !new RegExp(`^${prefix}-[0-9]{3}$`).test(finding.id)) {
+    errors.push(`finding id must match ${prefix}-NNN for stage '${stage}'`);
+  }
+  if (!REVIEW_SEVERITIES.includes(finding.severity)) {
+    errors.push(`finding '${finding.id || '?'}' severity must be one of: ${REVIEW_SEVERITIES.join(', ')}`);
+  }
+  if (regression && finding.severity !== 'blocker') {
+    errors.push(`verifier regression '${finding.id || '?'}' must have blocker severity; new major or low findings are not allowed`);
+  }
+  if (!REVIEW_CATEGORIES.includes(finding.category)) {
+    errors.push(`finding '${finding.id || '?'}' category must be one of: ${REVIEW_CATEGORIES.join(', ')}`);
+  }
+  for (const field of ['location', 'impact', 'alternative']) {
+    if (typeof finding[field] !== 'string' || !finding[field].trim()) {
+      errors.push(`finding '${finding.id || '?'}' requires a non-empty ${field}`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * Validate and summarize one structured v2 cycle. Incomplete cycles are valid
+ * but not ready; malformed or over-budget cycles are invalid and never ready.
+ */
+export function structuredReviewCycleState(entries, stage, cycle) {
+  const staged = entries.filter(entry => entry.version === 2 && entry.stage === stage && entry.cycle === cycle);
+  const errors = [];
+  if (staged.length === 0) {
+    return { valid: true, ready: false, reason: `no ${stage} review recorded for cycle '${cycle}'`, errors };
+  }
+
+  const auditors = staged.filter(entry => entry.role === 'auditor');
+  const verifiers = staged.filter(entry => entry.role === 'verifier');
+  if (auditors.length !== 1) errors.push(`cycle '${cycle}' must contain exactly one discovery auditor`);
+  if (staged[0]?.role !== 'auditor') errors.push(`cycle '${cycle}' must begin with its discovery auditor`);
+  if (verifiers.length > 2) errors.push(`cycle '${cycle}' exceeds the limit of one initial verification plus one targeted re-verification`);
+
+  for (const entry of staged) {
+    if (!REVIEW_ROLES.includes(entry.role)) errors.push(`cycle '${cycle}' contains invalid role '${entry.role}'`);
+    if (!REVIEW_VERDICTS.includes(entry.verdict)) errors.push(`cycle '${cycle}' contains invalid verdict '${entry.verdict}'`);
+    if (typeof entry.reviewer !== 'string' || !entry.reviewer.trim()) errors.push(`cycle '${cycle}' contains an empty reviewer`);
+  }
+
+  const auditor = auditors[0];
+  const originalIds = new Set();
+  if (auditor) {
+    if (!Array.isArray(auditor.findings)) errors.push(`cycle '${cycle}' auditor findings must be an array`);
+    for (const finding of Array.isArray(auditor.findings) ? auditor.findings : []) {
+      errors.push(...validateStructuredFinding(finding, stage));
+      if (originalIds.has(finding?.id)) errors.push(`cycle '${cycle}' repeats original finding id '${finding?.id}'`);
+      originalIds.add(finding?.id);
+    }
+    if (auditor.findings?.length > 0 && auditor.verdict !== 'changes-requested') {
+      errors.push(`cycle '${cycle}' auditor findings require a changes-requested verdict`);
+    }
+    if (auditor.findings?.length === 0 && auditor.verdict === 'changes-requested') {
+      errors.push(`cycle '${cycle}' changes-requested auditor requires at least one finding`);
+    }
+  }
+
+  const originalStatuses = new Map([...originalIds].map(id => [id, 'unresolved']));
+  const regressionStatuses = new Map();
+  const allIds = new Set(originalIds);
+
+  verifiers.forEach((verifier, index) => {
+    const expectedVerification = index === 0 ? 'initial' : 'targeted-reverification';
+    if (verifier.verification !== expectedVerification) {
+      errors.push(`cycle '${cycle}' verifier ${index + 1} must be marked '${expectedVerification}'`);
+    }
+    if (auditor && verifier.reviewer === auditor.reviewer) {
+      errors.push(`cycle '${cycle}' verifier reviewer must differ from auditor '${auditor.reviewer}'`);
+    }
+    if (verifiers.slice(0, index).some(prior => prior.reviewer === verifier.reviewer)) {
+      errors.push(`cycle '${cycle}' targeted re-verification requires a fresh verifier`);
+    }
+    if (Array.isArray(verifier.findings) && verifier.findings.length > 0) {
+      errors.push(`cycle '${cycle}' verifier cannot add findings; only blocker regressions are allowed`);
+    }
+    if (!Array.isArray(verifier.resolutions)) errors.push(`cycle '${cycle}' verifier resolutions must be an array`);
+    const seenResolutions = new Set();
+    for (const resolution of Array.isArray(verifier.resolutions) ? verifier.resolutions : []) {
+      if (!resolution || typeof resolution !== 'object' || !originalIds.has(resolution.id)) {
+        errors.push(`verifier resolution '${resolution?.id || '?'}' is not an original auditor finding id`);
+        continue;
+      }
+      if (seenResolutions.has(resolution.id)) errors.push(`verifier repeats resolution '${resolution.id}' in one entry`);
+      seenResolutions.add(resolution.id);
+      if (!REVIEW_RESOLUTION_STATUSES.includes(resolution.status)) {
+        errors.push(`resolution '${resolution.id}' status must be one of: ${REVIEW_RESOLUTION_STATUSES.join(', ')}`);
+      } else {
+        originalStatuses.set(resolution.id, resolution.status);
+      }
+    }
+
+    if (!Array.isArray(verifier.regressionResolutions)) errors.push(`cycle '${cycle}' verifier regressionResolutions must be an array`);
+    const seenRegressionResolutions = new Set();
+    for (const resolution of Array.isArray(verifier.regressionResolutions) ? verifier.regressionResolutions : []) {
+      if (!resolution || typeof resolution !== 'object' || !regressionStatuses.has(resolution.id)) {
+        errors.push(`regression resolution '${resolution?.id || '?'}' does not reference a blocker regression from an earlier verification`);
+        continue;
+      }
+      if (seenRegressionResolutions.has(resolution.id)) errors.push(`verifier repeats regression resolution '${resolution.id}' in one entry`);
+      seenRegressionResolutions.add(resolution.id);
+      if (!REVIEW_RESOLUTION_STATUSES.includes(resolution.status)) {
+        errors.push(`regression resolution '${resolution.id}' status must be one of: ${REVIEW_RESOLUTION_STATUSES.join(', ')}`);
+      } else {
+        regressionStatuses.set(resolution.id, resolution.status);
+      }
+    }
+
+    if (!Array.isArray(verifier.regressions)) errors.push(`cycle '${cycle}' verifier regressions must be an array`);
+    for (const regression of Array.isArray(verifier.regressions) ? verifier.regressions : []) {
+      errors.push(...validateStructuredFinding(regression, stage, true));
+      if (allIds.has(regression?.id)) errors.push(`cycle '${cycle}' reuses finding id '${regression?.id}'`);
+      allIds.add(regression?.id);
+      regressionStatuses.set(regression?.id, 'unresolved');
+    }
+  });
+
+  if (errors.length > 0) {
+    return { valid: false, ready: false, reason: errors[0], errors };
+  }
+  if (verifiers.length === 0) {
+    return { valid: true, ready: false, reason: `cycle '${cycle}' has no verifier review`, errors };
+  }
+  const latest = verifiers[verifiers.length - 1];
+  if (latest.verdict !== 'approved') {
+    return { valid: true, ready: false, reason: `latest ${stage} verifier verdict for cycle '${cycle}' is not approved`, errors };
+  }
+  const unresolvedOriginal = [...originalStatuses].find(([, status]) => status !== 'resolved');
+  if (unresolvedOriginal) {
+    return { valid: true, ready: false, reason: `original finding '${unresolvedOriginal[0]}' is unresolved`, errors };
+  }
+  const unresolvedRegression = [...regressionStatuses].find(([, status]) => status !== 'resolved');
+  if (unresolvedRegression) {
+    return { valid: true, ready: false, reason: `blocker regression '${unresolvedRegression[0]}' is unresolved`, errors };
+  }
+  return { valid: true, ready: true, reason: `cycle '${cycle}' approved by verifier '${latest.reviewer}'`, errors };
+}
+
 /**
  * Whether a stage's review gate is satisfied.
  *
- * Ready requires: the latest entry for the stage is an `approved` `verifier`
- * verdict, AND a prior `auditor` entry exists in the same stage whose reviewer
- * label differs from that verifier. This encodes the two-fresh-reviewer
- * separation (an auditor found work; a distinct verifier approved it) without
- * any file tracking. Returns { ready, reason }.
+ * Version 1 uses the original latest-verifier plus distinct-auditor rule.
+ * Version 2 validates the one fixed bounded cycle and all of its structured
+ * findings, resolutions, regressions, reviewer separation, and pass budget.
+ * Returns { ready, reason }.
  */
 export function reviewGateReady(id, stage, repoRoot = process.cwd()) {
   const staged = readReviews(id, repoRoot).filter(r => r.stage === stage);
@@ -316,6 +469,21 @@ export function reviewGateReady(id, stage, repoRoot = process.cwd()) {
     return { ready: false, reason: `no ${stage} review recorded` };
   }
   const latest = staged[staged.length - 1];
+  if (staged.some(entry => entry.version === 2) && latest.version !== 2) {
+    return { ready: false, reason: `latest ${stage} entry cannot use legacy readiness after a structured review cycle` };
+  }
+  if (latest.version === 2) {
+    const expectedCycle = `${stage}-1`;
+    const cycles = new Set(staged.filter(entry => entry.version === 2).map(entry => entry.cycle));
+    if (cycles.size !== 1 || !cycles.has(expectedCycle)) {
+      return { ready: false, reason: `${stage} structured review must contain exactly one cycle named '${expectedCycle}'` };
+    }
+    const state = structuredReviewCycleState(staged, stage, expectedCycle);
+    return { ready: state.ready, reason: state.reason };
+  }
+  if (latest.version !== undefined && latest.version !== 1) {
+    return { ready: false, reason: `latest ${stage} review uses unsupported version '${latest.version}'` };
+  }
   if (latest.verdict !== 'approved' || latest.role !== 'verifier') {
     return { ready: false, reason: `latest ${stage} review is not an approved verifier verdict (got ${latest.role}/${latest.verdict})` };
   }
@@ -437,6 +605,36 @@ function hasFencedSourceCode(content) {
   return /^```(?:bash|c|cpp|csharp|css|go|html|java|javascript|js|jsx|kotlin|python|py|ruby|rs|rust|scala|sh|shell|sql|swift|toml|ts|tsx|typescript|yaml|yml)\b/im.test(content);
 }
 
+function hasReviewCycleReference(content) {
+  return /^##\s+(?:bounded\s+|adversarial\s+)?review[- ]cycle(?:\s+reference)?\s*$/im.test(content);
+}
+
+function reviewCycleReference(content) {
+  return content.match(/^(?:\*\*Cycle:\*\*|Cycle:)\s*`?([A-Za-z0-9._-]+)`?\s*$/im)?.[1] || null;
+}
+
+function reviewFindingIds(content, prefix) {
+  return new Set(content.split('\n')
+    .map(line => line.match(new RegExp(`^\\|\\s*(${prefix}-[0-9]{3})\\s*\\|`, 'i'))?.[1]?.toUpperCase())
+    .filter(Boolean));
+}
+
+function validateArtifactReviewIds(manifest, stage, content, repoRoot, errors) {
+  const entries = readReviews(manifest.id, repoRoot)
+    .filter(entry => entry.version === 2 && entry.stage === stage && entry.cycle === `${stage}-1`);
+  if (entries.length === 0) return;
+  const prefix = REVIEW_PREFIXES[stage];
+  const artifactIds = reviewFindingIds(content, prefix);
+  const logIds = new Set(entries
+    .flatMap(entry => [...(entry.findings || []), ...(entry.regressions || [])])
+    .map(finding => finding.id));
+  const missing = [...logIds].filter(id => !artifactIds.has(id));
+  const extra = [...artifactIds].filter(id => !logIds.has(id));
+  if (missing.length > 0 || extra.length > 0) {
+    errors.push(`${stage} artifact review IDs must match reviews.json cycle '${stage}-1' (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
+  }
+}
+
 /**
  * Check only structural evidence required before a gate is approved. Semantic
  * design review remains the responsibility of the user and review subagents.
@@ -447,12 +645,18 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
 
   if (gate === 'architect') {
     const architecture = readArtifact(manifest, 'architecture', repoRoot, errors);
-    for (const section of ['## Summary', '## Architecture Confirmation Ledger', '## Architectural Decisions', '## Seams', '## Validity Check Results']) {
+    const sections = ['## Summary', '## Architecture Confirmation Ledger', '## Architectural Decisions', '## Seams', '## Validity Check Results'];
+    for (const section of sections) {
       if (architecture && !architecture.includes(section)) errors.push(`architecture.md missing required section: ${section}`);
+    }
+    if (architecture && ['feature', 'epic'].includes(manifest.class) && !hasReviewCycleReference(architecture)) {
+      errors.push('architecture.md missing required section: ## Review Cycle Reference');
+    }
+    if (architecture && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(architecture) !== 'architect-1') {
+      errors.push('architecture.md review cycle reference must be architect-1');
     }
     const ledger = architecture.match(/## Architecture Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
     const rows = ledger.split('\n').filter(line => /^\|\s*A-\d+/i.test(line));
-    if (architecture && rows.length === 0) errors.push('architecture.md confirmation ledger needs at least one decision row');
     for (const row of rows) {
       const cells = row.split('|').map(cell => cell.trim());
       if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`architecture confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
@@ -462,22 +666,34 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
       errors.push('architecture.md validity status must be passed or passed-after-resolution');
     }
     if (architecture && unresolvedBlockers(architecture)) errors.push('architecture.md has an unresolved blocker');
+    if (architecture && ['feature', 'epic'].includes(manifest.class)) {
+      validateArtifactReviewIds(manifest, 'architect', architecture, repoRoot, errors);
+    }
   }
 
   if (gate === 'specify') {
     const decisions = readArtifact(manifest, 'decisions', repoRoot, errors);
-    for (const section of ['## Confirmation Ledger', '## Interface Changes', '## Decision Log', '## Dry-Run Findings']) {
+    const sections = ['## Confirmation Ledger', '## Interface Changes', '## Decision Log', '## Dry-Run Findings'];
+    for (const section of sections) {
       if (decisions && !decisions.includes(section)) errors.push(`decisions.md missing required section: ${section}`);
+    }
+    if (decisions && ['feature', 'epic'].includes(manifest.class) && !hasReviewCycleReference(decisions)) {
+      errors.push('decisions.md missing required section: ## Review Cycle Reference');
+    }
+    if (decisions && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(decisions) !== 'specify-1') {
+      errors.push('decisions.md review cycle reference must be specify-1');
     }
     const ledger = decisions.match(/## Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
     const rows = ledger.split('\n').filter(line => /^\|\s*D-\d+/i.test(line));
-    if (decisions && rows.length === 0) errors.push('decisions.md confirmation ledger needs at least one decision row');
     for (const row of rows) {
       const cells = row.split('|').map(cell => cell.trim());
       if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
       if (!cells[5]) errors.push(`confirmation ledger row has no explicit user response: ${cells[1] || row}`);
     }
     if (decisions && unresolvedBlockers(decisions)) errors.push('decisions.md has an unresolved dry-run blocker');
+    if (decisions && ['feature', 'epic'].includes(manifest.class)) {
+      validateArtifactReviewIds(manifest, 'specify', decisions, repoRoot, errors);
+    }
   }
 
   if (gate === 'plan') {

@@ -23,8 +23,8 @@ plan     → plan.md (live checklist)
 plan gate approved
     ↓
 implement → per section: code + tests green, live checklist updated
-    ↓         then once, over the whole change: independent review →
-    ↓         behavior-preserving refactor → tests still green → fresh verifier approves
+    ↓         then once, over the whole change: bounded RV discovery →
+    ↓         one finding batch/remediation → focused verifier closure
     ↓
 implement gate approved
     ↓
@@ -89,21 +89,32 @@ The reconciliation process:
 
 Only after docs gate is approved does `change-archive.mjs` run.
 
+## Bounded adversarial reviews
+
+Formal architecture, specification, implementation, and refactor review follows `adversarial-review.md`:
+
+- `architect`: one `AV-*` cycle over `architecture.md`.
+- Standard and epic `specify`: one `SV-*` cycle over the implement-as-if contract walk.
+- Standard implementation and refactor execution: one `RV-*` cycle over the completed diff, with gate attestations in `reviews.json`.
+- `triage`: lightweight challenge and self-check only. It has no formal review cycle or review-log requirement.
+
+Each formal cycle has exactly one broad discovery pass, one consolidated blocker/major finding batch, one remediation, focused verification of original IDs, and at most one targeted correction/reverification. Verification does not broaden scope or introduce new low/major findings.
+
 ## Independent implementation review (implement gate)
 
-Before the implement gate can be approved, every change (standard, triage, and refactor) passes one independent review-and-refactor pass over the finished work — described in full in `implementation-review.md`:
+Before the implement gate can be approved, each full-spine feature and refactor execution passes one independent bounded `RV-*` cycle over the finished work, described in `implementation-review.md`:
 
 1. Bring all implementation to a green test baseline (standard changes do this per plan section; a refactor's selected cleanup is the work itself).
-2. A **fresh auditor subagent** reviews the whole change against the language idiom packs, flagging unsafe/panic-prone code, non-idiomatic patterns, oversized/monolithic modules, and hygiene issues, and records findings with `review-log.mjs`.
-3. Apply behavior-preserving cleanup for those findings. Firm-seam tests stay green throughout; a firm-seam failure is a kickback, never a test edit.
-4. Run the full suite green, then a **distinct fresh verifier subagent** confirms behavior is preserved and approves with `review-log.mjs`.
+2. A **fresh auditor subagent** makes one broad applicable review and records one consolidated `RV-*` blocker/major batch with concrete impact and alternatives.
+3. Apply one behavior-preserving remediation for the batch. Firm-seam tests stay green throughout; a firm-seam failure is a kickback, never a test edit.
+4. Run the full suite green, then a **distinct fresh verifier subagent** checks only the original IDs. At most one targeted correction/reverification is allowed.
 5. `manifest-gate.mjs --gate implement --approve` refuses until that approved verifier review exists.
 
-This is intentionally snapshot-free: the review record in `.changes/active/<id>/reviews.json` is an attestation, with no per-file hashing, locking, or index checks.
+This is intentionally snapshot-free: `.changes/active/<id>/reviews.json` is an attestation, while structured `RV-*` findings live in the active artifact. There is no per-file hashing, locking, or index check.
 
 ## Refactor class lifecycle
 
-A `class: refactor` change skips the spec spine: `refactor` (audit the scope, rank opportunities in `refactor.md`, record the user's explicit `RF-NNN` selection) → `implement` (apply the selected cleanup with the independent review above) → `docs`. It never changes observable behavior; anything that would is escalated to `architect`. See `implementation-review.md` for the audit roles, opportunity schema, and boundaries.
+A `class: refactor` change skips the spec spine: `refactor` (read-only opportunity audit, rank `RF-*` opportunities, record exact user selection) → `implement` (apply selected cleanup, then run one bounded `RV-*` cycle) → `docs`. It never changes observable behavior; anything that would is escalated to `architect`. The opportunity audit is not a second post-execution review cycle.
 
 ## Tracking multiple concurrent changes
 

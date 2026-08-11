@@ -22,6 +22,7 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - [ ] **PREFER opaque structs and narrow headers when representation is not part of the ABI.** Expose data directly when it is intentionally a stable interchange or hardware-facing layout.
 - [ ] **PREFER `const` for pointees not modified through an interface.** Remember that it does not imply immutability through aliases or thread safety.
 - [ ] **CONSIDER `restrict` only for a documented, proven non-aliasing contract over the relevant accesses.** Violating that caller contract causes undefined behavior; do not add it as a generic optimization hint.
+- [ ] **Model closed state with an enum plus a tagged union or state-specific struct when payloads differ, and route mutation through transition functions.** C enums can hold out-of-range values, so validate wire, persisted, and cast integers before using them as tags; read only the union member selected by the valid active tag.
 
 ### Sizes and Memory
 
@@ -54,6 +55,7 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - [ ] **PREFER scoped, auditable critical sections and condition-predicate loops.** Recheck predicates after wakeup and define lock ordering where multiple locks exist.
 - [ ] **PREFER strong compiler warnings in CI for every supported compiler, with narrow documented suppressions.** Use the project's warning baseline rather than assuming one flag set is portable.
 - [ ] **PREFER static analysis and sanitizer-enabled test configurations where supported.** Combine ASan/UBSan, leak/thread tools, fuzzing, and platform tools as applicable; sanitizer success is not a proof of defined behavior.
+- [ ] **Use `qsort` and `bsearch` only with a comparator that defines the required ordering and cannot overflow.** Return relational comparison results rather than subtracting integers, and satisfy `bsearch`'s sorted-input and element-layout preconditions; a direct bounded loop is clearer for tiny or stateful searches.
 
 ## Smell List
 
@@ -65,6 +67,8 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - Error paths that leak resources, discard partial I/O, swallow status, or use `assert` for recoverable conditions.
 - Unconditional null-after-free churn that suggests aliases are safe, or no invalidation strategy where a live variable may be reused.
 - Fixed-width integers used everywhere without a boundary requirement, or native widths assumed at wire/ABI/data boundaries.
+- Bare integer states, unchecked enum casts, mismatched union tags, or state fields changed outside the function that enforces legal transitions.
+- Sorting comparators implemented as subtraction, inconsistent equality/order/hash callbacks, or `bsearch` over data not sorted by the same relation.
 - `restrict` added without a caller-visible non-aliasing contract.
 - Signed overflow, out-of-range narrowing, invalid shifts, unchecked pointer arithmetic, or reliance on representation/packing not guaranteed by the target contract.
 - `volatile` synchronization, unsynchronized shared state, unsafe signal-handler calls, or condition waits not guarded by predicate loops.

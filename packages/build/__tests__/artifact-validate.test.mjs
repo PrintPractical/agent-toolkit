@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { validateGateArtifacts, writeManifest } from '../lib/index.mjs';
+import { appendReview, validateGateArtifacts, writeManifest } from '../lib/index.mjs';
 
 describe('validateGateArtifacts', () => {
   let cwd;
@@ -58,6 +58,7 @@ describe('validateGateArtifacts', () => {
       '|---|---|---|---|---|---|---|',
       '| A-001 | q | r | none | accept | confirmed | yes |',
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+      '## Review Cycle Reference', 'Cycle: architect-1',
     ].join('\n'));
     assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
   });
@@ -71,6 +72,7 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none | accept | confirmed | yes |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
       '**Classification:** assumption', '**Disposition:** accepted-assumption',
+      '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
     assert.equal(validateGateArtifacts(manifest, 'specify', cwd).valid, true);
   });
@@ -84,6 +86,7 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none | accept | confirmed | yes |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
       '**Classification:** blocker', '**Disposition:** unresolved',
+      '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
     const result = validateGateArtifacts(manifest, 'specify', cwd);
     assert.equal(result.valid, false);
@@ -136,5 +139,92 @@ describe('validateGateArtifacts', () => {
     ].join('\n'));
 
     assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+  });
+
+  it('requires review-cycle references for feature architecture and decisions', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none | accept | confirmed | yes |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'decisions.md'), [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| D-001 | q | r | none | accept | confirmed | yes |',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+    ].join('\n'));
+
+    assert.match(validateGateArtifacts(manifest, 'architect', cwd).errors.join('\n'), /Review Cycle Reference/);
+    assert.match(validateGateArtifacts(manifest, 'specify', cwd).errors.join('\n'), /Review Cycle Reference/);
+  });
+
+  it('does not require N/A review boilerplate for exempt bug artifacts', () => {
+    manifest.class = 'bug';
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none | accept | confirmed | yes |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+
+    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+  });
+
+  it('accepts empty confirmation ledgers without placeholder N/A rows', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', 'No material decisions.', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+      '## Review Cycle Reference', 'Cycle: architect-1',
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'decisions.md'), [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+      '## Review Cycle Reference', 'Cycle: specify-1',
+    ].join('\n'));
+
+    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+    assert.equal(validateGateArtifacts(manifest, 'specify', cwd).valid, true);
+  });
+
+  it('requires artifact finding IDs to match the structured review log', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', 'x', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Architectural Decisions', 'x', '## Seams', 'x',
+      '## Review Cycle Reference', 'Cycle: architect-1',
+      '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    appendReview(manifest.id, {
+      version: 2, cycle: 'architect-1', stage: 'architect', role: 'auditor', reviewer: 'critic-a',
+      verdict: 'changes-requested', findings: [{
+        id: 'AV-001', severity: 'major', category: 'correctness', location: 'architecture.md:1',
+        impact: 'contract is incomplete', alternative: 'define the missing contract',
+      }], at: new Date().toISOString(),
+    }, cwd);
+
+    let result = validateGateArtifacts(manifest, 'architect', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /missing: AV-001/);
+
+    fs.appendFileSync(path.join(dir, 'architecture.md'), '\n' + [
+      '| ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Review log |',
+      '|---|---|---|---|---|---|---|---|',
+      '| AV-001 | major | correctness | architecture.md:1 | contract is incomplete | define it | complete | reviews.json |',
+    ].join('\n'));
+    result = validateGateArtifacts(manifest, 'architect', cwd);
+    assert.equal(result.valid, true, result.errors.join('\n'));
   });
 });

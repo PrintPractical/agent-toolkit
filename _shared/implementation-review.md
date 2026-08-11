@@ -1,162 +1,77 @@
 # Behavior-Preserving Implementation Review
 
-This document defines the independent implementation-review model used by standard changes, triage fixes, and maintenance refactors. The review roles, the two-reviewer separation, the report record, and the local-cleanup boundary apply to all of them. The audit, ranking, opportunity, and explicit-selection sections apply only to `class: refactor`.
-
-The review is deliberately **snapshot-free**. It tracks no per-file content hashes, locks, epochs, or Git-index state. What it enforces is a simple, hard-to-skip cycle: a fresh reviewer looks at the finished work, records findings, the work is cleaned up, tests stay green, and a distinct fresh reviewer approves. `review-log.mjs` records that cycle and `manifest-gate.mjs` refuses the gate until it is satisfied.
+This document applies the bounded cycle in `adversarial-review.md` to completed standard implementation and refactor execution. It is snapshot-free: no per-file hashes, locks, epochs, or Git-index state are tracked.
 
 ## Core rule
 
-A refactor changes implementation structure without changing observable behavior. Review must account for more than return values: errors, side effects, ordering, timing guarantees, persistence, wire/storage formats, public types, resource ownership, logs or metrics relied on operationally, supported inputs, and compatibility surfaces can all be behavior.
+A refactor changes implementation structure without changing observable behavior. Behavior includes outputs, errors, side effects, ordering and timing guarantees, persistence and wire formats, public types, resource ownership, operationally consumed telemetry, supported inputs, and compatibility surfaces.
 
-For `class: refactor`, audit findings are proposals, not authorization. No source, configuration, documentation, or test file may change before the user explicitly selects stable opportunity IDs.
+For `class: refactor`, audit opportunities are proposals, not authorization. No source, configuration, documentation, or test file changes before the user selects exact `RF-NNN` IDs.
 
-## Where review runs in the lifecycle
+## Lifecycle
 
-- **Standard / triage (`implement`):** implement each plan section to a green test baseline (L2: `implement → tests green`, per section, no per-section refactor). After **all** sections are green, run **one** independent review-and-refactor pass (L3) over the whole change. The L3 review gates the `implement` gate.
-- **Refactor class:** there is no L2 — the change *is* the L3 pass applied to the user-selected opportunities. The review gates the `implement` (execution) gate.
+- **Standard implementation:** complete every plan section to a green baseline, then run one `RV-*` cycle over the whole change. Do not refactor per section.
+- **Refactor execution:** execute selected opportunities to green, then run one `RV-*` cycle over the complete diff.
+- **Triage:** excluded. It uses its lightweight self-check and no formal review log.
 
-L3 always has the same shape:
-
-```
-all work green
-  → fresh AUDITOR subagent records findings   (review-log.mjs, role=auditor)
-  → behavior-preserving refactor applied
-  → full test suite green (firm-seam failure = kickback, never a test edit)
-  → fresh VERIFIER subagent approves           (review-log.mjs, role=verifier)
-  → implement gate
-```
-
-The auditor and verifier are **two distinct fresh subagents**, each launched in its own context, neither of which produced the implementation. `review-log.mjs` refuses an `approved` verifier verdict unless a prior auditor review from a *different* reviewer label exists for the stage.
-
-## What every reviewer must do
-
-Both the auditor and the verifier are read-only and MUST, for the code in scope:
-
-1. **Load the idiom pack for every language detected in scope** (`references/idioms/<lang>.md`) and review the code against its Power Checklist and Smell List. The idiom pack — not a separate checklist maintained here — is the source of truth for language quality. If no pack exists for a language, say so and use the repository's conventions and tooling.
-2. **Hunt for unsafe and panic-prone code.** Flag `unsafe`/FFI without a stated safety contract, and reachable panics on recoverable conditions (in Rust: `.unwrap()`/`.expect()`/`panic!`/`todo!`/`unreachable!`/panicking indexing on I/O, parsing, input, env, locks, channels, task joins; the equivalent in other languages). Swallowed or ignored errors count.
-3. **Judge structure.** Flag oversized, multi-responsibility, or monolithic modules (for example, most of a crate's logic living in `src/lib.rs`/`src/main.rs` instead of focused modules composed by higher-level ones), duplication, leaky abstractions, tangled control flow, and wrong dependency direction.
-4. **Check hygiene.** Dead code, commented-out code, debug prints, stray placeholders/TODOs, and inconsistent naming.
-
-A reviewer that finds nothing must say why the code is already sound, not stay silent. `review-log.mjs` requires at least one finding when the verdict is `changes-requested`.
-
-## Review roles
-
-Run roles independently and in parallel when possible. Audit roles are read-only; they may write findings only to the active maintenance artifact and the review log. For small standard changes a single auditor subagent may cover all roles; for a refactor, prefer separate role coverage.
-
-### Scope and architecture mapper
-
-- Maps requested scope to concrete first-party paths and records exclusions.
-- Reads relevant CONTEXT files, seams, dependencies, and Known Soft Spots.
-- Identifies cross-component effects, active-change overlap, generated ownership, and likely batch boundaries.
-- Does not infer that an undocumented boundary is safe to change.
-
-### Behavior and contract guardian
-
-- Enumerates observables and invariants for each candidate.
-- Locates firm seams, public contracts, compatibility surfaces, and enforcing tests.
-- Rejects behavior-changing candidates from local execution.
-- Treats ambiguity as a blocker, not permission.
-
-### Structure and dependency reviewer
-
-- Finds duplication, unnecessary coupling, misplaced responsibilities, tangled control flow, dead paths, leaky abstractions, oversized/monolithic modules, and dependency-direction problems.
-- Requires concrete file/symbol evidence and a bounded structural alternative.
-- Distinguishes local cleanup from redesign or dependency migration.
-
-### Language-idiom reviewer
-
-- One reviewer covers each language detected in scope and loads that language's idiom pack.
-- Finds transliteration, unsafe escape hatches, panic-prone and non-idiomatic resource/error/concurrency patterns, and missed language capabilities.
-- Does not recommend syntax churn without a specific payoff and preservation argument.
-
-### Tests and coverage reviewer
-
-- Maps existing tests to behavior and seams.
-- Identifies relevant baseline commands, existing failures, brittle structural tests, and behavior gaps requiring characterization before cleanup.
-- Never edits or creates tests during audit.
-
-### Runtime and operational-risk reviewer
-
-Use when scope includes persistence, concurrency, resource lifecycle, networking, deployment, or observability.
-
-- Checks ordering, retries, cancellation, cleanup, race exposure, data compatibility, performance guarantees, and operationally consumed telemetry.
-- Flags changes that look local in code but alter runtime behavior.
-
-### Fresh verifier (final reviewer)
-
-- Must not be the implementer or the auditor for this workflow. A distinct self-declared reviewer label is required.
-- Reviews the complete refactored diff rather than relying on opportunity summaries.
-- Confirms every auditor finding was resolved or explicitly deferred with a rationale, replays preservation arguments against CONTEXT/firm seams/idiom guidance, and confirms tests are green.
-- Reports findings; it does not silently fix them. Any new fix is another refactor pass followed by another fresh verifier review.
-
-## Phases
-
-### 1. Orient
-
-Normalize scope, exclude non-first-party/tool-owned material, discover CONTEXT, enumerate firm seams, detect every scoped language, and load all matching idiom packs.
-
-### 2. Audit (fresh auditor subagent)
-
-Run the specialized read-only roles. Findings must cite evidence (`file:line`) and name the observables that constrain a safe change, covering idioms, unsafe/panics, structure, and hygiene as above. Record the outcome:
+The formal cycle is:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> \
-  --role auditor --reviewer "<self-declared label>" \
-  --verdict changes-requested \
-  --finding "src/io.rs:42 [safety] .expect() on I/O — return Result" \
-  --finding "src/lib.rs [structure] split monolith into focused modules"
+all scoped work green
+  -> fresh AUDITOR performs one broad discovery pass
+  -> one consolidated RV blocker/major finding batch
+  -> one behavior-preserving remediation
+  -> tests green
+  -> distinct fresh VERIFIER checks only original RV IDs
+  -> at most one targeted correction and focused reverification
+  -> implement gate
 ```
 
-Use `--verdict approved` only if the finished work genuinely needs no cleanup; state that rationale in the skill narrative.
+The auditor and verifier are distinct fresh read-only subagents, neither of which implemented the work. The verifier performs closure, not a second broad review.
 
-### 3. Select (refactor class only)
+## Discovery coverage
 
-The user selects exact opportunity IDs. Record the response verbatim and close dependencies explicitly. No exact selection means no execution.
+The auditor loads the idiom pack for every language in scope and reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` report is required. The pass must also catch unsafe or panic-prone recoverable paths, swallowed errors, wrong ownership or dependency direction, monolithic responsibilities, duplication, leaky abstractions, dead/debug/placeholder code, and operational risks from persistence, concurrency, resources, networking, or deployment.
 
-### 4. Refactor (behavior-preserving)
+Specialized lenses may run in parallel as one coordinated discovery pass:
 
-Resolve auditor findings and independently remove dead code, duplication, unclear responsibilities, obscured flow, idiom violations, panic-prone and unsafe patterns, and poor error handling. Do not change observable behavior. Firm-seam tests must stay green throughout; a firm-seam test that goes red means behavior changed — stop and kick back, never edit the test to pass.
+- Scope, architecture, and contract mapping
+- Structure, dependency, state, and data review
+- Language idioms and error/safety review
+- Tests and preservation coverage
+- Runtime, security, and operational risk when applicable
 
-### 5. Verify (fresh verifier subagent)
+They report to one consolidator. They do not produce later batches.
 
-Run the full applicable test suite; it must be green. Then launch a distinct fresh verifier subagent that re-loads the idiom packs, confirms the four review areas, and confirms every auditor finding is resolved or deferred:
+## Findings and bounded closure
+
+Use the `RV-NNN` finding contract from `adversarial-review.md`: severity `blocker|major`; category `correctness|security|simplicity|maintainability|idioms`; concrete evidence, impact, and alternative. Record all findings in one artifact table. A clean pass records a brief evidence-based rationale.
+
+Resolve the complete batch once. Local/private/reversible idiomatic choices are agent-owned. Escalate decisions at the materiality boundary. Firm-seam tests stay green; a firm-seam failure is a kickback, never a test edit.
+
+After tests are green, the verifier checks only the original `RV-*` IDs and records each as resolved or unresolved. Verification must not repeat discovery, expand scope, or introduce new low/major findings. A remediation-caused blocker regression is the only new-ID exception: record it with `--regression`, correct it within the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or safety requires broad review, stop and kick back.
+
+## Review log
+
+`review-log.mjs` records the structured gate attestation. Use cycle `implement-1` for a feature or `refactor-1` for refactor execution. Put the same `RV-*` details in `plan.md` or `refactor.md`:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> \
-  --role verifier --reviewer "<distinct self-declared label>" --verdict approved
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> --cycle <implement-1|refactor-1> \
+  --role auditor --reviewer "<fresh label>" --verdict changes-requested \
+  --finding '{"id":"RV-001","severity":"blocker","category":"correctness","location":"src/io.rs:42","impact":"request panic","alternative":"return a typed error"}'
+
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> --cycle <implement-1|refactor-1> \
+  --role verifier --reviewer "<distinct fresh label>" --verdict approved \
+  --resolution RV-001=resolved
 ```
 
-`changes-requested` from the verifier returns to phase 4 with a new fresh reviewer. A behavior/contract concern is escalated, not resolved locally.
+If focused verification detects a blocker regression caused by remediation, the initial verifier records `--regression '<structured blocker finding JSON>'`; the fresh targeted verifier records `--regression-resolution RV-NNN=resolved`. Verifiers never record new major or low findings.
 
-### 6. Gate
+The auditor may record `approved` with no `--finding` when there are no findings, with the rationale in the artifact. The final entry still must be an approved verifier backed by a differently labeled auditor. This label is an attestation, not identity proof; the orchestrator must launch genuinely fresh contexts.
 
-`manifest-gate.mjs --gate implement --approve` reads the review log and refuses unless the latest entry for the stage is an `approved` verifier verdict backed by a distinct prior auditor review. There is no separate certification step, snapshot, or index check.
+## Refactor opportunity audit
 
-### 7. Reconcile and archive
-
-Reconcile CONTEXT Known Soft Spots and soft structural prose, update relevant developer docs, verify provenance, obtain docs approval, and archive the complete artifact. Firm criteria do not change in this phase.
-
-## Review record schema
-
-Each `review-log.mjs record` appends one entry to `.changes/active/<id>/reviews.json`:
-
-```json
-{
-  "version": 1,
-  "stage": "implement",
-  "role": "auditor",
-  "reviewer": "<self-declared nonempty label>",
-  "verdict": "changes-requested",
-  "findings": [
-    "src/io.rs:42 [safety] .expect() on I/O — return Result or handle"
-  ],
-  "at": "<iso-8601>"
-}
-```
-
-`stage` is `implement` (standard/triage) or `refactor` (refactor class). `role` is `auditor` or `verifier`. `verdict` is `approved` or `changes-requested`; a `changes-requested` entry requires at least one finding. Each finding is a short `"<file[:line]> [category] <required action>"` string, where category is `safety`, `idioms`, `structure`, or `hygiene`. The reviewer label is self-declared and does not prove real-world identity — the orchestrator must still launch genuinely fresh subagents — but the log blocks an approved verifier from reusing the auditor's label, so the two reviewers are at least distinct.
-
-## Opportunity report schema (refactor class)
+The pre-selection refactor audit is an opportunity inventory, separate from the post-execution `RV-*` cycle. It may use the discovery lenses above, remains read-only, and produces stable `RF-*` opportunities. It does not authorize implementation.
 
 Every persisted opportunity in `refactor.md` contains:
 
@@ -170,7 +85,7 @@ Every persisted opportunity in `refactor.md` contains:
 | `evidence` | File/symbol/line, tool output, or measured observation |
 | `payoff` | Specific maintenance, clarity, safety, or cost benefit |
 | `behavior_argument` | Why all named observables remain invariant |
-| `invariants` | Assertions the implementation and reviewer will check |
+| `invariants` | Assertions implementation and review will check |
 | `seams` | IDs/names, firmness, CONTEXT sources, and interaction |
 | `risk` | `low`, `medium`, or `high`, with reason |
 | `effort` | `small`, `medium`, or `large`, with reason |
@@ -179,34 +94,19 @@ Every persisted opportunity in `refactor.md` contains:
 | `conflicts` | Other IDs, active work, or file overlap |
 | `files` | Proposed file set |
 | `verification` | Targeted and broader commands |
-| `sources` | Audit roles that independently support the finding |
+| `sources` | Audit lenses supporting the opportunity |
 | `disposition` | Selection/completion evidence, blocker, deferral, rejection, or handoff reason |
 
 An opportunity missing evidence or a behavior-preservation argument is not executable.
 
 ## Local cleanup boundary
 
-Local refactor execution is allowed when all of these hold:
+Local execution is allowed only when behavior and firm seams remain unchanged, scope is bounded to selected opportunities or the change's files, tests can establish current behavior, no material product/domain/architecture/compatibility/security/data-migration/operational-policy decision is needed, and verification is green.
 
-- The outcome is strictly behavior-preserving.
-- Firm seams and firm-seam tests remain unchanged.
-- The structural change is bounded to selected opportunities (refactor class) or the change's own files (standard).
-- Existing tests or added characterization can establish the current behavior.
-- The change does not require a product, domain, architecture, compatibility, data-migration, or operational-policy decision.
-- Relevant verification is green.
-
-Examples include bounded extraction/inline operations, splitting a monolithic module into focused ones, renaming internals, removing proven dead private code, consolidating equivalent private logic, simplifying control flow, replacing a panic-prone path with proper error handling, and replacing a private mechanism with an equivalent idiomatic one.
+Examples include bounded extraction or inline operations, splitting private monolithic responsibilities, renaming internals, removing proven dead private code, consolidating equivalent private logic, simplifying private control flow, replacing panic-prone handling with equivalent typed propagation, and choosing an equivalent idiomatic private mechanism.
 
 ## Architect boundary
 
-Record the candidate as `escalated-architect` and do not execute it here when any of these is true:
+Record a refactor opportunity as `escalated-architect`, or kick standard implementation upstream, when observable behavior or a firm seam would change; behavior is disputed or cannot be characterized; a public API, protocol, storage format, error semantic, timing/ordering guarantee, side effect, or compatibility policy changes; a consequential seam is created or removed; or dependency migration, security policy, performance, data migration, or operational policy needs a material decision.
 
-- Any observable behavior is intended to change, including a bug fix.
-- A firm seam, firm contract, firm criterion, or firm-seam test would change.
-- Current behavior is disputed, unknowable, or cannot be safely characterized.
-- Public API, protocol, storage format, supported input, error semantics, ordering/timing guarantee, side effect, or compatibility policy would change.
-- The work creates/removes a consequential seam or needs a cross-component architectural decision rather than a bounded structural substitution.
-- A dependency upgrade, data migration, security policy, performance tradeoff, or operational policy needs approval.
-- Safe execution requires expanding beyond selected scope and the user has not approved a new audit/selection record.
-
-The handoff includes the opportunity ID, evidence, desired outcome, affected seams, behavior/contract delta, risks, and dependencies. Refactor does not invoke the firm-change protocol itself; `architect` owns that deliberation.
+The handoff includes the finding/opportunity ID, evidence, desired outcome, affected seams, contract delta, risks, and dependencies.

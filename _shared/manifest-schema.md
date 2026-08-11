@@ -35,6 +35,10 @@ artifacts:
   plan:         plan.md
   refactor:     refactor.md          # refactor class only (replaces architecture/decisions/plan)
 
+# Formal review findings live in the active artifacts:
+# architecture.md: AV-NNN; decisions.md: SV-NNN; plan/refactor.md: RV-NNN
+# Implementation/refactor gate attestations additionally live in reviews.json.
+
 context_targets:                    # CONTEXT.md files this change should reconcile
   - CONTEXT.md
   - src/gateway/CONTEXT.md
@@ -76,18 +80,18 @@ Refactor:             refactor → implement → done
 | Gate | Approved by | What it certifies |
 |---|---|---|
 | `refactor` | User, after audit + explicit opportunity selection | Ranked opportunities recorded; user selected exact `RF-NNN` IDs to execute |
-| `architect` | User, after classified validity review and deterministic artifact validation | No unresolved blockers |
-| `specify` | User, after explicit confirmation ledger, dry run, and deterministic artifact validation | Every material decision explicitly confirmed; no unresolved blockers |
+| `architect` | User, after bounded `AV-*` review and deterministic artifact validation | Material topics confirmed; original review IDs closed; no unresolved blockers |
+| `specify` | User, after explicit confirmation ledger, bounded `SV-*` implement-as-if review, and deterministic artifact validation | Every material decision explicitly confirmed; original review IDs closed; no unresolved blockers |
 | `plan` | User, after traceability and deterministic artifact validation | Every acceptance criterion traces to >=1 task |
-| `implement` | User, after all tests pass **and an approved independent review** | Implementation complete, all tasks checked, behavior-preserving cleanup verified by a distinct fresh reviewer |
+| `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation complete and tests pass; when formal review applies, original findings are closed by a distinct fresh verifier |
 | `docs` | User, after reconciliation + verifier subagent | CONTEXT hierarchy updated and verified |
 
 ## Change classes
 
-- **`small`** — Used by `triage`. Single component, no new seams, no interface changes. Abbreviated pipeline.
-- **`bug`** — Used by `triage`. Existing behavior being restored. No architect/specify required unless scope expands.
-- **`feature`** — Standard full pipeline.
-- **`epic`** — Runs `architect` (identify children + overall design) then `specify` (cross-cutting contracts), then decomposes into child changes via `epic-split`. The epic manifest never runs plan or implement — it tracks child change IDs and completion. Each child runs the full `architect → specify → plan → implement` spine independently, depth-first.
+- **`small`** — Used by `triage`. Single component, no new seams or interface changes. Abbreviated pipeline with a lightweight self-check, not formal adversarial review.
+- **`bug`** — Used by `triage`. Existing behavior being restored. No architect/specify or formal review required unless scope expands.
+- **`feature`** — Standard full pipeline, including bounded `AV-*`, `SV-*`, and `RV-*` review cycles.
+- **`epic`** — Runs `architect` with one `AV-*` cycle, then `specify` with one `SV-*` cycle over cross-cutting contracts, then decomposes via `epic-split`. The epic never runs plan or implement. Each child runs its own applicable spine depth-first.
 - **`refactor`** — Used by the `refactor` skill for behavior-preserving cleanup. Skips the spec spine entirely: `refactor` (audit the scope, rank opportunities, record the user's explicit `RF-NNN` selection) → `implement` (apply the selected cleanup, keep tests green, obtain a distinct fresh independent review) → `docs`. Never changes observable behavior; anything that would is escalated to `architect`. With `refactor_mode: audit-only` the change stops after the report without executing.
 
 ## Epic parent/child model

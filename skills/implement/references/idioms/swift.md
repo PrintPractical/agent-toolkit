@@ -22,6 +22,7 @@ Choose the simplest abstraction that preserves those guarantees. Value types, pr
 
 - [ ] **Prefer structs for independent values.** Use a class when identity, shared mutable state, Objective-C interoperation, or framework inheritance is part of the model.
 - [ ] **Model finite states with enums and associated values.** Keep state-specific data beside its case rather than spreading validity across booleans and optionals.
+- [ ] **Expose legal state changes as methods that return a new state or a typed failure.** Keep direct mutation inaccessible when it could bypass transition rules, and validate raw or decoded representations before constructing the domain state.
 - [ ] **Make mutation visible.** Prefer `let`, nonmutating transformations, and narrowly scoped `mutating` methods; use copy-on-write collections rather than defensive copying.
 - [ ] **Preserve value semantics in custom value types.** A struct that hides unexpectedly shared mutable reference storage must provide copy-on-write behavior or clearly document reference-like semantics.
 - [ ] **Use raw values only for real serialized or interoperable representations.** Associated values are usually better for domain data that differs by case.
@@ -75,6 +76,7 @@ Choose the simplest abstraction that preserves those guarantees. Value types, pr
 - [ ] **Choose collections by semantics.** Use `Array` for order, `Set` for uniqueness/membership, and `Dictionary` for keyed lookup; do not encode maps as tuple arrays without a reason.
 - [ ] **Use sequence operations when they communicate intent, but keep a clear loop when it better expresses control flow or avoids needless allocation.** Prefer lazy chains when intermediate materialization is unnecessary.
 - [ ] **Use collection indices rather than assuming integer offsets.** Avoid repeated linear indexing into non-random-access collections.
+- [ ] **Avoid repeated `Array.removeFirst()` for a growing FIFO workload because it shifts remaining elements.** Use a maintained head index or a deque/ring-buffer type already accepted by the project; use `Set`/`Dictionary` keys only when their `Hashable` identity is stable, and keep `Comparable` consistent with equality when both are provided.
 - [ ] **Follow Swift API Design Guidelines.** Names should read grammatically at call sites, distinguish mutating/nonmutating pairs, and omit redundant type words.
 - [ ] **Use argument labels to clarify roles and units.** Represent units and domain identifiers with types when confusion would be costly.
 - [ ] **Keep public APIs small and document ownership, actor isolation, errors, and complexity that callers must understand.**
@@ -95,6 +97,7 @@ Choose the simplest abstraction that preserves those guarantees. Value types, pr
 - Force unwraps and `try!` on decoded, user-provided, network, file, or mutable data
 - Implicitly unwrapped optionals used to postpone lifecycle design rather than satisfy a framework initialization contract
 - Multiple booleans and loosely related optionals encoding a state machine that permits impossible combinations
+- Public state mutation that bypasses legal transitions, or decoded raw values treated as valid domain states without validation
 - Stringly typed states, identifiers, notification names, dictionary keys, or errors where enums, wrappers, or typed constants fit
 - Classes chosen by reflex for plain data, with identity and shared mutation introduced accidentally
 - Deep inheritance or protocol layers that add indirection without substitutability or reuse
@@ -116,6 +119,7 @@ Choose the simplest abstraction that preserves those guarantees. Value types, pr
 
 - Public setters exposing invariants that should be maintained by domain operations
 - Arrays repeatedly scanned for keyed lookup or uniqueness where `Dictionary` or `Set` expresses intent
+- `Array.removeFirst()` in a growing queue, mutable hash identity while a value is in a set/dictionary, or `Comparable` ordering inconsistent with equality
 - Dense chains of `map`, `flatMap`, and optional chaining that conceal branching, errors, or side effects
 - Generic abstractions created before a second concrete use demonstrates the shared behavior
 - Access levels widened solely so tests can reach implementation details

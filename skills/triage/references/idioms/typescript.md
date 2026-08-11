@@ -40,6 +40,7 @@ Make illegal states difficult to construct without making ordinary code fight an
 
 - [ ] **Use discriminated unions for finite states and variant payloads.** Put data required by a state on that variant rather than behind optional properties.
 - [ ] **Make owned unions exhaustive.** In a `switch`, assign the remaining value to `never` or call an `assertNever` helper so new variants require a decision.
+- [ ] **Express legal state changes as functions from one discriminated union to the next, or as commands accepted by an exhaustive reducer.** Keep variant fields readonly when mutation could create an impossible combination, and validate persisted states before they enter the typed transition path.
 - [ ] **Use literal unions, enums, or const-backed objects according to runtime needs.** Do not ban either `enum` or object alternatives dogmatically; account for emission, interoperability, and reverse mapping.
 - [ ] **Use `as const` to retain literal and readonly inference for values that are intended to be fixed.** Do not use it to pretend a mutable runtime object is deeply immutable.
 - [ ] **Use `satisfies` to check a value against a contract while preserving useful inferred literals.** Use an annotation when consumers should see the broader declared type.
@@ -84,6 +85,7 @@ Make illegal states difficult to construct without making ordinary code fight an
 ### Collections, Resources, and Testing
 
 - [ ] **Use objects for known records, `Map` for arbitrary keys, `Set` for uniqueness, and arrays for ordered sequences.** Model the runtime collection actually used.
+- [ ] **Remember that TypeScript does not change JavaScript key equality or collection complexity.** `Map<object, V>` keys compare by identity, repeated array front removal is linear, and static `Readonly` does not make a key stable at runtime; select or derive a stable primitive key when domain equality requires it.
 - [ ] **Pair resource acquisition with deterministic cleanup using `try`/`finally` or target-supported resource syntax.** Cover timers, listeners, subscriptions, streams, files, and sockets.
 - [ ] **Apply backpressure and explicit shutdown to producers, streams, and owned background work.** Garbage collection is not lifecycle management.
 - [ ] **Test observable behavior, runtime validation, error translation, cancellation, cleanup, and concurrency limits.** Add type-level tests for important inference and rejection contracts.
@@ -107,6 +109,7 @@ Make illegal states difficult to construct without making ordinary code fight an
 ### Modeling and Abstraction Smells
 
 - Optional-property bags plus several booleans encoding states that should be a discriminated union
+- Reducers or setters that can construct union states forbidden by the domain, or typed persisted states accepted without runtime validation
 - Optional booleans where `undefined`, `false`, and `true` accidentally create an undocumented three-state API
 - Strings used for closed states, event kinds, identifiers, or units with no checked vocabulary
 - Generic parameters that appear once, cannot be inferred, or merely move a cast into the implementation

@@ -33,6 +33,7 @@ Prefer direct language and platform features over clever coercion, hidden mutati
 - [ ] **Use arrays for ordered sequences, not as sparse maps.** Prefer collection methods when they clarify transformation and a loop when control flow or early exit is central.
 - [ ] **Accept and return iterables when eager array materialization is unnecessary.** Preserve laziness for large or streaming inputs where the runtime supports it.
 - [ ] **Model finite states with tagged objects.** Keep state-specific data with a discriminant instead of coordinating flags and nullable fields by convention.
+- [ ] **Construct and transition tagged states through focused functions when legal moves matter.** Validate external discriminants and payloads, reject illegal transitions explicitly, and use a `switch` or transition table rather than letting callers mutate tags and payload fields independently.
 - [ ] **Use object spread for shallow copying only.** Be explicit about nested sharing; copying syntax does not create deep immutability.
 
 ### Values and Control Flow
@@ -40,6 +41,7 @@ Prefer direct language and platform features over clever coercion, hidden mutati
 - [ ] **Use `===` and `!==` by default.** Allow deliberate coercive equality only for a narrow, explained semantic such as `value == null` matching both nullish values.
 - [ ] **Use `?.` for genuinely optional traversal and `??` for nullish defaults.** Use `||` only when all falsy values should trigger the fallback.
 - [ ] **Define the meaning of missing, `undefined`, and `null` at API boundaries.** Avoid emitting several representations of the same absence accidentally.
+- [ ] **Account for JavaScript collection equality.** `Map` and `Set` use SameValueZero for primitive keys and identity for objects; use a stable primitive/domain key or canonical object when value-equivalent object instances must match.
 - [ ] **Use explicit numeric parsing and validate the complete accepted format.** Account for `NaN`, infinities, precision limits, and `BigInt` where domain values require them.
 - [ ] **Keep mutation local and visible.** Prefer transformations that return values, while avoiding wasteful copying when a contained mutation is clearer and measured.
 
@@ -68,6 +70,7 @@ Prefer direct language and platform features over clever coercion, hidden mutati
 - [ ] **Understand ordering among synchronous code, promise jobs, timers, rendering, and host-specific queues.** Do not make correctness depend on an assumed delay.
 - [ ] **Avoid shared mutable state across requests or concurrent operations unless its ownership and synchronization semantics are explicit.**
 - [ ] **Use workers or host-appropriate background facilities for measured CPU-bound work.** Moving synchronous work into an `async` function does not make it nonblocking.
+- [ ] **Use arrays as growing FIFO queues only when their bounds make front removal immaterial.** Repeated `shift()` is linear; use a head index, ring buffer, or maintained deque abstraction when queue operations dominate.
 - [ ] **Apply backpressure to streams and producers.** Await writes or consumption signals rather than buffering without limit.
 
 ### Resources and Cleanup
@@ -96,6 +99,7 @@ Prefer direct language and platform features over clever coercion, hidden mutati
 - Coercive equality, truthiness defaults, or string/number addition where accepted input types are not obvious
 - Object keys used for arbitrary external keys where prototype-sensitive behavior or string coercion is unintended
 - Sparse arrays, `delete array[index]`, or array scans standing in for `Map`/`Set` semantics
+- Object keys assumed to compare by value in `Map`/`Set`, or mutable tagged-state objects whose discriminant and payload can become inconsistent
 - JSON stringify/parse used as a deep clone, losing cycles, prototypes, dates, maps, sets, `BigInt`, `undefined`, and special numbers
 - Mutation of built-in or third-party prototypes, especially as a package import side effect
 

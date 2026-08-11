@@ -25,6 +25,7 @@ Flag proposals that introduce abstraction, pointers, channels, goroutines, or gl
 - [ ] **PREFER embedding for capability composition, not inheritance simulation.** Be deliberate about promoted methods and whether they become part of the public API.
 - [ ] **MUST preserve useful zero values where practical.** A zero value should be ready to use or fail clearly; constructors are warranted when invariants, dependencies, or ownership require them.
 - [ ] **PREFER explicit dependencies over package globals and hidden registries.** Construction should show what a component needs.
+- [ ] **Model closed states with a named type and constants when states carry no payload, then centralize legal transitions in a method or function.** Constants do not prevent arbitrary values, so validate decoded and external inputs. When variants carry different data, use explicit variant structs and a package-private marker interface only when that added closed-set machinery is worth it.
 
 ### Errors and Boundaries
 
@@ -63,6 +64,7 @@ Flag proposals that introduce abstraction, pointers, channels, goroutines, or gl
 ### Collections, Allocation, and Generics
 
 - [ ] **PREFER slices as sequence APIs and maps for keyed lookup.** Document whether inputs or returned slices/maps may be retained or mutated when aliasing matters.
+- [ ] **Use standard workload-specific machinery before custom containers.** A slice plus head index or a scoped queue type avoids repeated `slice[1:]` retention and front-copying; `container/heap` supports repeated extrema, and `sort`/`slices`/`maps` helpers should be preferred when the module's Go version provides the needed contract. Map iteration order is unspecified, so sort keys when output order is observable.
 - [ ] **MUST distinguish nil from empty only where the observable contract requires it, such as serialization or protocol semantics.** Otherwise accept idiomatic nil slices and maps appropriately.
 - [ ] **PREFER `make` capacity hints when size is known and material, but measure before complicating allocation strategy.** Avoid preallocation guesses that waste memory or obscure code.
 - [ ] **MUST copy slices, maps, or byte buffers at ownership boundaries when later mutation would violate the contract.** Assignment copies headers, not backing data.
@@ -89,6 +91,7 @@ Flag proposals that introduce abstraction, pointers, channels, goroutines, or gl
 - Java-style constructors, getters, builders, and inheritance-shaped embedding around simple structs
 - Generics introduced to avoid a few clear concrete operations, or constraints so broad that supported behavior is unclear
 - Constructors required only because a type's accidental zero value panics or behaves inconsistently
+- Raw strings or integers mutated as state with transition rules scattered across callers; named constants accepted from external data without validation
 - Indiscriminate pointer use for small values, optionality without semantics, or mutation that should be explicit in a result
 
 ### Error and Context Smells
@@ -117,6 +120,7 @@ Flag proposals that introduce abstraction, pointers, channels, goroutines, or gl
 - `init` functions that perform I/O, register hidden behavior, start goroutines, or make initialization order significant
 - Mutable package globals, global clients configured by side effect, or tests that must restore ambient state
 - Returning internal slices or maps whose mutation can violate invariants, or retaining caller buffers without documenting ownership
+- Queue code that repeatedly shifts a slice or retains a large backing array indefinitely; output that accidentally depends on map iteration order
 - Writing to a nil map, assuming a non-nil empty slice in an API, or depending accidentally on JSON's nil/empty distinction
 
 ### Performance and Test Smells

@@ -19,11 +19,12 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-You have strong architectural opinions. Read `references/challenge-protocol.md` now and internalize it. You will:
+You have strong architectural opinions. Read `references/challenge-protocol.md`, `references/adversarial-review.md`, and `references/engineering-fundamentals.md` now and internalize them. You will:
 - Challenge any proposal that deviates from idiomatic patterns for the active language. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 - Default stance toward existing code: **soft**. Existing patterns are not automatically correct. If a better solution exists — even one requiring a larger refactor — surface it. The user prefers a larger refactor that yields a better result over matching mediocre patterns.
 - Challenge any proposed `firm` designation until justified (see `references/challenge-protocol.md`). Default seam firmness is `soft`.
 - Surface refactors as **first-class, costed, approved decisions** here. No refactors are discovered during `implement`.
+- Ask the user only about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, and meaningful architectural or operational tradeoffs. Auto-select conventional idiomatic choices that are local/private/reversible; do not put them in the confirmation ledger.
 
 ## Preconditions
 
@@ -71,7 +72,7 @@ Read any selected architect or reforge seed and treat it as provisional context.
 
 ### Epic Phase 3: High-level architectural discussion
 
-Discuss the overall shape with the user in concise numbered batches. The goal of this phase is the big picture — not implementation details (those are per-child). For every material topic, state the recommendation, rationale, and alternatives, then require an explicit response: `accept`, choose an alternative, or provide a decision. A missing, vague, or ambiguous answer stays `unresolved`; never infer acceptance from silence. Cover:
+Discuss the overall shape with the user in concise numbered batches. The goal is the big picture, not per-child implementation detail. Apply the materiality boundary: for each user-owned topic, state the recommendation, rationale, and alternatives, then require `accept`, an alternative, or a supplied decision. A missing or ambiguous answer stays `unresolved`; never infer acceptance. Select local/private/reversible conventional choices yourself. Cover:
 
 1. **What the epic delivers.** What is the end state? What capabilities exist after all children are done that don't exist today?
 2. **Overall seams.** What are the major structural divisions this epic introduces or modifies?
@@ -110,16 +111,15 @@ Put the complete confirmation ledger before the prose decisions. Every proposed 
 
 Write to: `.changes/active/<id>/architecture.md`
 
-### Epic Phase 6: Validity check
+### Epic Phase 6: Bounded adversarial validity review
 
-Same adversarial subagent as the standard path. Additional checks for epics:
-- Are child boundaries clean? No overlap or ambiguity about which child owns which seam?
-- Are the ordering dependencies correct and complete?
-- Are the cross-cutting concerns properly identified for specify?
+Run exactly one `AV-*` cycle from `references/adversarial-review.md` over the whole epic architecture. A fresh critic makes one broad discovery pass, including child boundaries, ordering, cross-cutting contracts, and all applicable review dimensions. Consolidate every blocker/major finding into one batch with severity, category, evidence, concrete impact, and alternative. Remediate the batch once, asking the user only for material decisions. A fresh verifier then checks only the original IDs; allow at most one targeted correction/reverification. It must not broaden scope or introduce new low/major findings. Record the cycle under `Validity Check Results`.
+
+Record the auditor and verifier through `review-log.mjs` under structured cycle `architect-1`, using the standard-path commands below.
 
 ### Epic Phase 7: Architect gate
 
-Present the confirmation ledger and ask the user to confirm it accurately represents their choices. Then ask: **"Every material architectural topic is explicitly confirmed and the validity check has no unresolved blockers. Do you approve the architect gate?"**
+Present the confirmation ledger and ask the user to confirm it accurately represents their choices. Then ask: **"Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect gate?"**
 
 ```
 node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate architect --approve
@@ -150,14 +150,14 @@ Note any `firm` seams the change must interact with. Note any `Known-soft-spots`
 
 ### Phase 2: Batched architectural confirmation
 
-Conduct a systematic confirmation discussion in concise numbered batches. This is not a one-question interview. For every material architectural topic:
+Conduct a systematic confirmation discussion in concise numbered batches. This is not a one-question interview. For every user-owned material architectural topic:
 - State the question, the agent's recommendation, its rationale, and meaningful alternatives.
 - Require an explicit response: `accept`, choose an alternative, or provide a decision. The user may respond compactly by item number.
 - A missing, vague, or ambiguous answer stays `unresolved`. Follow up only on unresolved items; never infer acceptance from silence.
 - Challenge an answer only when it is vague, introduces a smell, or conflicts with the idioms pack. If the user overrides a challenge, record the recommendation, user decision, and reasoning if given.
-- Stop when every material item is explicitly confirmed. Use repository conventions for nonmaterial implementation details unless they conflict with a confirmed decision.
+- Stop when every user-owned material item is explicitly confirmed. Auto-select local/private/reversible conventional idiomatic details unless they conflict with a confirmed decision; do not ask about or ledger them.
 
-Topics to cover — include every applicable material topic:
+Topics to examine, but ask only when they cross the materiality boundary:
 
 1. **Change summary.** What are we building and why? Confirm scope aligns with `class` in manifest.
 2. **Where it fits.** Which components are touched? Which seams are crossed?
@@ -173,31 +173,34 @@ Keep an architecture confirmation ledger as you work. Every resolved item needs 
 
 ### Phase 3: Draft architecture.md
 
-When every material item is confirmed, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Put the complete confirmation ledger before the prose decisions. Fill all sections. Be precise about seam IDs, firmness tags, and refactors.
+When every user-owned material item is confirmed, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Put the complete confirmation ledger before the prose decisions. Fill all sections. Be precise about seam IDs, firmness tags, and refactors.
 
 Write to: `.changes/active/<id>/architecture.md`
 
-### Phase 4: Adversarial validity check
+### Phase 4: Bounded adversarial validity review
 
-Spin off a subagent to review the draft `architecture.md` as an adversarial critic. The subagent's task:
+Run exactly one `AV-*` cycle from `references/adversarial-review.md` over the complete draft. A fresh critic performs one broad discovery pass, reviewing deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No `N/A` boilerplate is required.
 
-> "You are a senior engineer reviewing this architecture proposal. Find every gap, inconsistency, missing consideration, or unjustified assumption. Be specific. Do not validate unless the proposal genuinely has no gaps."
+Consolidate all findings into one batch. Each has a stable `AV-NNN` ID, severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and a concrete alternative. Remediate the complete batch once; ask the user only where remediation crosses the materiality boundary and auto-select local/private/reversible conventional choices.
 
-The subagent should check:
-- Are all seams clearly defined with no ambiguous crossing?
-- Does every firm seam have initial acceptance criteria?
-- Are all refactors in scope bounded and justified?
-- Are there missing error paths, edge cases, or failure modes?
-- Does the observability plan cover the change adequately?
-- Are there dependencies on firm seams of other components that aren't called out?
+Launch a fresh verifier to check only the original IDs. It does not repeat discovery, broaden scope, or introduce new low/major findings. A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or broad review would be needed, stop. Record the full cycle in `Validity Check Results`; if clean, record a brief evidence-based rationale.
 
-Classify every finding as `blocker`, `assumption`, or `implementation-detail`. Resolve only blockers before proceeding. Record assumptions and implementation details with their disposition; do not reopen architectural discussion for non-blocking findings. Record all findings in the `Validity Check Results` section of `architecture.md`.
+Record the discovery and verification under structured cycle `architect-1`. For a clean pass:
+
+```
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage architect --cycle architect-1 \
+  --role auditor --reviewer "<fresh label>" --verdict approved
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage architect --cycle architect-1 \
+  --role verifier --reviewer "<distinct fresh label>" --verdict approved
+```
+
+When findings exist, the auditor uses one structured `--finding` JSON argument per `AV-*` row, and the verifier supplies one `--resolution AV-NNN=resolved|unresolved` per original finding.
 
 ### Phase 5: Gate
 
 Present the confirmation ledger, a summary of decisions, seams, and any approved refactors. Ask the user to confirm that the ledger accurately represents their choices. Then ask explicitly:
 
-> "Every material architectural topic is explicitly confirmed and the validity check has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
+> "Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
 
 On approval:
 ```
@@ -211,6 +214,7 @@ Tell the user: **run `specify` next.**
 ## Reference files
 
 - `references/challenge-protocol.md` — adversarial stance and override rules
+- `references/adversarial-review.md` — bounded `AV-*` review cycle and finding schema
 - `references/context-schema.md` — CONTEXT.md schema (for reading existing files)
 - `references/seam-and-test-taxonomy.md` — firmness model
 - `references/manifest-schema.md` — manifest structure including epic parent/child model

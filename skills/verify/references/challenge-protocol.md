@@ -20,7 +20,24 @@ Challenge any proposal that:
 - Accepts a soft incumbent pattern without asking whether it can be improved
 - Resolves ambiguity with the first plausible answer rather than the best answer
 
+Apply these challenges internally as well as conversationally. If the better choice is local/private/reversible and conventional, select it without asking the user. Bring the challenge to the user only when it crosses the materiality boundary below.
+
 **Default stance toward existing code:** soft. Existing code is not automatically correct. If a better solution exists — especially one that uses the language's own power or is cleaner structurally — surface it. The user would rather hear about a larger refactor that yields a better result than have the agent match mediocre existing patterns.
+
+## Materiality boundary
+
+Ask the user to decide only when the choice materially affects at least one of:
+
+- A public or externally consumed contract, including observable error semantics
+- Security, privacy, authorization, or compliance policy
+- Compatibility, versioning, persistence, or migration
+- A firm seam or its enforcing criteria
+- An irreversible, costly-to-reverse, or operationally costly commitment
+- A meaningful architectural or operational tradeoff with competing outcomes
+
+Everything else is an agent-owned implementation choice. Auto-select the conventional, idiomatic repository-aligned option when the choice is local or private, reversible, and does not alter the items above. This includes private helper names, local data representation, private control flow, file-local decomposition, and equivalent library mechanisms. Record consequential agent selections in the artifact when useful, but do not manufacture a user confirmation row or question for them.
+
+Uncertainty is not automatically material. Investigate first. Ask only when evidence leaves two materially different valid outcomes or a listed boundary truly needs user authority.
 
 ## Dependency evidence
 
@@ -33,11 +50,13 @@ Package versions and APIs are time-sensitive facts, not model knowledge.
 
 ## The challenge pattern
 
-1. **State the concern.** One sentence. Be specific, not generic.
+1. **State each material concern.** One sentence per concern. Be specific, not generic.
 2. **Name the alternative.** What would you do instead and why?
 3. **Invite response.** The user may accept, refute, or propose a third path.
 
-Do not pile on multiple challenges at once. One concern at a time. Resolve it, then continue.
+Batch related material concerns so the user can answer them together. Ask at most one focused follow-up for material items left unanswered; do not drip questions across repeated rounds. Handle agent-owned choices internally.
+
+This conversational rule does not govern formal review findings. Formal architecture, specification, implementation, and refactor review uses the single consolidated batch and bounded cycle in `adversarial-review.md`.
 
 ## Override rules
 

@@ -23,6 +23,8 @@ AgentToolkit/
 
 To add a new shared file, add it to `_shared/` (or `_templates/` / `_idioms/`), then update `packages/build/sync-shared.mjs` to specify which skills receive it.
 
+Canonical source ownership is strict: shared guidance belongs in `_shared/`, templates in `_templates/`, idiom deltas in `_idioms/`, scripts and sync configuration in `packages/build/`, and tests in `packages/build/__tests__/`. Generated `skills/*/references/` and `skills/*/scripts/` files are distribution outputs, never authoring locations.
+
 ## SKILL.md rules
 
 - `name`: lowercase hyphen-separated, ≤64 chars, matches folder name.
@@ -30,6 +32,13 @@ To add a new shared file, add it to `_shared/` (or `_templates/` / `_idioms/`), 
 - Keep SKILL.md under 500 lines. Move detailed reference material to `references/`.
 - Progressive disclosure: only `name` + `description` load at agent startup. Full SKILL.md loads when relevant. Supporting files load on demand.
 - Prefer scripts over inline code blocks — script execution output consumes context; the script file itself does not.
+
+## Bounded material review
+
+- Scope discovery to the requested change, affected seams, acceptance criteria, and credible workload or failure risks.
+- Require evidence and concrete alternatives for material findings. Do not instruct a skill to find every possible gap or eliminate every possible ambiguity.
+- Use `_shared/engineering-fundamentals.md` for cross-language engineering choices. Idiom packs should contain only the language-specific expression or trap, not copies of generic fundamentals.
+- Treat duplicated literals as material when they encode domain facts that must change together; do not force incidental logs, test prose, or unrelated UI text behind one constant merely because wording repeats.
 
 ## Scripts
 
@@ -88,7 +97,7 @@ CI: firm-seam test failure = hard block. Soft-prose staleness = warning + `Conte
 ## Adding an idioms pack
 
 1. Create `_idioms/<lang>.md` following the structure of existing packs: applicability, core principle, power-checklist, and smell-list.
-2. Use a lowercase kebab-case filename. The build discovers packs automatically and syncs them to consuming skills.
+2. Use a lowercase kebab-case filename. The build discovers packs automatically and syncs them to consuming skills, including `plan` and `refactor`.
 3. Update `README.md` to list the new language.
 4. Add or update idiom structure/distribution tests when the pack introduces a new format requirement.
 5. Use the filename stem as `manifest.language` (for example, `rust`, `go`, or `typescript`).

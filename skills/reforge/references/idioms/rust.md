@@ -28,6 +28,7 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - [ ] **MUST manage resources with ownership and `Drop`.** Keep manual release inside a sound abstraction and account for partial initialization and early returns.
 - [ ] **PREFER borrowing over cloning when it remains simple.** Clone deliberately when it decouples lifetimes, captures a snapshot, or is cheap enough for the workload.
 - [ ] **PREFER newtypes and enums for domain distinctions and state machines.** Do not replace straightforward data with elaborate type machinery that obscures behavior.
+- [ ] **PREFER enum variants with variant-specific payloads and transition methods for closed state machines.** Keep fields private when arbitrary mutation could bypass legal transitions; validate persisted or external discriminants before constructing the enum.
 - [ ] **PREFER the smallest useful visibility.** Public fields suit stable data records; private fields plus getters or domain methods suit invariants, evolution, computed values, and controlled mutation. Avoid reflexive getters and reflexive exposure alike.
 - [ ] **CONSIDER `#[non_exhaustive]` for externally consumed types expected to grow.** It imposes construction/matching costs on callers, so do not add it automatically to internal types or deliberately closed APIs.
 
@@ -51,10 +52,13 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 ### Traits, Types, and Collections
 
 - [ ] **MUST preserve semantic contracts when implementing or deriving traits.** `Eq`, `Ord`, `Hash`, serialization, and conversion behavior must agree with domain identity and compatibility requirements.
+- [ ] **MUST keep `Eq`, `Hash`, and `Ord` coherent for collection keys.** Equal values must hash equally, `cmp(a, b) == Equal` must agree with equality for ordered keys, and fields participating in identity must not mutate while logically keyed.
+- [ ] **Choose Rust polymorphism from the variant set.** Start with a concrete type; use an `enum` for a closed set, generics for compile-time variation, argument-position `impl Trait` as concise generic input, return-position `impl Trait` to hide one concrete return type, and `dyn Trait` for runtime heterogeneity or an open implementation set. Include monomorphization/code-size, object-safety, allocation/indirection, and API-evolution costs rather than defaulting to traits.
 - [ ] **PREFER standard traits and conversions when their semantics fit.** Use `From` for infallible conversion, `TryFrom` for validation, and avoid surprising implicit allocation or loss.
 - [ ] **PREFER derives for behavior that is genuinely correct.** Do not derive `Clone` merely to satisfy the borrow checker or because neighboring types do; cloning may be expensive or violate single-owner intent.
 - [ ] **PREFER iterator combinators for recognizable transformations and loops for stateful control flow, early exits, multiple accumulators, or clearer debugging.** Clarity beats a blanket ban on either form.
 - [ ] **PREFER lazy iterator pipelines and collection APIs such as `entry` when they simplify the operation.** Avoid intermediate collections unless they establish ownership, ordering, reuse, or a useful phase boundary.
+- [ ] **Choose standard collections by operation semantics.** `Vec` fits contiguous indexed sequences, `VecDeque` FIFO work, `HashMap`/`HashSet` average keyed access without stable iteration order, `BTreeMap`/`BTreeSet` sorted/range access, and `BinaryHeap` repeated extrema; do not use `Vec::remove(0)` as a growing queue.
 - [ ] **MUST handle enum variants intentionally.** Wildcards are appropriate for forward-compatible external/non-exhaustive enums or deliberately irrelevant cases, but should not hide meaningful variants of an enum you control.
 
 ### Concurrency and Async
@@ -78,6 +82,7 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - `String`, booleans, tuples, or untyped maps carrying domain states that a focused enum/newtype/struct would make safer.
 - A monolithic `src/lib.rs` or `src/main.rs` holding most of the crate's logic; very large multi-responsibility modules; a flat module stuffed with unrelated items; or logic living in the crate root that should sit behind a named module boundary.
 - `Box<dyn Trait>` everywhere despite a closed set of variants, or generics everywhere despite compile-time/code-size and API costs.
+- Trait indirection around one concrete implementation; `dyn Trait` where an owned enum is closed and exhaustiveness matters; or `impl Trait` described as runtime polymorphism.
 - Public fields that permit invalid mutation, or boilerplate getters that provide no invariant, abstraction, or evolution benefit.
 - `#[non_exhaustive]`, `Clone`, `Default`, `Serialize`, or equality/order derives added without checking downstream and semantic consequences.
 - Iterator chains that obscure control flow, or manual loops that reimplement a clear standard iterator operation.

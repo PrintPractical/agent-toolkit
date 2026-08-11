@@ -34,15 +34,13 @@ function allowedGatesFor(manifest) {
   return ALLOWED_GATES[manifest.class] || ['architect', 'specify', 'plan', 'implement', 'docs'];
 }
 
-// The independent-review stage a gate depends on. Only the implement gate is
-// review-gated, and only for the classes that run the full review-and-refactor
-// pass: a refactor records under 'refactor', a feature under 'implement'. The
-// lightweight triage classes (small, bug) and epics are exempt. Returns null
-// when the gate needs no review.
+// Feature and epic architecture/specification artifacts require bounded review
+// cycles. Formal implementation review remains limited to feature/refactor;
+// lightweight bug/small changes and epic implementation are exempt.
 function reviewStageForGate(manifest, gate) {
-  if (gate !== 'implement') return null;
-  if (manifest.class === 'refactor') return 'refactor';
-  if (manifest.class === 'feature') return 'implement';
+  if (['architect', 'specify'].includes(gate) && ['feature', 'epic'].includes(manifest.class)) return gate;
+  if (gate === 'implement' && manifest.class === 'refactor') return 'refactor';
+  if (gate === 'implement' && manifest.class === 'feature') return 'implement';
   return null;
 }
 
@@ -144,13 +142,13 @@ if (values.approve) {
     process.exit(1);
   }
 
-  // Implement (or a refactor's execution) requires an approved independent review.
+  // Applicable gates require a completed bounded independent-review cycle.
   const reviewStage = reviewStageForGate(manifest, values.gate);
   if (reviewStage) {
     const gate = reviewGateReady(values.id, reviewStage, repoRoot);
     if (!gate.ready) {
       console.error(`Cannot approve the ${values.gate} gate: independent review not satisfied — ${gate.reason}.`);
-      console.error(`Record a fresh auditor review and a distinct verifier approval with review-log.mjs (stage ${reviewStage}).`);
+      console.error(`Record one discovery auditor and a distinct verifier approval with review-log.mjs (stage ${reviewStage}).`);
       process.exit(1);
     }
   }

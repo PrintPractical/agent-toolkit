@@ -21,6 +21,7 @@ Flag proposals that replace a well-defined domain model or lifecycle with dynami
 
 - [ ] **PREFER `dataclass` for value-oriented records with generated comparison and representation.** Choose `frozen=True`, ordering, slots, and custom equality only when their semantics fit; do not use a dataclass merely to avoid writing a meaningful class API.
 - [ ] **PREFER `Enum` for a closed set of named values.** Use `StrEnum` only when string interoperability is part of the contract, and compare enum members rather than duplicating their raw values.
+- [ ] **Put legal state changes in methods or transition functions that accept and return the enum/state record, and validate deserialized enum values at the boundary.** Use distinct dataclasses or a tagged union when variants carry different required data instead of mutating a dictionary of optional fields.
 - [ ] **CONSIDER value objects or small classes instead of primitive-heavy APIs.** Validation and invariants should live near the data they govern.
 - [ ] **MUST implement `__eq__` and `__hash__` consistently.** Mutable objects should not usually be hashable; return `NotImplemented` when comparison with another type is unsupported.
 - [ ] **PREFER standard data-model hooks over bespoke conventions.** Iteration, containment, context management, formatting, and path protocols make objects compose with Python and its ecosystem.
@@ -39,6 +40,7 @@ Flag proposals that replace a well-defined domain model or lifecycle with dynami
 - [ ] **PREFER generators for lazy pipelines and potentially large inputs.** Document single-use behavior and avoid yielding while holding a resource longer than callers expect.
 - [ ] **PREFER a comprehension when it is a direct readable transformation.** Use an ordinary loop when branching, state changes, error handling, or naming intermediate values makes intent clearer.
 - [ ] **CONSIDER `itertools`, `enumerate`, `zip`, and unpacking before manual index bookkeeping.** Preserve explicit validation when unequal lengths or truncation matter.
+- [ ] **Choose the standard container for the dominant operation.** Use `collections.deque` rather than `list.pop(0)` for a growing FIFO queue, `heapq` for repeated minima, sets/dicts for membership or keyed lookup, and sorting/bisect only when ordered traversal or range insertion costs fit the workload.
 
 ### Errors and Resources
 
@@ -81,6 +83,7 @@ Flag proposals that replace a well-defined domain model or lifecycle with dynami
 - Mutable default arguments such as `def f(items=[])`; use `None` or a default factory when a fresh value is required
 - Nested `dict[str, Any]` structures passed across layers, with required keys and value meanings known only by convention
 - Stringly typed modes, statuses, field names, or dispatch where an enum, value object, callable, or protocol would express the contract
+- Enum-valued state changed without one transition policy, or deserialized state trusted merely because an annotation names the enum
 - Boolean parameters whose call sites conceal distinct operations, especially several independent flags
 - A dataclass with extensive mutation and invariant repair that should expose behavior through a purposeful class API
 - Identity checks for value equality (`is` instead of `==`), or equality checks for singletons such as `None` instead of `is`
@@ -97,6 +100,7 @@ Flag proposals that replace a well-defined domain model or lifecycle with dynami
 ### Iteration and Module Smells
 
 - Materializing a list solely to iterate once when streaming materially improves memory use or latency
+- `list.pop(0)` used as an unbounded queue, repeated linear membership scans where a set fits, or code assuming dict insertion order is sorted order
 - A dense comprehension or generator expression with hidden side effects, multiple branches, or duplicated expensive work
 - Import-time registration or singleton construction whose ordering changes behavior or makes tests depend on module cache state
 - Circular imports patched repeatedly with local imports instead of addressing module responsibilities

@@ -1,11 +1,11 @@
 ---
 name: implement
-description: Use after plan gate is approved to execute the task checklist in plan.md. Implements each section to a green test baseline, then runs one independent review-and-refactor pass (fresh auditor + verifier subagents) over the whole change before the implement gate. Enforces the firm-seam test tripwire, logs kickbacks on flaws, and reconciles CONTEXT.md files when done. Do not run unless the plan gate is approved.
+description: Use after plan gate is approved to execute plan.md. Implements each section to a green baseline, then runs one bounded independent RV review and behavior-preserving remediation over the whole change before the implement gate. Enforces the firm-seam tripwire, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan gate is approved.
 ---
 
 # Implement
 
-You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make **zero product/contract/scope decisions** here. If something requires such a decision, stop — that is a kickback. Local, behavior-preserving quality decisions during the review-and-refactor pass are part of the job.
+You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make no new decisions about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Those are kickbacks. You do select conventional idiomatic local/private/reversible implementation choices.
 
 ## Running the helper scripts
 
@@ -19,9 +19,9 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-The implementer follows the plan. It does not interpret, improvise, or "make reasonable assumptions" about behavior, contracts, or scope. Any such ambiguity is a defect in the spec process and triggers a kickback.
+The implementer follows confirmed outcomes and scope. It does not improvise behavior or contracts. Investigate uncertainty first; kick back only when evidence leaves a user-owned material decision unresolved. Private helpers, local data structures, control flow, and equivalent idiomatic mechanisms are implementation choices, not spec defects.
 
-Code quality is still your job, but it is **not** done per section. Each section is implemented to a green test baseline; the single behavior-preserving review-and-refactor pass happens once, after all sections are green, driven by fresh independent reviewers (see `references/implementation-review.md`).
+Code quality is still your job, but it is **not** reviewed per section. Each section reaches a green baseline; the single bounded review and behavior-preserving remediation happens once after all sections are green (see `references/implementation-review.md`).
 
 ## Preconditions
 
@@ -30,7 +30,7 @@ Load `manifest.yaml`. Verify:
 - `gates.implement` is `pending`.
 - `plan.md` exists.
 
-If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the review-and-refactor pass. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+Read `references/engineering-fundamentals.md`. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for implementation and review. If no matching pack exists, state that and use repository conventions and tooling.
 
 ## The loop: per section (implement → tests green)
 
@@ -50,38 +50,30 @@ Write any test tasks labeled `[firmness: soft]` in this section. Run the tests; 
 
 ## After all sections complete
 
-### Independent review & behavior-preserving refactor (L3)
+### Bounded independent review & behavior-preserving remediation (L3)
 
 This runs **once**, over the whole change, and gates the implement gate. Full detail is in `references/implementation-review.md`.
 
-1. **Fresh auditor subagent.** Launch a read-only subagent in a separate context (not you, the implementer). Give it the diff, the relevant CONTEXT/seams, and instruct it to load `references/idioms/<lang>.md` for every language in scope and review against it. It must actively hunt for:
-   - unsafe / panic-prone code (e.g. Rust `.unwrap()`/`.expect()`/`panic!` on I/O, parsing, input, locks, task joins; swallowed errors),
-   - idiom-pack violations,
-   - oversized / monolithic modules and other structural bloat,
-   - hygiene issues (dead code, debug prints, stray TODOs).
-
-   Record its findings:
+1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, and every language idiom pack. Following `references/adversarial-review.md`, it reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` boilerplate.
+2. **One consolidated batch.** Deduplicate all blocker/major findings. Record stable `RV-NNN` IDs in the plan's review table with severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and concrete alternative. Do not emit nits or later batches. Attest with:
    ```
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --role auditor \
-     --reviewer "<auditor label>" --verdict changes-requested \
-     --finding "<file:line> [safety|idioms|structure|hygiene] <required action>"
+   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --cycle implement-1 --role auditor \
+      --reviewer "<auditor label>" --verdict changes-requested \
+      --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
    ```
-   If the work genuinely needs no cleanup, the auditor may record `--verdict approved` with a stated rationale.
-
-2. **Apply behavior-preserving cleanup** for the findings. Change only implementation and soft-seam tests. **Firm-seam tests must stay green at all times** — a firm-seam failure means behavior changed: STOP and kick back (it is not a pure refactor). Soft-seam tests may be rewritten to match the new structure.
-
-3. **Full green run.** Run the full test suite (or relevant subset). It must pass after the refactor.
-
-4. **Fresh verifier subagent.** Launch a *distinct* read-only subagent (not you and not the auditor). It re-loads the idiom packs, confirms the auditor's findings are resolved or explicitly deferred, and confirms behavior is preserved. Its reviewer label must differ from the auditor's:
+   If clean, record `approved` plus a brief evidence-based rationale in the plan.
+3. **One remediation.** Resolve the complete batch behavior-preservingly. Auto-select local/private/reversible idiomatic fixes. Kick back any remediation crossing the materiality boundary. Change only implementation and soft-seam tests. Firm-seam tests must stay green; failure means STOP and kick back, never edit the test.
+4. **Full green run.** Run the full applicable suite after remediation.
+5. **Focused verification.** Launch a distinct fresh read-only verifier. It checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
    ```
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --role verifier \
-     --reviewer "<distinct verifier label>" --verdict approved
+   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --cycle implement-1 --role verifier \
+      --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
    ```
-   A `changes-requested` verdict returns to step 2 with a new fresh reviewer.
+   A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.
 
 ### Implement gate
 
-When all sections are green, the review-and-refactor pass is done, and an approved verifier review is recorded:
+When all sections are green, the bounded review/remediation is done, and an approved verifier review is recorded:
 
 > "All implementation sections are complete, tests pass, and the independent review is approved. Do you approve the implement gate?"
 
@@ -95,7 +87,7 @@ The gate refuses unless an approved verifier review (backed by a distinct audito
 
 When you encounter:
 - An ambiguity the plan did not cover
-- A decision you'd have to make (any non-trivial choice)
+- A decision at the materiality boundary that the artifacts do not resolve
 - A firm-seam test that fails during the refactor pass (behavior change)
 - A conflict between the plan and reality that requires resolving
 
@@ -156,10 +148,12 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 
 ## Reference files
 
-- `references/implementation-review.md` — the independent review-and-refactor model, roles, and review record
+- `references/implementation-review.md` — bounded independent implementation review and review record
+- `references/adversarial-review.md` — bounded cycle, review dimensions, and `RV-*` finding contract
 - `references/seam-and-test-taxonomy.md` — firm/soft test rules, tripwire
 - `references/manifest-schema.md` — kickback types
 - `references/change-lifecycle.md` — docs reconciliation + archive
 - `references/firm-change-protocol.md` — if a firm seam must change
 - `references/drift-control.md` — CONTEXT.md update rules
-- `references/idioms/<lang>.md` — review-and-refactor guidance
+- `references/idioms/<lang>.md` — implementation and review guidance
+- `references/engineering-fundamentals.md` — cross-language data, state, abstraction, and bounded-resource guidance

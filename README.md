@@ -78,21 +78,22 @@ brainstorm (optional)
 architect
   └─ gathers relevant CONTEXT.md files
   └─ batched architectural-topic confirmation with explicit user responses
-  └─ adversarial discussion: seams, decisions, refactors, idioms
- └─ validity-check subagent hunts for gaps
+  └─ bounded adversarial discussion: material seams, decisions, refactors, engineering fundamentals, idioms
+ └─ validity-check subagent tests material risks within the change scope
  └─ produces: .changes/active/<id>/architecture.md
  └─ approves: architect gate
 
 specify
   └─ batched material-decision confirmation with explicit user responses
- └─ nails every interface change, error path, edge case
- └─ implement-as-if dry-run subagent: finds remaining gaps
+ └─ defines material interface changes, error paths, and edge cases
+ └─ implement-as-if dry-run subagent: finds unresolved material blockers within scope
  └─ produces: .changes/active/<id>/decisions.md
  └─ reconciles architecture.md
  └─ approves: specify gate
 
 plan
  └─ decomposes into detailed task checklist
+ └─ applies engineering fundamentals and the target-language idiom pack to concrete task choices
  └─ test tasks labeled by seam firmness (firm = safety net, soft = disposable)
  └─ traceability: every acceptance criterion → at least one task
  └─ produces: .changes/active/<id>/plan.md
@@ -295,13 +296,19 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
 
 ### Idioms packs
 
-Consulted by `architect`, `specify`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
+Consulted by `architect`, `specify`, `plan`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
 
 The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** To add a pack, create `_idioms/<lang>.md` using a lowercase kebab-case filename and run `npm run build`; the build discovers and distributes canonical packs automatically. The filename stem is the `manifest.language` value.
+
+### Engineering review
+
+The shared engineering fundamentals guide workload-based data structure choices, asymptotic and resource bounds, legal state transitions, abstraction selection, standard algorithms, equality/hash/order contracts, and material domain duplication. Reviews are intentionally bounded to the requested change, affected seams, acceptance criteria, and credible workload or failure risks. They require evidence and concrete alternatives for material findings rather than an unbounded search for hypothetical issues.
 
 ---
 
 ## Development
+
+Canonical authored sources live in `_shared/`, `_templates/`, `_idioms/`, and `packages/build/`. Files under `skills/*/references/` and `skills/*/scripts/` are generated copies; do not edit them directly.
 
 ```bash
 npm install

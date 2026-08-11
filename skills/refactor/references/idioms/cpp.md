@@ -46,6 +46,8 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - [ ] **PREFER composition over inheritance for reuse.** Use virtual interfaces when runtime substitution is required; give polymorphic bases a suitable virtual destructor when deletion through the base is supported, and mark overrides `override`.
 - [ ] **MUST preserve ABI/lifetime contracts in callbacks and polymorphic APIs.** Returning values from virtual functions does not inherently force heap allocation; decide representation from semantics and measured cost.
 - [ ] **CONSIDER templates, concepts (C++20), variants, or virtual dispatch according to whether polymorphism is compile-time, closed-set, or open/runtime.** Include compile-time, code-size, ABI, and extensibility costs.
+- [ ] **Model a closed state machine with `enum class` or `std::variant` plus state-specific payload types, and expose transition operations that reject illegal moves.** Use `std::visit` so adding a payload variant requires handling; validate numeric or serialized tags before construction.
+- [ ] **Keep equality, hashing, and ordering semantically aligned.** Equal keys must produce equal `std::hash` values, ordered-container equivalence must match intended identity, and key fields must not be mutated through aliases while stored in an associative container.
 
 ### Concurrency and Tooling
 
@@ -63,6 +65,8 @@ Use this guidance when designing, specifying, implementing, reviewing, triaging,
 - `vector[i]` assumed to perform bounds checks; iterator/reference use after container invalidation.
 - `string_view`, `span`, lambda captures, or coroutine state outliving the referenced object or temporary.
 - `optional` used where failures require diagnostics, or sentinel/null values used where absence should be explicit.
+- Parallel booleans or raw integer states in place of `enum class`/`variant`, or public mutation that bypasses legal transition checks.
+- Hash/equality disagreement, an ordering relation that is not strict weak ordering, or mutation of fields that determine an associative-container key.
 - Structured bindings that copy expensive values accidentally, especially `for (auto [k, v] : map)`.
 - C++20/23 features used without matching the declared standard and supported compiler/standard-library versions.
 - Blanket bans on loops, `printf`/C APIs, or inheritance without considering project interfaces, interoperability, formatting safety, and semantics.

@@ -9,11 +9,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
+import { ALL_IDIOMS, ALL_SHARED, SYNC_MAP } from '../sync-shared.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
 const SYNC_SCRIPT = path.join(REPO_ROOT, 'packages/build/sync-shared.mjs');
 const IDIOMS_DIR = path.join(REPO_ROOT, '_idioms');
-const IDIOM_CONSUMERS = ['architect', 'specify', 'implement', 'triage', 'reforge'];
 
 describe('sync-shared.mjs', () => {
   it('runs without error in check mode when generated assets are current', () => {
@@ -80,16 +80,40 @@ describe('sync-shared.mjs', () => {
     assert.match(rust, /metadata-reported manifest path rather than assuming `~\/\.cargo`/);
   });
 
-  it('syncs every canonical idiom pack to every consuming skill', () => {
-    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+  it('distributes every canonical idiom pack to every configured consumer', () => {
     const packNames = fs.readdirSync(IDIOMS_DIR).filter(name => name.endsWith('.md')).sort();
+    const expectedIdioms = packNames.map(name => ({
+      src: `_idioms/${name}`,
+      dest: `idioms/${name}`,
+    }));
+    const consumers = Object.entries(SYNC_MAP)
+      .filter(([, files]) => files.some(({ src }) => src.startsWith('_idioms/')))
+      .map(([skill]) => skill);
 
-    for (const skill of IDIOM_CONSUMERS) {
-      for (const name of packNames) {
-        const src = path.join(IDIOMS_DIR, name);
-        const dest = path.join(REPO_ROOT, 'skills', skill, 'references', 'idioms', name);
-        assert.ok(fs.existsSync(dest), `Expected ${skill} to receive idioms/${name}`);
-        assert.ok(fs.readFileSync(src).equals(fs.readFileSync(dest)), `${skill}/idioms/${name} must match canonical source`);
+    assert.ok(consumers.includes('plan'), 'plan must receive idiom packs');
+    assert.ok(consumers.includes('refactor'), 'refactor must retain idiom packs');
+    assert.deepEqual(ALL_IDIOMS, expectedIdioms);
+
+    for (const skill of consumers) {
+      const configuredIdioms = SYNC_MAP[skill]
+        .filter(({ src }) => src.startsWith('_idioms/'));
+      assert.deepEqual(configuredIdioms, expectedIdioms, `${skill} must receive every canonical idiom pack`);
+    }
+  });
+
+  it('distributes engineering and adversarial references through ALL_SHARED', () => {
+    const required = [
+      '_shared/adversarial-review.md',
+      '_shared/engineering-fundamentals.md',
+    ];
+
+    for (const src of required) {
+      assert.ok(ALL_SHARED.some(file => file.src === src), `ALL_SHARED must include ${src}`);
+    }
+
+    for (const skill of ['architect', 'specify', 'plan', 'implement', 'refactor']) {
+      for (const src of required) {
+        assert.ok(SYNC_MAP[skill].some(file => file.src === src), `${skill} must receive ${src}`);
       }
     }
   });

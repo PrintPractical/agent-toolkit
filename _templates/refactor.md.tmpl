@@ -139,18 +139,27 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 
 **Notes:** {{scope amendments, findings, or none}}
 
-## Independent review (implement gate)
+## Bounded independent review (implement gate)
+
+**Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
+**Cycle:** `refactor-1`
+**Cycle bound:** one broad discovery pass; one consolidated blocker/major batch; one remediation; focused verification of original `RV-*` IDs; at most one targeted correction/reverification
 
 **Auditor (fresh subagent):** {{self-declared label; not the implementer}}
-**Auditor command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding "<file:line> [category] <action>"`
+**Auditor command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --cycle refactor-1 --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding '<structured finding JSON>'`
 
-| Finding | Category | Evidence | Required action | Status |
-|---|---|---|---|---|
-| {{summary}} | safety / idioms / structure / hygiene | `{{file:line}}` | {{action}} | unresolved / resolved |
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Focused verification |
+|---|---|---|---|---|---|---|---|
+| RV-001 | blocker / major | correctness / security / simplicity / maintainability / idioms | `{{file:line}}` | {{specific consequence}} | {{concrete direction}} | {{resolution}} | reviews.json entry |
+
+<!-- Remove the example row when clean; use the clean-review rationale instead. -->
 
 **Verifier (distinct fresh subagent):** {{self-declared label; not the implementer or auditor}}
 **Verifier verdict:** pending | approved | changes-requested
-**Verifier command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --role verifier --reviewer "<distinct label>" --verdict approved`
+**Verifier command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --cycle refactor-1 --role verifier --reviewer "<distinct label>" --verdict approved --resolution RV-001=resolved`
+**Verification scope:** original RV IDs plus any remediation-caused blocker regression recorded through `--regression`; no broad rediscovery or new low/major findings
+**Targeted correction/reverification used:** no | yes - {{original RV IDs and blocker regression closed through `--regression-resolution`}}
+**Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
 
 ## Full verification
 
