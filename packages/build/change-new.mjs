@@ -85,9 +85,9 @@ const dir = changeDir(id, repoRoot);
 console.error(`Creating change: ${id}`);
 fs.mkdirSync(dir, { recursive: true });
 
-// Epics only use architect + specify gates. They never run plan/implement/docs.
+// Epics only use architect + specify approvals. They never run plan/implement/docs.
 // Refactors skip the spec spine: refactor (audit + selection) → implement → docs.
-const gates = values.class === 'epic'
+const approvals = values.class === 'epic'
   ? { architect: 'pending', specify: 'pending' }
   : values.class === 'refactor'
   ? { refactor: 'pending', implement: 'pending', docs: 'pending' }
@@ -99,15 +99,16 @@ const manifest = {
   id,
   title: values.title,
   class: values.class,
-  stage: isRefactor ? 'refactor' : 'architect',
+  phase: isRefactor ? 'refactor' : 'architect',
   language: values.language,
   ...(values.parent ? { parent: values.parent } : {}),
   ...(values.class === 'epic' ? { children: [] } : {}),
   ...(isRefactor ? { refactor_mode: values.mode, refactor_selected_ids: [] } : {}),
-  gates,
+  approvals,
   artifacts: isRefactor
-    ? { refactor: 'refactor.md' }
+    ? { change_brief: 'change-brief.md', refactor: 'refactor.md' }
     : {
+        change_brief: 'change-brief.md',
         architecture: 'architecture.md',
         decisions:    'decisions.md',
         plan:         'plan.md',
@@ -123,15 +124,15 @@ console.error(`Manifest written: ${path.join(dir, 'manifest.yaml')}`);
 if (values.parent) {
   addChildToEpic(values.parent, id, repoRoot);
   console.error(`Linked as child of epic: ${values.parent}`);
-  console.error(`Stage: architect — run the 'architect' skill next (child change)`);
+  console.error(`Phase: architect — run the 'architect' skill next (child change)`);
 } else if (values.class === 'epic') {
-  console.error(`Stage: architect — run the 'architect' skill next`);
+  console.error(`Phase: architect — run the 'architect' skill next`);
   console.error(`  Epic flow: architect → specify → (auto-decompose into children)`);
 } else if (isRefactor) {
-  console.error(`Stage: refactor — run the 'refactor' skill next`);
+  console.error(`Phase: refactor — run the 'refactor' skill next`);
   console.error(`  Refactor flow: refactor (audit + selection) → implement (execute + review) → docs`);
 } else {
-  console.error(`Stage: architect — run the 'architect' skill next`);
+  console.error(`Phase: architect — run the 'architect' skill next`);
 }
 
 // Write to stdout as JSON for agent consumption

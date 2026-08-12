@@ -23,6 +23,8 @@ Use the constructive challenge stance in `references/challenge-protocol.md`, but
 
 ## Preconditions
 
+Before checking status, creating a manifest, reading CONTEXT.md, or scanning code, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. After selecting or creating the workspace, write `change-brief.md` from `references/templates/change-brief.md.tmpl`.
+
 Check for an active change:
 ```
 node "$SKILL_DIR/scripts/change-status.mjs"
@@ -33,7 +35,7 @@ If no active change, create one:
 node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" --class small|bug [--language <lang>]
 ```
 
-Load the active `manifest.yaml`. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the challenge and refactor passes. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+Load the active `manifest.yaml`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for the challenge and refactor passes. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## Phase 1: Classify
 
@@ -107,10 +109,10 @@ If the change affects a CONTEXT.md claim (rare for small fixes, common for bugs 
 
 ## Phase 7: Archive
 
-Approve the docs gate (even if no CONTEXT changes — the gate is always required):
+Approve the docs approval (even if no CONTEXT changes — the approval is always required):
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate implement --approve
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate docs --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
 
@@ -132,4 +134,4 @@ Do not be heroic about keeping something in triage. A legitimate escalation is n
 - `references/context-schema.md` — for reading CONTEXT.md
 - `references/seam-and-test-taxonomy.md`
 - `references/firm-change-protocol.md` — if a firm seam is involved
-- `references/idioms/<lang>.md` — if language is set
+- `idioms` skill — if language is set

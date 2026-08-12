@@ -40,7 +40,7 @@ export const ALL_SHARED = [
   { src: '_shared/engineering-fundamentals.md', dest: 'engineering-fundamentals.md' },
 ];
 
-const ALL_TEMPLATES = [
+export const ALL_TEMPLATES = [
   { src: '_templates/CONTEXT.md.tmpl',          dest: 'templates/CONTEXT.md.tmpl' },
   { src: '_templates/manifest.yaml.tmpl',       dest: 'templates/manifest.yaml.tmpl' },
   { src: '_templates/architecture.md.tmpl',     dest: 'templates/architecture.md.tmpl' },
@@ -73,58 +73,86 @@ export const SYNC_MAP = {
     { src: '_templates/architect-seed.md.tmpl', dest: 'templates/architect-seed.md.tmpl' },
   ],
   architect: [
-    ...ALL_SHARED,
-    ...ALL_TEMPLATES,
-    ...ALL_IDIOMS,
+    { src: '_shared/challenge-protocol.md',      dest: 'challenge-protocol.md' },
+    { src: '_shared/context-schema.md',          dest: 'context-schema.md' },
+    { src: '_shared/manifest-schema.md',         dest: 'manifest-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md',  dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/change-lifecycle.md',        dest: 'change-lifecycle.md' },
+    { src: '_shared/firm-change-protocol.md',    dest: 'firm-change-protocol.md' },
+    { src: '_shared/adversarial-review.md',      dest: 'adversarial-review.md' },
+    { src: '_shared/engineering-fundamentals.md', dest: 'engineering-fundamentals.md' },
+    { src: '_templates/architecture.md.tmpl',    dest: 'templates/architecture.md.tmpl' },
+    { src: '_templates/change-brief.md.tmpl',    dest: 'templates/change-brief.md.tmpl' },
   ],
   specify: [
-    ...ALL_SHARED,
-    { src: '_templates/decisions.md.tmpl',   dest: 'templates/decisions.md.tmpl' },
-    { src: '_templates/architecture.md.tmpl', dest: 'templates/architecture.md.tmpl' },
-    ...ALL_IDIOMS,
+    { src: '_shared/challenge-protocol.md',      dest: 'challenge-protocol.md' },
+    { src: '_shared/manifest-schema.md',         dest: 'manifest-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md',  dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/firm-change-protocol.md',    dest: 'firm-change-protocol.md' },
+    { src: '_shared/adversarial-review.md',      dest: 'adversarial-review.md' },
+    { src: '_shared/engineering-fundamentals.md', dest: 'engineering-fundamentals.md' },
+    { src: '_templates/decisions.md.tmpl',       dest: 'templates/decisions.md.tmpl' },
   ],
   plan: [
-    ...ALL_SHARED,
-    { src: '_templates/plan.md.tmpl',         dest: 'templates/plan.md.tmpl' },
-    { src: '_templates/decisions.md.tmpl',    dest: 'templates/decisions.md.tmpl' },
-    { src: '_templates/architecture.md.tmpl', dest: 'templates/architecture.md.tmpl' },
-    ...ALL_IDIOMS,
+    { src: '_shared/manifest-schema.md',         dest: 'manifest-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md',  dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/change-lifecycle.md',        dest: 'change-lifecycle.md' },
+    { src: '_shared/adversarial-review.md',      dest: 'adversarial-review.md' },
+    { src: '_shared/engineering-fundamentals.md', dest: 'engineering-fundamentals.md' },
+    { src: '_templates/plan.md.tmpl',            dest: 'templates/plan.md.tmpl' },
   ],
   implement: [
-    ...ALL_SHARED,
-    { src: '_templates/plan.md.tmpl',         dest: 'templates/plan.md.tmpl' },
-    ...ALL_IDIOMS,
+    { src: '_shared/manifest-schema.md',         dest: 'manifest-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md',  dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/implementation-review.md',   dest: 'implementation-review.md' },
+    { src: '_shared/change-lifecycle.md',        dest: 'change-lifecycle.md' },
+    { src: '_shared/drift-control.md',           dest: 'drift-control.md' },
+    { src: '_shared/firm-change-protocol.md',    dest: 'firm-change-protocol.md' },
+    { src: '_shared/adversarial-review.md',      dest: 'adversarial-review.md' },
+    { src: '_shared/engineering-fundamentals.md', dest: 'engineering-fundamentals.md' },
   ],
   refactor: [
-    ...ALL_SHARED,
-    ...ALL_TEMPLATES,
-    ...ALL_IDIOMS,
+    { src: '_shared/challenge-protocol.md',     dest: 'challenge-protocol.md' },
+    { src: '_shared/context-schema.md',         dest: 'context-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md', dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/implementation-review.md',  dest: 'implementation-review.md' },
+    { src: '_shared/drift-control.md',          dest: 'drift-control.md' },
+    { src: '_shared/firm-change-protocol.md',   dest: 'firm-change-protocol.md' },
+    { src: '_shared/adversarial-review.md',     dest: 'adversarial-review.md' },
+    { src: '_templates/refactor.md.tmpl',     dest: 'templates/refactor.md.tmpl' },
+    { src: '_templates/change-brief.md.tmpl', dest: 'templates/change-brief.md.tmpl' },
   ],
   triage: [
-    ...ALL_SHARED,
-    { src: '_templates/manifest.yaml.tmpl',   dest: 'templates/manifest.yaml.tmpl' },
-    { src: '_templates/plan.md.tmpl',         dest: 'templates/plan.md.tmpl' },
-    ...ALL_IDIOMS,
+    { src: '_shared/challenge-protocol.md',     dest: 'challenge-protocol.md' },
+    { src: '_shared/context-schema.md',         dest: 'context-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md', dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/firm-change-protocol.md',   dest: 'firm-change-protocol.md' },
+    { src: '_templates/change-brief.md.tmpl',   dest: 'templates/change-brief.md.tmpl' },
   ],
   map: [
-    ...ALL_SHARED,
+    { src: '_shared/context-schema.md',         dest: 'context-schema.md' },
+    { src: '_shared/drift-control.md',          dest: 'drift-control.md' },
+    { src: '_shared/seam-and-test-taxonomy.md', dest: 'seam-and-test-taxonomy.md' },
     { src: '_templates/CONTEXT.md.tmpl',      dest: 'templates/CONTEXT.md.tmpl' },
     { src: '_templates/manifest.yaml.tmpl',   dest: 'templates/manifest.yaml.tmpl' },
   ],
   reforge: [
-    ...ALL_SHARED,
+    { src: '_shared/challenge-protocol.md',      dest: 'challenge-protocol.md' },
     { src: '_templates/reforge-seed.md.tmpl', dest: 'templates/reforge-seed.md.tmpl' },
     { src: '_templates/CONTEXT.md.tmpl',      dest: 'templates/CONTEXT.md.tmpl' },
-    ...ALL_IDIOMS,
   ],
   verify: [
-    ...ALL_SHARED,
+    { src: '_shared/context-schema.md',         dest: 'context-schema.md' },
+    { src: '_shared/seam-and-test-taxonomy.md', dest: 'seam-and-test-taxonomy.md' },
+    { src: '_shared/drift-control.md',          dest: 'drift-control.md' },
+    { src: '_shared/firm-change-protocol.md',   dest: 'firm-change-protocol.md' },
     { src: '_templates/CONTEXT.md.tmpl',      dest: 'templates/CONTEXT.md.tmpl' },
   ],
   'what-now': [
     { src: '_shared/manifest-schema.md',      dest: 'manifest-schema.md' },
     { src: '_shared/change-lifecycle.md',     dest: 'change-lifecycle.md' },
   ],
+  idioms: ALL_IDIOMS,
 };
 
 // ── Scripts bundled into every skill ──────────────────────────────────────────
@@ -132,20 +160,20 @@ export const SYNC_MAP = {
 // invokes plus the shared lib. Scripts import the lib via './lib/index.mjs', which
 // resolves identically in packages/build/ (dev) and skills/<name>/scripts/ (installed).
 
-const SCRIPT_FILES = [
-  'lib/index.mjs',
-  'change-new.mjs',
-  'change-status.mjs',
-  'change-archive.mjs',
-  'manifest-gate.mjs',
-  'artifact-validate.mjs',
-  'context-scaffold.mjs',
-  'context-discover.mjs',
-  'context-verify.mjs',
-  'kickback-log.mjs',
-  'review-log.mjs',
-  'epic-split.mjs',
-];
+export const SCRIPT_MAP = {
+  brainstorm: [],
+  architect: ['change-new.mjs', 'context-discover.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
+  specify: ['epic-split.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
+  plan: ['kickback-log.mjs', 'manifest-approval.mjs'],
+  implement: ['change-archive.mjs', 'context-verify.mjs', 'kickback-log.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
+  refactor: ['change-archive.mjs', 'change-new.mjs', 'context-discover.mjs', 'context-verify.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
+  triage: ['change-archive.mjs', 'change-new.mjs', 'change-status.mjs', 'manifest-approval.mjs'],
+  map: ['context-discover.mjs', 'context-scaffold.mjs'],
+  reforge: [],
+  verify: ['context-discover.mjs', 'context-verify.mjs'],
+  'what-now': ['change-status.mjs'],
+  idioms: [],
+};
 
 const ALL_SKILLS = Object.keys(SYNC_MAP);
 
@@ -181,6 +209,20 @@ export function syncShared({ check = false } = {}) {
     }
   }
 
+  function unexpectedFiles(directory, expected) {
+    if (!fs.existsSync(directory)) return [];
+    const found = [];
+    const visit = (current, relative = '') => {
+      for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+        const next = path.join(relative, entry.name);
+        if (entry.isDirectory()) visit(path.join(current, entry.name), next);
+        else if (entry.isFile()) found.push(next);
+      }
+    };
+    visit(directory);
+    return found.filter(file => !expected.has(file));
+  }
+
   // 1. Sync shared references / templates / idioms into each skill's references/
   for (const [skill, files] of Object.entries(SYNC_MAP)) {
     const skillRefDir = path.join(repoRoot, 'skills', skill, 'references');
@@ -192,6 +234,16 @@ export function syncShared({ check = false } = {}) {
       return true;
     });
 
+    const expected = new Set(deduped.map(file => file.dest));
+    if (check) {
+      for (const extra of unexpectedFiles(skillRefDir, expected)) {
+        console.error(`DRIFT: skills/${skill}/references/${extra} is not configured`);
+        driftFound = true;
+      }
+    } else {
+      fs.rmSync(skillRefDir, { recursive: true, force: true });
+    }
+
     for (const { src, dest } of deduped) {
       syncOne(
         path.join(repoRoot, src),
@@ -201,10 +253,21 @@ export function syncShared({ check = false } = {}) {
     }
   }
 
-  // 2. Sync helper scripts + lib into every skill's scripts/
+  // 2. Sync only helpers invoked by each skill, plus their shared library.
   for (const skill of ALL_SKILLS) {
     const skillScriptsDir = path.join(repoRoot, 'skills', skill, 'scripts');
-    for (const scriptRel of SCRIPT_FILES) {
+    const scripts = SCRIPT_MAP[skill];
+    if (!scripts) throw new Error(`No script capability map for skill: ${skill}`);
+    const expected = new Set(scripts.length > 0 ? ['lib/index.mjs', ...scripts] : []);
+    if (check) {
+      for (const extra of unexpectedFiles(skillScriptsDir, expected)) {
+        console.error(`DRIFT: skills/${skill}/scripts/${extra} is not configured`);
+        driftFound = true;
+      }
+    } else {
+      fs.rmSync(skillScriptsDir, { recursive: true, force: true });
+    }
+    for (const scriptRel of expected) {
       syncOne(
         path.join(repoRoot, 'packages/build', scriptRel),
         path.join(skillScriptsDir, scriptRel),

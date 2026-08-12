@@ -8,7 +8,7 @@ Every change tracked by this toolkit has a `manifest.yaml` in `.changes/active/<
 id: YYYY-MM-DD-<slug>               # e.g. 2026-07-01-add-rate-limiter
 title: Short human-readable title
 class: feature | bug | small | epic | refactor
-stage: refactor | architect | specify | plan | implement | done
+phase: refactor | architect | specify | plan | implement | done
 language: <idiom-pack-id>           # lowercase filename stem, e.g. rust, go, typescript; omit for language-agnostic
 
 # Epic parent/child linking (optional)
@@ -21,7 +21,7 @@ refactor_mode: execute | audit-only # execute applies selected cleanup; audit-on
 refactor_selected_ids:              # user-approved opportunity IDs from refactor.md
   - RF-001
 
-gates:
+approvals:
   refactor:   pending | approved    # refactor class only: audit + selection approved
   architect:  pending | approved
   specify:    pending | approved
@@ -30,6 +30,7 @@ gates:
   docs:       pending | approved
 
 artifacts:
+  change_brief:  change-brief.md      # intake captured before discovery
   architecture: architecture.md     # relative to this directory
   decisions:    decisions.md
   plan:         plan.md
@@ -37,7 +38,7 @@ artifacts:
 
 # Formal review findings live in the active artifacts:
 # architecture.md: AV-NNN; decisions.md: SV-NNN; plan/refactor.md: RV-NNN
-# Implementation/refactor gate attestations additionally live in reviews.json.
+# Implementation/refactor approval attestations additionally live in reviews.json.
 
 context_targets:                    # CONTEXT.md files this change should reconcile
   - CONTEXT.md
@@ -45,16 +46,20 @@ context_targets:                    # CONTEXT.md files this change should reconc
 
 kickbacks:
   - type:       defect | amendment
-    stage:      specify | plan | implement
+    phase:      specify | plan | implement
     at:         2026-07-01T14:32:00Z
     missed:     "What the upstream spec should have caught"
     resolution: "What was decided to resolve it"
     impact: specify | plan | implementation
-    invalidated_gates: "specify,plan"
-    restart_stage: specify
+    invalidated_approvals: "specify,plan"
+    restart_phase: specify
 ```
 
-## Stage machine
+## Change brief
+
+Create `change-brief.md` from `change-brief.md.tmpl` immediately after creating an active workspace and before discovery. It records the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. It may identify unknowns; it does not decide architecture.
+
+## Phase machine
 
 ```
 Feature/bug/small:    architect → specify → plan → implement → done
@@ -67,17 +72,17 @@ Refactor:             refactor → implement → done
                       (audit + selection) (execute + independent review)
 ```
 
-- Stage advances only when the corresponding gate is `approved`.
-- **No skill auto-advances past a gate.** Every gate transition requires explicit user approval in the session.
-- Each spine skill checks the prior gate on startup and refuses to proceed if it is not `approved`.
-- `change-status.mjs` prints the current stage and the recommended next skill.
-- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream gate. Re-approve only invalidated gates without losing unaffected checklist work.
+- The phase advances only when the corresponding approval is `approved`.
+- **No skill auto-advances past an approval.** Every approval requires explicit user approval in the session.
+- Each spine skill checks the prior approval on startup and refuses to proceed if it is not `approved`.
+- `change-status.mjs` prints the current phase and the recommended next skill.
+- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream approval. Re-approve only invalidated approvals without losing unaffected checklist work.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs` to create child change manifests. The epic's `architecture.md` + `decisions.md` become parent context for each child's `architect` session.
 
-## Gate semantics
+## Approval semantics
 
-| Gate | Approved by | What it certifies |
+| Approval | Approved by | What it certifies |
 |---|---|---|
 | `refactor` | User, after audit + explicit opportunity selection | Ranked opportunities recorded; user selected exact `RF-NNN` IDs to execute |
 | `architect` | User, after bounded `AV-*` review and deterministic artifact validation | Material topics confirmed; original review IDs closed; no unresolved blockers |
@@ -98,23 +103,23 @@ Refactor:             refactor → implement → done
 
 An epic is a container for multiple related feature/bug/small changes that are too large to implement as one change but share a common architectural context.
 
-**Epic manifest:** Contains `class: epic` and a `children` list of child change IDs. The epic runs `architect` then `specify`; `epic-split` populates the `children` list after the specify gate is approved. The epic reaches `done` when all children reach `done` (or are archived).
+**Epic manifest:** Contains `class: epic` and a `children` list of child change IDs. The epic runs `architect` then `specify`; `epic-split` populates the `children` list after the specify approval is approved. The epic reaches `done` when all children reach `done` (or are archived).
 
 **Child manifests:** Contain `parent: <epic-id>` linking back to the epic. Each child has its own full pipeline.
 
-**Execution order — depth-first.** Take each child all the way to `done` (architect → specify → plan → implement) before starting the next, in dependency order. Do not architect/specify all children up front: the epic's `specify` already locked the cross-cutting contracts between children, so each child is insulated from the others. Independent children may run in parallel, but each runs its full spine start-to-finish — never batched by stage. If a child implementation reveals a cross-cutting contract is wrong, kick back to the epic's `specify` (firm-change protocol) and propagate to any already-completed children.
+**Execution order — depth-first.** Take each child all the way to `done` (architect → specify → plan → implement) before starting the next, in dependency order. Do not architect/specify all children up front: the epic's `specify` already locked the cross-cutting contracts between children, so each child is insulated from the others. Independent children may run in parallel, but each runs its full spine start-to-finish — never batched by phase. If a child implementation reveals a cross-cutting contract is wrong, kick back to the epic's `specify` (firm-change protocol) and propagate to any already-completed children.
 
 **Scripts:**
 - `change-new.mjs --class epic` — create a new epic manifest
 - `change-new.mjs --parent <epic-id>` — create a child linked to an epic
 - `epic-split.mjs --epic <id> --children '[...]'` — bulk-create children from an existing epic architecture.md
-- `change-status.mjs --id <epic-id>` — show epic progress with per-child stage rollup
+- `change-status.mjs --id <epic-id>` — show epic progress with per-child phase rollup
 
 ## Kickback types and quality metric
 
-Kickback entries log times when `implement` had to stop and return to an upstream stage.
+Kickback entries log times when `implement` had to stop and return to an upstream phase.
 
-An empty `resolution` means the kickback is unresolved. Resolve only the affected artifact at its recorded `restart_stage` before re-approving invalidated gates.
+An empty `resolution` means the kickback is unresolved. Resolve only the affected artifact at its recorded `restart_phase` before re-approving invalidated approvals.
 
 - **`defect`** — The upstream spec was incomplete; the dry-run in `specify` should have caught this. Counts against kickback frequency.
 - **`amendment`** — Legitimate external requirement change or new information. Does not count against kickback frequency.

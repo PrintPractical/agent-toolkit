@@ -26,6 +26,10 @@ Deliberately selective. You are looking for:
 
 This requires honesty. A PoC author often anchors on their prototype's patterns. Your job is to see past the implementation to the underlying intent.
 
+## Intake
+
+Before exploration, subagents, or reference reads, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. Use the answers to bound the PoC exploration.
+
 ## Phase 1: Comprehend the PoC
 
 Run explore subagents to understand the prototype — not to document it, but to extract intent.
@@ -58,7 +62,7 @@ Questions (one at a time, challenge answers):
 
 Challenge vague answers. "I'd refactor the architecture" is not an answer. "The event loop model was wrong because X; I'd use Y instead" is an answer.
 
-After the target language is known, load `references/idioms/<lang>.md` if it exists and use it to challenge implementation anti-patterns and the proposed production direction. If no matching pack exists, state that and use the target ecosystem's established conventions and tooling rather than assuming pack guidance.
+After the target language is known, use the `idioms` skill to load its matching pack and challenge implementation anti-patterns and the proposed production direction. If no matching pack is installed, state that and use the target ecosystem's established conventions and tooling rather than assuming pack guidance.
 
 ## Phase 3: Write reforge-seed.md
 
@@ -103,4 +107,4 @@ If the target language is known, note:
 - `references/templates/reforge-seed.md.tmpl`
 - `references/templates/CONTEXT.md.tmpl` — for reference on what architect will produce
 - `references/challenge-protocol.md`
-- `references/idioms/<lang>.md` — if target language is known
+- `idioms` skill — if target language is known

@@ -5,13 +5,17 @@ description: Use when an idea, problem, or possible solution is not formed enoug
 
 # Brainstorm
 
-You are running the **brainstorm** entry ramp. Your job is to turn an early, incomplete idea into a clearer set of options and, when useful, a provisional direction for `architect` to challenge. This is optional discovery, not a pipeline stage.
+You are running the **brainstorm** entry ramp. Your job is to turn an early, incomplete idea into a clearer set of options and, when useful, a provisional direction for `architect` to challenge. This is optional discovery, not a pipeline phase.
 
 ## Boundaries
 
-- Do not create a change manifest, approve a gate, or create an active change.
+- Do not create a change manifest, approve an approval, or create an active change.
 - Do not present an explored option as approved architecture.
 - `architect` remains the right direct entry point when the user already has a sufficiently formed change.
+
+## Intake
+
+Before reading references, exploring the repository, or creating a seed, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed.
 
 ## Your stance
 
@@ -54,7 +58,7 @@ If yes, fill `references/templates/architect-seed.md.tmpl` and write `architect-
 
 Then tell the user:
 
-> "The brainstorm seed is ready. Run `architect` and point it at this seed. It will challenge and formalize the direction before any architect gate is approved."
+> "The brainstorm seed is ready. Run `architect` and point it at this seed. It will challenge and formalize the direction before any architect approval is approved."
 
 If no, leave the result as session discussion. Do not create an artifact merely for bookkeeping.
 

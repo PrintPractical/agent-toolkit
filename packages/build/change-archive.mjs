@@ -4,7 +4,7 @@
  *
  * Usage: node change-archive.mjs --id <change-id>
  *
- * Precondition: manifest.gates.docs must be 'approved'.
+ * Precondition: manifest.approvals.docs must be 'approved'.
  * Output (stdout): JSON { id, archive }
  * Progress (stderr): human-readable status
  */
@@ -19,13 +19,14 @@ import {
   activeDir,
   archiveDir,
   changeDir,
+  completeEpicIfDelivered,
 } from './lib/index.mjs';
 
 const { values } = parseArgs({
   options: {
     help:  { type: 'boolean', short: 'h', default: false },
     id:    { type: 'string' },
-    force: { type: 'boolean', default: false }, // bypass docs gate check (emergency use)
+    force: { type: 'boolean', default: false }, // bypass docs approval check (emergency use)
   },
   strict: true,
 });
@@ -51,9 +52,9 @@ try {
   process.exit(1);
 }
 
-if (!values.force && manifest.gates?.docs !== 'approved') {
-  console.error(`Error: docs gate is not approved for change '${id}'.`);
-  console.error('Approve the docs gate first (run verify + reconcile CONTEXT.md files), then archive.');
+if (!values.force && manifest.approvals?.docs !== 'approved') {
+  console.error(`Error: docs approval is not approved for change '${id}'.`);
+  console.error('Approve docs first (run verify + reconcile CONTEXT.md files), then archive.');
   console.error('Use --force to bypass (not recommended).');
   process.exit(1);
 }
@@ -68,8 +69,8 @@ console.error(`Archiving change: ${id}`);
 console.error(`  Source:  ${srcDir}`);
 console.error(`  Archive: ${zipPath}`);
 
-// Update manifest stage before zipping
-manifest.stage = 'done';
+// Update manifest phase before zipping
+manifest.phase = 'done';
 writeManifest(id, manifest, repoRoot);
 
 try {
@@ -87,5 +88,10 @@ console.error(`Zip created: ${zipPath}`);
 fs.rmSync(srcDir, { recursive: true, force: true });
 console.error(`Active directory removed: ${srcDir}`);
 console.error(`Change '${id}' archived successfully.`);
+
+if (manifest.parent) {
+  const parent = completeEpicIfDelivered(manifest.parent, repoRoot);
+  if (parent.phase === 'done') console.error(`Parent epic '${manifest.parent}' is complete.`);
+}
 
 process.stdout.write(JSON.stringify({ id, archive: zipPath }) + '\n');

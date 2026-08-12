@@ -17,8 +17,8 @@ import {
   writeManifest,
   listActiveChanges,
   nextSkill,
-  STAGES,
-  GATES,
+  PHASES,
+  APPROVALS,
 } from '../lib/index.mjs';
 
 // ── parseYaml ────────────────────────────────────────────────────────────────
@@ -42,15 +42,15 @@ describe('parseYaml', () => {
   });
 
   it('parses nested mappings', () => {
-    const yaml = 'gates:\n  architect: pending\n  specify: approved\n';
+    const yaml = 'milestones:\n  architect: pending\n  specify: approved\n';
     const result = parseYaml(yaml);
-    assert.equal(result.gates.architect, 'pending');
-    assert.equal(result.gates.specify, 'approved');
+    assert.equal(result.milestones.architect, 'pending');
+    assert.equal(result.milestones.specify, 'approved');
   });
 
   it('strips inline comments', () => {
-    const result = parseYaml('stage: architect  # current stage\n');
-    assert.equal(result.stage, 'architect');
+    const result = parseYaml('position: architect  # current position\n');
+    assert.equal(result.position, 'architect');
   });
 
   it('handles empty sequences', () => {
@@ -61,19 +61,19 @@ describe('parseYaml', () => {
 
   it('parses block sequence mappings without leaking nested keys', () => {
     const yaml = [
-      'stage: specify',
+      'position: specify',
       'kickbacks:',
       '  - type: defect',
-      '    stage: implement',
+      '    position: implement',
       '    missed: Missing error behavior',
       '    resolution: null',
     ].join('\n');
 
     const result = parseYaml(yaml);
-    assert.equal(result.stage, 'specify');
+    assert.equal(result.position, 'specify');
     assert.deepEqual(result.kickbacks, [{
       type: 'defect',
-      stage: 'implement',
+      position: 'implement',
       missed: 'Missing error behavior',
       resolution: null,
     }]);
@@ -84,17 +84,17 @@ describe('parseYaml', () => {
 
 describe('stringifyYaml', () => {
   it('round-trips a simple object', () => {
-    const obj = { id: 'test-id', title: 'Test', stage: 'architect' };
+    const obj = { id: 'test-id', title: 'Test', phase: 'architect' };
     const yaml = stringifyYaml(obj);
     assert.ok(yaml.includes('id: test-id'));
     assert.ok(yaml.includes('title: Test'));
-    assert.ok(yaml.includes('stage: architect'));
+    assert.ok(yaml.includes('phase: architect'));
   });
 
   it('serializes nested objects', () => {
-    const obj = { gates: { architect: 'pending', specify: 'approved' } };
+    const obj = { approvals: { architect: 'pending', specify: 'approved' } };
     const yaml = stringifyYaml(obj);
-    assert.ok(yaml.includes('gates:'));
+    assert.ok(yaml.includes('approvals:'));
     assert.ok(yaml.includes('architect: pending'));
     assert.ok(yaml.includes('specify: approved'));
   });
@@ -167,9 +167,9 @@ describe('readManifest / writeManifest', () => {
       id,
       title: 'Test Change',
       class: 'feature',
-      stage: 'architect',
+      phase: 'architect',
       language: 'rust',
-      gates: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
+      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
       artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
       context_targets: ['CONTEXT.md'],
       kickbacks: [],
@@ -180,9 +180,9 @@ describe('readManifest / writeManifest', () => {
 
     assert.equal(read.id, id);
     assert.equal(read.title, 'Test Change');
-    assert.equal(read.stage, 'architect');
+    assert.equal(read.phase, 'architect');
     assert.equal(read.language, 'rust');
-    assert.equal(read.gates.architect, 'pending');
+    assert.equal(read.approvals.architect, 'pending');
   });
 
   it('throws when manifest does not exist', () => {
@@ -222,52 +222,52 @@ describe('listActiveChanges', () => {
 // ── nextSkill ─────────────────────────────────────────────────────────────────
 
 describe('nextSkill', () => {
-  it('returns architect when stage is architect and gate pending', () => {
-    const m = { stage: 'architect', gates: { architect: 'pending' } };
+  it('returns architect when phase is architect and approval pending', () => {
+    const m = { phase: 'architect', approvals: { architect: 'pending' } };
     assert.equal(nextSkill(m), 'architect');
   });
 
-  it('returns specify when architect gate approved', () => {
-    const m = { stage: 'architect', gates: { architect: 'approved' } };
+  it('returns specify when architect approval approved', () => {
+    const m = { phase: 'architect', approvals: { architect: 'approved' } };
     assert.equal(nextSkill(m), 'specify');
   });
 
-  it('returns specify when stage is specify and gate pending', () => {
-    const m = { stage: 'specify', gates: { specify: 'pending' } };
+  it('returns specify when phase is specify and approval pending', () => {
+    const m = { phase: 'specify', approvals: { specify: 'pending' } };
     assert.equal(nextSkill(m), 'specify');
   });
 
-  it('returns plan when specify gate approved', () => {
-    const m = { stage: 'specify', gates: { specify: 'approved' } };
+  it('returns plan when specify approval approved', () => {
+    const m = { phase: 'specify', approvals: { specify: 'approved' } };
     assert.equal(nextSkill(m), 'plan');
   });
 
-  it('returns implement when plan gate approved', () => {
-    const m = { stage: 'plan', gates: { plan: 'approved' } };
+  it('returns implement when plan approval approved', () => {
+    const m = { phase: 'plan', approvals: { plan: 'approved' } };
     assert.equal(nextSkill(m), 'implement');
   });
 
-  it('returns null when stage is done', () => {
-    const m = { stage: 'done', gates: {} };
+  it('returns null when phase is done', () => {
+    const m = { phase: 'done', approvals: {} };
     assert.equal(nextSkill(m), null);
   });
 
   it('routes a refactor class through audit → execute → docs', () => {
-    assert.match(nextSkill({ class: 'refactor', stage: 'refactor', gates: { refactor: 'pending' } }), /refactor \(audit/);
-    assert.match(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'pending' } }), /execute/);
-    assert.match(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'approved', docs: 'pending' } }), /docs/);
-    assert.equal(nextSkill({ class: 'refactor', stage: 'implement', gates: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), null);
+    assert.match(nextSkill({ class: 'refactor', phase: 'refactor', approvals: { refactor: 'pending' } }), /refactor \(audit/);
+    assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'pending' } }), /execute/);
+    assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'approved', docs: 'pending' } }), /docs/);
+    assert.equal(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), null);
   });
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 describe('constants', () => {
-  it('STAGES contains expected values in order', () => {
-    assert.deepEqual(STAGES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'done']);
+  it('PHASES contains expected values in order', () => {
+    assert.deepEqual(PHASES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'done']);
   });
 
-  it('GATES contains expected values', () => {
-    assert.deepEqual(GATES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs']);
+  it('APPROVALS contains expected values', () => {
+    assert.deepEqual(APPROVALS, ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs']);
   });
 });

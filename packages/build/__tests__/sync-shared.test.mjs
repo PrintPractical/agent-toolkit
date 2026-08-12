@@ -7,9 +7,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { execSync } from 'node:child_process';
-import { ALL_IDIOMS, ALL_SHARED, SYNC_MAP } from '../sync-shared.mjs';
+import { ALL_IDIOMS, SCRIPT_MAP, SYNC_MAP } from '../sync-shared.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
 const SYNC_SCRIPT = path.join(REPO_ROOT, 'packages/build/sync-shared.mjs');
@@ -80,42 +79,26 @@ describe('sync-shared.mjs', () => {
     assert.match(rust, /metadata-reported manifest path rather than assuming `~\/\.cargo`/);
   });
 
-  it('distributes every canonical idiom pack to every configured consumer', () => {
+  it('distributes every canonical idiom pack only to the idioms skill', () => {
     const packNames = fs.readdirSync(IDIOMS_DIR).filter(name => name.endsWith('.md')).sort();
     const expectedIdioms = packNames.map(name => ({
       src: `_idioms/${name}`,
       dest: `idioms/${name}`,
     }));
-    const consumers = Object.entries(SYNC_MAP)
-      .filter(([, files]) => files.some(({ src }) => src.startsWith('_idioms/')))
-      .map(([skill]) => skill);
-
-    assert.ok(consumers.includes('plan'), 'plan must receive idiom packs');
-    assert.ok(consumers.includes('refactor'), 'refactor must retain idiom packs');
     assert.deepEqual(ALL_IDIOMS, expectedIdioms);
-
-    for (const skill of consumers) {
-      const configuredIdioms = SYNC_MAP[skill]
-        .filter(({ src }) => src.startsWith('_idioms/'));
-      assert.deepEqual(configuredIdioms, expectedIdioms, `${skill} must receive every canonical idiom pack`);
+    assert.deepEqual(SYNC_MAP.idioms, expectedIdioms);
+    for (const [skill, files] of Object.entries(SYNC_MAP)) {
+      if (skill !== 'idioms') {
+        assert.equal(files.some(({ src }) => src.startsWith('_idioms/')), false, `${skill} must not bundle idiom packs`);
+      }
     }
   });
 
-  it('distributes engineering and adversarial references through ALL_SHARED', () => {
-    const required = [
-      '_shared/adversarial-review.md',
-      '_shared/engineering-fundamentals.md',
-    ];
-
-    for (const src of required) {
-      assert.ok(ALL_SHARED.some(file => file.src === src), `ALL_SHARED must include ${src}`);
-    }
-
-    for (const skill of ['architect', 'specify', 'plan', 'implement', 'refactor']) {
-      for (const src of required) {
-        assert.ok(SYNC_MAP[skill].some(file => file.src === src), `${skill} must receive ${src}`);
-      }
-    }
+  it('uses explicit, minimal reference capabilities', () => {
+    assert.ok(SYNC_MAP.architect.length < 12, 'architect must not receive the complete shared bundle');
+    assert.ok(SYNC_MAP.plan.length < 8, 'plan must not receive the complete shared bundle');
+    assert.equal(SYNC_MAP.reforge.some(({ src }) => src === '_shared/adversarial-review.md'), false);
+    assert.equal(SYNC_MAP.implement.some(({ src }) => src.startsWith('_templates/')), false);
   });
 
   it('syncs the brainstorm architect seed template', () => {
@@ -145,30 +128,41 @@ describe('sync-shared.mjs', () => {
     }
   });
 
-  it('all 11 skills have a references/ directory after sync', () => {
+  it('all configured skills have a references/ directory after sync', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = Object.keys(SYNC_MAP);
     for (const skill of skills) {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
     }
   });
 
-  it('every skill bundles its helper scripts + lib (self-contained)', () => {
+  it('bundles only each skill capability scripts plus the shared lib', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
-    const expectedScripts = [
-      'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
-      'manifest-gate.mjs', 'artifact-validate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
-      'context-verify.mjs', 'kickback-log.mjs', 'review-log.mjs', 'epic-split.mjs',
-    ];
-    for (const skill of skills) {
+    for (const [skill, scripts] of Object.entries(SCRIPT_MAP)) {
+      const expectedScripts = scripts.length > 0 ? ['lib/index.mjs', ...scripts] : [];
+      const scriptsDir = path.join(REPO_ROOT, 'skills', skill, 'scripts');
+      const actualScripts = fs.existsSync(scriptsDir)
+        ? fs.readdirSync(scriptsDir, { recursive: true }).filter(file => !fs.statSync(path.join(scriptsDir, file)).isDirectory()).sort()
+        : [];
+      assert.deepEqual(actualScripts, [...expectedScripts].sort(), `${skill} should bundle exactly its declared scripts`);
       for (const script of expectedScripts) {
         const p = path.join(REPO_ROOT, 'skills', skill, 'scripts', script);
         assert.ok(fs.existsSync(p), `Expected ${skill}/scripts/${script} to be bundled`);
       }
+    }
+  });
+
+  it('check mode detects stale generated files', () => {
+    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+    const stalePath = path.join(REPO_ROOT, 'skills/architect/references/stale.md');
+    fs.writeFileSync(stalePath, 'stale\n');
+    try {
+      assert.throws(() => execSync(`node "${SYNC_SCRIPT}" --check`, { cwd: REPO_ROOT, stdio: 'pipe' }));
+    } finally {
+      fs.rmSync(stalePath, { force: true });
     }
   });
 

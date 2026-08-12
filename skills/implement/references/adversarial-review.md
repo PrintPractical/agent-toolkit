@@ -32,7 +32,7 @@ Only findings that can block approval or materially improve the artifact/work en
 | Alternative | Concrete safer or simpler direction, not generic advice |
 | Status | `open` or `resolved` |
 
-`blocker` means approval or safe execution cannot continue. `major` means the proposal/work is viable but carries a material defect or avoidable cost. Every recorded finding must resolve before the gate; move work that cannot be resolved within the bounded cycle to an explicit upstream kickback instead of deferring it inside the cycle.
+`blocker` means approval or safe execution cannot continue. `major` means the proposal/work is viable but carries a material defect or avoidable cost. Every recorded finding must resolve before approval; move work that cannot be resolved within the bounded cycle to an explicit upstream kickback instead of deferring it inside the cycle.
 
 ## The bounded cycle
 
@@ -41,12 +41,12 @@ Each architecture session, each standard or epic specify session, and each compl
 1. **Broad discovery, once.** Inspect the complete agreed scope in one pass. Parallel lenses are allowed, but they are one coordinated pass and feed one result.
 2. **Consolidated findings, once.** Deduplicate and present one complete batch of all `blocker` and `major` findings. Assign stable IDs. Do not drip findings across conversations.
 3. **Remediation, once.** Resolve the complete batch together. User confirmation is required only at the materiality boundary in `challenge-protocol.md`; local/private/reversible conventional choices are selected automatically.
-4. **Focused verification.** Verify only the original IDs against the remediated artifact or diff. Do not repeat broad discovery, expand scope, or introduce new low/major findings. The sole new-ID exception is a blocker regression caused by remediation: record it with the stage prefix through `--regression`, correct it within the same focused scope, then close it through `--regression-resolution` during the one targeted reverification.
-5. **One targeted correction, maximum.** If verification shows an original ID is unresolved or records a remediation-caused blocker regression, allow one correction limited to those IDs and one focused reverification. If any ID remains unresolved, or safe approval would require new broad investigation, stop and return to the appropriate upstream stage rather than extending the cycle.
+4. **Focused verification.** Verify only the original IDs against the remediated artifact or diff. Do not repeat broad discovery, expand scope, or introduce new low/major findings. The sole new-ID exception is a blocker regression caused by remediation: record it with the phase prefix through `--regression`, correct it within the same focused scope, then close it through `--regression-resolution` during the one targeted reverification.
+5. **One targeted correction, maximum.** If verification shows an original ID is unresolved or records a remediation-caused blocker regression, allow one correction limited to those IDs and one focused reverification. If any ID remains unresolved, or safe approval would require new broad investigation, stop and return to the appropriate upstream phase rather than extending the cycle.
 
 The cycle therefore permits at most one broad pass, one finding batch, one remediation, one verification, and one targeted correction/reverification. Verification is closure, not a second review.
 
-## Records by stage
+## Records by phase
 
 Every formal cycle uses structured version-2 entries in `reviews.json` through `review-log.mjs`. The artifact records the same cycle name, findings, remediation, and verification evidence so humans can read the decision trail.
 

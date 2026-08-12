@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * change-status.mjs — Print current stage and recommended next skill for active changes.
+ * change-status.mjs — Print current phase and recommended next skill for active changes.
  *
  * Usage:
  *   node change-status.mjs                    # list all active changes
@@ -64,9 +64,9 @@ for (const id of ids) {
     id,
     title: manifest.title,
     class: manifest.class,
-    stage: manifest.stage,
+    phase: manifest.phase,
     language: manifest.language || null,
-    gates: manifest.gates,
+    approvals: manifest.approvals,
     next_skill: skill,
     kickbacks: { defect: defectKickbacks, amendment: totalKickbacks - defectKickbacks, total: totalKickbacks },
     ...(unresolvedKickback ? { unresolved_kickback: unresolvedKickback } : {}),
@@ -81,7 +81,7 @@ for (const id of ids) {
   console.error(`  Title:      ${manifest.title}`);
   console.error(`  Class:      ${manifest.class}`);
   if (manifest.parent) console.error(`  Parent:     ${manifest.parent}`);
-  console.error(`  Stage:      ${manifest.stage}`);
+  console.error(`  Phase:      ${manifest.phase}`);
   if (manifest.language) console.error(`  Language:   ${manifest.language}`);
 
   if (isEpic) {
@@ -89,14 +89,14 @@ for (const id of ids) {
     const children = manifest.children || [];
     console.error(`  Children:   ${children.length} total — ${es.done} done, ${es.inProgress} in-progress, ${es.pending} pending`);
     if (children.length > 0) {
-      // Show each child's stage
+      // Show each child's phase
       for (const childId of children) {
-        let childStage = 'archived';
+        let childPhase = 'archived';
         try {
           const child = readManifest(childId, repoRoot);
-          childStage = child.stage;
+          childPhase = child.phase;
         } catch { /* archived */ }
-        console.error(`    • ${childId} [${childStage}]`);
+        console.error(`    • ${childId} [${childPhase}]`);
       }
     }
     if (es.done === children.length && children.length > 0) {
@@ -105,7 +105,7 @@ for (const id of ids) {
       console.error(`  Next:       ${skill}`);
     }
   } else {
-    console.error(`  Gates:      ${Object.entries(manifest.gates || {}).map(([k, v]) => `${k}:${v}`).join(' ')}`);
+    console.error(`  Approvals:  ${Object.entries(manifest.approvals || {}).map(([k, v]) => `${k}:${v}`).join(' ')}`);
     if (skill) {
       console.error(`  Next skill: ${skill}`);
     } else {
@@ -117,10 +117,10 @@ for (const id of ids) {
     console.error(`  Kickbacks:  ${defectKickbacks} defect, ${totalKickbacks - defectKickbacks} amendment`);
   }
   if (unresolvedKickback) {
-    const invalidated = Array.isArray(unresolvedKickback.invalidated_gates)
-      ? unresolvedKickback.invalidated_gates
-      : (unresolvedKickback.invalidated_gates || 'specify,plan').split(',');
-    console.error(`  Restart:    ${unresolvedKickback.restart_stage || 'specify'} (${invalidated.join(', ')})`);
+    const invalidated = Array.isArray(unresolvedKickback.invalidated_approvals)
+      ? unresolvedKickback.invalidated_approvals
+      : (unresolvedKickback.invalidated_approvals || 'specify,plan').split(',');
+    console.error(`  Restart:    ${unresolvedKickback.restart_phase || 'specify'} (${invalidated.join(', ')})`);
   }
 }
 

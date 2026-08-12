@@ -1,11 +1,11 @@
 ---
 name: specify
-description: Use after architect gate is approved to run the specification stage. Batches material decisions with recommendations, requires explicit confirmation of each, finalizes interface changes, then runs an adversarial implement-as-if dry run for unresolved blockers. Emits decisions.md and reconciles architecture.md. Do not run unless the architect gate is approved.
+description: Use after architect approval is approved to run the specification phase. Batches material decisions with recommendations, requires explicit confirmation of each, finalizes interface changes, then runs an adversarial implement-as-if dry run for unresolved blockers. Emits decisions.md and reconciles architecture.md. Do not run unless the architect approval is approved.
 ---
 
 # Specify
 
-You are running the **specify** stage of the agent-toolkit pipeline. Spine stage 2. Your job is to settle every material behavioral and contract decision before `plan` and `implement`, while preserving implementation freedom for local, reversible, idiomatic choices. An unresolved material decision becomes a kickback during `implement`.
+You are running the **specify** phase of the agent-toolkit pipeline. Spine phase 2. Your job is to settle every material behavioral and contract decision before `plan` and `implement`, while preserving implementation freedom for local, reversible, idiomatic choices. An unresolved material decision becomes a kickback during `implement`.
 
 **If `manifest.class = epic`:** Follow the Epic Specify path at the bottom of this file. Epic specify is scoped to cross-cutting contracts only — not per-child implementation details.
 
@@ -26,8 +26,8 @@ Same adversarial posture as `architect`. Re-read `references/challenge-protocol.
 ## Preconditions
 
 Load `manifest.yaml`. Verify:
-- `stage` is `specify` (i.e., architect gate was approved).
-- `gates.specify` is `pending`.
+- `phase` is `specify` (i.e., architect approval was approved).
+- `approvals.specify` is `pending`.
 - `architecture.md` exists and has a passed validity check.
 - **If `class = epic`:** jump to the Epic Specify section below.
 
@@ -35,7 +35,7 @@ If preconditions fail, tell the user what's wrong and which step to run instead.
 
 Load `architecture.md` fully. This is your spec baseline.
 
-If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for interface design guidance. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+If `manifest.language` is set, use the `idioms` skill to load its matching pack for interface design guidance. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## Phase 1: Interface inventory
 
@@ -79,9 +79,9 @@ Remediate the complete batch once. Obtain user confirmation only for remediation
 Record the discovery and verification under structured cycle `specify-1` with `review-log.mjs`. The auditor uses structured `--finding` JSON from the shared policy; the verifier supplies one `--resolution SV-NNN=resolved|unresolved` for every original finding. An approved clean auditor still requires a distinct verifier:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage specify --cycle specify-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-1 \
   --role auditor --reviewer "<fresh label>" --verdict approved
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage specify --cycle specify-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-1 \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved
 ```
 
@@ -104,15 +104,15 @@ Compare `decisions.md` against `architecture.md`. If any decision changes, clari
 - Update `architecture.md` to reflect the refined understanding.
 - Note the reconciliation in `decisions.md` under "Architecture Reconciliation."
 
-## Phase 6: Gate
+## Phase 6: Approval
 
 Present the confirmation ledger, interfaces finalized, and dry-run findings. Ask the user to confirm the ledger accurately represents their choices. Then ask:
 
-> "Every user-owned material decision is explicitly confirmed and the bounded specification review has no unresolved blockers. Do you approve the specify gate? (This will advance to `plan`.)"
+> "Every user-owned material decision is explicitly confirmed and the bounded specification review has no unresolved blockers. Do you approve the specify approval? (This will advance to `plan`.)"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate specify --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval specify --approve
 ```
 
 Tell the user: **run `plan` next.**
@@ -126,8 +126,8 @@ If you are running `specify` because `implement` kicked back (not a fresh sessio
 - Update `decisions.md` with the new resolution.
 - Reconcile `architecture.md` if needed.
 - Set the latest kickback entry's `resolution` in `manifest.yaml` to the actual decision. Do not leave it empty or use a placeholder such as `pending`.
-- Re-approve only the invalidated gate(s). A specify-impacting kickback requires specify then plan; a plan-only kickback requires only plan.
-- Confirm the manifest's recommended next stage before telling the user to resume implementation.
+- Re-approve only the invalidated approval(s). A specify-impacting kickback requires specify then plan; a plan-only kickback requires only plan.
+- Confirm the manifest's recommended next phase before telling the user to resume implementation.
 
 ## Reference files
 
@@ -137,7 +137,7 @@ If you are running `specify` because `implement` kicked back (not a fresh sessio
 - `references/manifest-schema.md` — kickback types and epic model
 - `references/firm-change-protocol.md` — if a firm interface must change
 - `references/templates/decisions.md.tmpl`
-- `references/idioms/<lang>.md` — interface design guidance
+- `idioms` skill — matching interface-design guidance
 
 ---
 
@@ -192,11 +192,11 @@ Write `decisions.md` covering:
 
 Write to: `.changes/active/<id>/decisions.md`
 
-**Phase E5: Gate + auto-decompose (you run this, not the user)**
+**Phase E5: Approval + auto-decompose (you run this, not the user)**
 
-First, approve the specify gate:
+First, approve the specify approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate specify --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval specify --approve
 ```
 
 **Then immediately run epic-split automatically** — do not ask the user to do this manually. Read the "Proposed Child Changes" section from `architecture.md` and the ordering/ownership decisions from `decisions.md`, construct the children JSON, and run:
@@ -217,8 +217,6 @@ node "$SKILL_DIR/scripts/epic-split.mjs" --epic <id> --children '[
   }
 ]'
 ```
-
-**Note on existing epic manifests with extra gates:** If the epic manifest has `plan`, `implement`, or `docs` gates (created before this fix), they are harmless — they are never read for epics. You can leave them as-is. Going forward, new epics only get `architect` and `specify` gates.
 
 Each child gets an `architect-seed.md` with its notes and implicit access to the epic's arch+decisions as parent context.
 

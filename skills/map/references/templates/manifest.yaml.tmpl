@@ -1,7 +1,7 @@
 id: "{{id}}"
 title: "{{title}}"
 class: feature  # feature | bug | small | epic | refactor
-stage: architect  # refactor | architect | specify | plan | implement | done
+phase: architect  # refactor | architect | specify | plan | implement | decomposed | done
 language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty for language-agnostic
 
 # parent: "{{epic-id}}"   # uncomment for child changes; set to the epic's change ID
@@ -10,9 +10,9 @@ language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty
 # Refactor class only (use change-new.mjs --class refactor to scaffold):
 # refactor_mode: execute        # execute | audit-only
 # refactor_selected_ids: []     # user-approved RF-NNN opportunity IDs from refactor.md
-# For a refactor, gates are { refactor, implement, docs } and artifacts is { refactor: refactor.md }.
+# For a refactor, approvals are { refactor, implement, docs } and artifacts is { refactor: refactor.md }.
 
-gates:
+approvals:
   architect:  pending
   specify:    pending
   plan:       pending
@@ -20,6 +20,7 @@ gates:
   docs:       pending
 
 artifacts:
+  change_brief:  change-brief.md
   architecture: architecture.md
   decisions:    decisions.md
   plan:         plan.md
@@ -32,10 +33,10 @@ context_targets:
 kickbacks: []
 # kickback entry shape:
 # - type:       defect | amendment
-#   stage:      specify | plan | implement
+#   phase:      specify | plan | implement
 #   at:         <iso-timestamp>
 #   missed:     "What the upstream spec should have caught"
 #   resolution: "What was decided to resolve it"
 #   impact:     specify | plan | implementation
-#   invalidated_gates: "specify,plan"
-#   restart_stage: specify
+#   invalidated_approvals: "specify,plan"
+#   restart_phase: specify

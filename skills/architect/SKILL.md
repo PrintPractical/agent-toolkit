@@ -1,11 +1,11 @@
 ---
 name: architect
-description: Use when starting a new feature, designing a new project, or making a substantial architectural change to an existing codebase. Entry ramp AND spine stage 1. Runs an adversarial architectural session that gathers context from CONTEXT.md files, challenges deviations from idiomatic patterns, surfaces refactors as first-class decisions, and produces a validity-checked architecture.md. For epics, decomposes into child changes instead of a single architecture.md. Do NOT use for bugs or tiny changes — use triage instead.
+description: Use when starting a new feature, designing a new project, or making a substantial architectural change to an existing codebase. Entry ramp and spine phase 1. Captures intake before scoped context discovery, then challenges deviations from idiomatic patterns, surfaces refactors as first-class decisions, and produces a validity-checked architecture.md. For epics, decomposes into child changes instead of a single architecture.md. Do NOT use for bugs or tiny changes — use triage instead.
 ---
 
 # Architect
 
-You are running the **architect** stage of the agent-toolkit pipeline. You are an entry ramp *and* the first spine stage. Your job is to produce a sound `architecture.md` that feeds `specify` — or, for epics, to decompose into child change manifests.
+You are running the **architect** phase of the agent-toolkit pipeline. You are an entry ramp and the first spine phase. Your job is to produce a sound `architecture.md` that feeds `specify` — or, for epics, to decompose into child change manifests.
 
 ## Running the helper scripts
 
@@ -19,8 +19,8 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-You have strong architectural opinions. Read `references/challenge-protocol.md`, `references/adversarial-review.md`, and `references/engineering-fundamentals.md` now and internalize them. You will:
-- Challenge any proposal that deviates from idiomatic patterns for the active language. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+You have strong architectural opinions. After intake establishes scope, read `references/challenge-protocol.md`, `references/adversarial-review.md`, and `references/engineering-fundamentals.md` and use the `idioms` skill only for applicable languages. You will:
+- Challenge any proposal that deviates from idiomatic patterns for the active language. If `manifest.language` is set, use the `idioms` skill to load its matching pack. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 - Default stance toward existing code: **soft**. Existing patterns are not automatically correct. If a better solution exists — even one requiring a larger refactor — surface it. The user prefers a larger refactor that yields a better result over matching mediocre patterns.
 - Challenge any proposed `firm` designation until justified (see `references/challenge-protocol.md`). Default seam firmness is `soft`.
 - Surface refactors as **first-class, costed, approved decisions** here. No refactors are discovered during `implement`.
@@ -29,13 +29,15 @@ You have strong architectural opinions. Read `references/challenge-protocol.md`,
 ## Preconditions
 
 Before starting, check:
-1. **Check for an optional architect seed.** Read a seed path explicitly supplied by the user. If none was supplied and `architect-seed.md` exists at the project root, ask whether it applies to this change before loading it. A seed is input to challenge, not an approved decision. Use it to confirm the title, class, and language before creating a manifest. A user may also supply a `reforge-seed.md` as the same kind of non-binding input.
-2. Is there an active change in `.changes/active/`? If yes, load `manifest.yaml`. If no, create one:
+1. **Intake before discovery.** Obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. Do not read a seed, manifest, CONTEXT.md, repository references, or scan the repository first. Record the intake in `change-brief.md` from `references/templates/change-brief.md.tmpl` immediately after a workspace exists.
+2. **Check for an optional architect seed.** Read a seed path explicitly supplied by the user only after intake. If none was supplied and `architect-seed.md` exists at the project root, ask whether it applies before loading it. A seed is input to challenge, not an approved decision. Use it to confirm the title, class, and language before creating a manifest. A user may also supply a `reforge-seed.md` as the same kind of non-binding input.
+3. Is there an active change in `.changes/active/`? If yes, load `manifest.yaml`. If no, create one:
    ```
    node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" [--class feature|epic] [--language <lang>]
    ```
-3. If the manifest stage is not `architect` or the architect gate is already `approved`, inform the user and stop.
-4. **Check `manifest.class`.** If `epic`, follow the Epic Decomposition path below instead of the standard path.
+4. Write `.changes/active/<id>/change-brief.md` from the intake and confirm `manifest.artifacts.change_brief` names it.
+5. If the manifest phase is not `architect` or the architect approval is already `approved`, inform the user and stop.
+6. **Check `manifest.class`.** If `epic`, follow the Epic Decomposition path below instead of the standard path.
 
 ---
 
@@ -54,7 +56,7 @@ architect (this session) → specify → decompose (epic-split) → done
 
 Check whether `.changes/active/<id>/architecture.md` already exists.
 
-**If it exists (recovery path for pre-existing epic docs):**
+**If it exists:**
 Read it. Present the sub-task / child-change descriptions found in it to the user and confirm they still represent the right breakdown. Note them for use in Phase 4.
 
 **If it does not exist (fresh epic):**
@@ -117,12 +119,12 @@ Run exactly one `AV-*` cycle from `references/adversarial-review.md` over the wh
 
 Record the auditor and verifier through `review-log.mjs` under structured cycle `architect-1`, using the standard-path commands below.
 
-### Epic Phase 7: Architect gate
+### Epic Phase 7: Architect approval
 
-Present the confirmation ledger and ask the user to confirm it accurately represents their choices. Then ask: **"Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect gate?"**
+Present the confirmation ledger and ask the user to confirm it accurately represents their choices. Then ask: **"Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect approval?"**
 
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate architect --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval architect --approve
 ```
 
 Tell the user: **run `specify` next. Specify will nail down the cross-cutting contracts. After specify, you decompose into child manifests.**
@@ -188,23 +190,23 @@ Launch a fresh verifier to check only the original IDs. It does not repeat disco
 Record the discovery and verification under structured cycle `architect-1`. For a clean pass:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage architect --cycle architect-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-1 \
   --role auditor --reviewer "<fresh label>" --verdict approved
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage architect --cycle architect-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-1 \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved
 ```
 
 When findings exist, the auditor uses one structured `--finding` JSON argument per `AV-*` row, and the verifier supplies one `--resolution AV-NNN=resolved|unresolved` per original finding.
 
-### Phase 5: Gate
+### Phase 5: Approval
 
 Present the confirmation ledger, a summary of decisions, seams, and any approved refactors. Ask the user to confirm that the ledger accurately represents their choices. Then ask explicitly:
 
-> "Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect gate? (This will advance the change to `specify`.)"
+> "Every user-owned material architectural topic is explicitly confirmed and the bounded validity review has no unresolved blockers. Do you approve the architect approval? (This will advance the change to `specify`.)"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate architect --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval architect --approve
 ```
 
 Tell the user: **run `specify` next.**
@@ -221,4 +223,4 @@ Tell the user: **run `specify` next.**
 - `references/change-lifecycle.md` — full pipeline
 - `references/firm-change-protocol.md` — if a firm seam needs to change
 - `references/templates/architecture.md.tmpl` — output template
-- `references/idioms/<lang>.md` — load if `manifest.language` is set
+- `idioms` skill — load the matching pack only if `manifest.language` is set

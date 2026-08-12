@@ -2,19 +2,18 @@
 /**
  * review-log.mjs — Record and query bounded independent review cycles.
  *
- * This is the lightweight replacement for the old snapshot-bound checkpoint
- * system. A review entry is an attestation — no content hashing, file locking,
+ * A review entry is an attestation: no content hashing, file locking,
  * epoch, or Git-index inspection. A discovery auditor and distinct verifier
  * drive each formal architecture, specification, implementation, or refactor
- * review gate.
+ * approval.
  *
  * Usage (structured v2):
- *   node review-log.mjs record --id <id> --stage <stage> --cycle <cycle> \
+ *   node review-log.mjs record --id <id> --phase <phase> --cycle <cycle> \
  *     --role auditor|verifier --reviewer <label> --verdict approved|changes-requested \
  *     [--finding '<json>']... [--resolution <ID>=resolved|unresolved]... \
   *     [--regression '<json>']... [--regression-resolution <ID>=resolved|unresolved]...
  *
- *   node review-log.mjs status --id <id> [--stage <stage>]
+ *   node review-log.mjs status --id <id> [--phase <phase>]
  *
  * Output (stdout): JSON. Progress/status (stderr): human-readable.
  */
@@ -25,8 +24,8 @@ import {
   appendReview,
   readReviews,
   latestReview,
-  reviewGateReady,
-  REVIEW_STAGES,
+  reviewApprovalReady,
+  REVIEW_PHASES,
   REVIEW_ROLES,
   REVIEW_VERDICTS,
   REVIEW_RESOLUTION_STATUSES,
@@ -35,21 +34,21 @@ import {
 
 const USAGE =
   'Usage:\n' +
-  '  review-log.mjs record --id <id> --stage architect|specify|implement|refactor --cycle <cycle> \\\n' +
+  '  review-log.mjs record --id <id> --phase architect|specify|implement|refactor --cycle <cycle> \\\n' +
   '    --role auditor --reviewer <label> --verdict <verdict> [--finding \'<json>\']...\n' +
-  '  review-log.mjs record --id <id> --stage <stage> --cycle <cycle> --role verifier \\\n' +
+  '  review-log.mjs record --id <id> --phase <phase> --cycle <cycle> --role verifier \\\n' +
   '    --reviewer <label> --verdict <verdict> [--resolution <ID>=resolved|unresolved]... \\\n' +
   '    [--regression \'<json>\']... [--regression-resolution <ID>=resolved|unresolved]...\n' +
-  '  review-log.mjs status --id <id> [--stage <stage>]\n' +
+  '  review-log.mjs status --id <id> [--phase <phase>]\n' +
   '\nFinding JSON: {"id":"RV-001","severity":"blocker|major","category":"correctness|security|simplicity|maintainability|idioms","location":"<path:line>","impact":"<impact>","alternative":"<concrete alternative>"}\n' +
-  'Historical version-1 records remain readable; all new records require a structured --cycle.';
+  'All review records require a structured --cycle.';
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     help:     { type: 'boolean', short: 'h', default: false },
     id:       { type: 'string' },
-    stage:    { type: 'string' },
+    phase:    { type: 'string' },
     role:     { type: 'string' },
     reviewer: { type: 'string' },
     verdict:  { type: 'string' },
@@ -90,8 +89,8 @@ try {
 }
 
 if (command === 'record') {
-  if (!values.stage || !REVIEW_STAGES.includes(values.stage)) {
-    fail(`--stage must be one of: ${REVIEW_STAGES.join(', ')}`);
+  if (!values.phase || !REVIEW_PHASES.includes(values.phase)) {
+    fail(`--phase must be one of: ${REVIEW_PHASES.join(', ')}`);
   }
   if (!values.role || !REVIEW_ROLES.includes(values.role)) {
     fail(`--role must be one of: ${REVIEW_ROLES.join(', ')}`);
@@ -113,15 +112,15 @@ if (command === 'record') {
   {
     const cycle = values.cycle.trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(cycle)) fail('--cycle must use letters, numbers, dot, underscore, or hyphen');
-    const expectedCycle = `${values.stage}-1`;
-    if (cycle !== expectedCycle) fail(`--cycle for stage '${values.stage}' must be '${expectedCycle}'`);
-    const cycleEntries = reviews.filter(item => item.version === 2 && item.stage === values.stage && item.cycle === cycle);
-    const otherCycles = reviews.filter(item => item.version === 2 && item.stage === values.stage && item.cycle !== cycle);
+    const expectedCycle = `${values.phase}-1`;
+    if (cycle !== expectedCycle) fail(`--cycle for phase '${values.phase}' must be '${expectedCycle}'`);
+    const cycleEntries = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle === cycle);
+    const otherCycles = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle !== cycle);
     const auditors = cycleEntries.filter(item => item.role === 'auditor');
     const verifiers = cycleEntries.filter(item => item.role === 'verifier');
 
     if (values.role === 'auditor') {
-      if (otherCycles.length > 0) fail(`stage '${values.stage}' already used its bounded discovery cycle`);
+      if (otherCycles.length > 0) fail(`phase '${values.phase}' already used its bounded discovery cycle`);
       if (cycleEntries.length > 0) fail(`cycle '${cycle}' already exists; exactly one discovery auditor is allowed`);
       if (structuredArgs > 0) fail('auditor entries cannot contain resolutions or regressions');
       if (values.verdict === 'changes-requested' && values.finding.length === 0) fail('a changes-requested verdict requires at least one --finding');
@@ -131,7 +130,7 @@ if (command === 'record') {
       if (values.finding.length > 0) fail('verifiers cannot add --finding entries; use --regression for blocker-only regressions');
       if (reviewer === auditors[0].reviewer) fail(`verifier reviewer must be different from auditor '${auditors[0].reviewer}'`);
       if (verifiers.some(item => item.reviewer === reviewer)) fail(`targeted re-verification requires a fresh verifier label`);
-      const current = structuredReviewCycleState(reviews, values.stage, cycle);
+      const current = structuredReviewCycleState(reviews, values.phase, cycle);
       if (current.ready) fail(`cycle '${cycle}' is already ready and cannot be re-verified`);
     }
 
@@ -155,7 +154,7 @@ if (command === 'record') {
     entry = {
       version: 2,
       cycle,
-      stage: values.stage,
+      phase: values.phase,
       role: values.role,
       reviewer,
       verdict: values.verdict,
@@ -178,37 +177,37 @@ if (command === 'record') {
       .find(findingId => existingIds.has(findingId));
     if (reusedId) fail(`structured finding id '${reusedId}' was already used in another review cycle`);
 
-    const prospective = structuredReviewCycleState([...reviews, entry], values.stage, cycle);
+    const prospective = structuredReviewCycleState([...reviews, entry], values.phase, cycle);
     if (!prospective.valid) fail(prospective.errors.join('; '));
   }
 
   appendReview(values.id, entry, repoRoot);
-  const gate = reviewGateReady(values.id, values.stage, repoRoot);
+  const approval = reviewApprovalReady(values.id, values.phase, repoRoot);
 
-  console.error(`Recorded ${values.role} review for '${values.id}' (stage ${values.stage}):`);
+  console.error(`Recorded ${values.role} review for '${values.id}' (phase ${values.phase}):`);
   console.error(`  Reviewer: ${reviewer}`);
   console.error(`  Verdict:  ${values.verdict}`);
   console.error(`  Findings: ${values.finding.length + values.regression.length}`);
-  console.error(`  Gate:     ${gate.ready ? 'READY' : 'not ready'} — ${gate.reason}`);
+  console.error(`  Approval: ${approval.ready ? 'READY' : 'not ready'} — ${approval.reason}`);
 
-  process.stdout.write(JSON.stringify({ id: values.id, entry, gate }) + '\n');
+  process.stdout.write(JSON.stringify({ id: values.id, entry, approval }) + '\n');
   process.exit(0);
 }
 
 if (command === 'status') {
-  const stages = values.stage ? [values.stage] : REVIEW_STAGES;
-  if (values.stage && !REVIEW_STAGES.includes(values.stage)) {
-    fail(`--stage must be one of: ${REVIEW_STAGES.join(', ')}`);
+  const phases = values.phase ? [values.phase] : REVIEW_PHASES;
+  if (values.phase && !REVIEW_PHASES.includes(values.phase)) {
+    fail(`--phase must be one of: ${REVIEW_PHASES.join(', ')}`);
   }
 
   const report = {};
-  for (const stage of stages) {
-    const latest = latestReview(values.id, stage, repoRoot);
-    const gate = reviewGateReady(values.id, stage, repoRoot);
-    report[stage] = { latest, gate };
-    console.error(`[${stage}] ${gate.ready ? 'READY' : 'not ready'} — ${gate.reason}`);
+  for (const phase of phases) {
+    const latest = latestReview(values.id, phase, repoRoot);
+    const approval = reviewApprovalReady(values.id, phase, repoRoot);
+    report[phase] = { latest, approval };
+    console.error(`[${phase}] ${approval.ready ? 'READY' : 'not ready'} — ${approval.reason}`);
   }
 
-  process.stdout.write(JSON.stringify({ id: values.id, stages: report }) + '\n');
+  process.stdout.write(JSON.stringify({ id: values.id, phases: report }) + '\n');
   process.exit(0);
 }

@@ -1,42 +1,42 @@
 #!/usr/bin/env node
 /**
- * artifact-validate.mjs — Check deterministic evidence before approving a gate.
+ * artifact-validate.mjs — Check deterministic evidence before approving an approval.
  *
- * Usage: node artifact-validate.mjs --id <id> --gate architect|specify|plan
+ * Usage: node artifact-validate.mjs --id <id> --approval architect|specify|plan
  */
 
 import { parseArgs } from 'util';
-import { readManifest, validateGateArtifacts } from './lib/index.mjs';
+import { readManifest, validateApprovalArtifacts } from './lib/index.mjs';
 
 const { values } = parseArgs({
   options: {
     help: { type: 'boolean', short: 'h', default: false },
     id: { type: 'string' },
-    gate: { type: 'string' },
+    approval: { type: 'string' },
   },
   strict: true,
 });
 
 if (values.help) {
-  console.log('Usage: artifact-validate.mjs --id <id> --gate architect|specify|plan');
+  console.log('Usage: artifact-validate.mjs --id <id> --approval architect|specify|plan');
   process.exit(0);
 }
-if (!values.id || !values.gate) {
-  console.error('Usage: artifact-validate.mjs --id <id> --gate architect|specify|plan');
+if (!values.id || !values.approval) {
+  console.error('Usage: artifact-validate.mjs --id <id> --approval architect|specify|plan');
   process.exit(1);
 }
 
 try {
   const manifest = readManifest(values.id, process.cwd());
-  const result = validateGateArtifacts(manifest, values.gate, process.cwd());
+  const result = validateApprovalArtifacts(manifest, values.approval, process.cwd());
   if (!result.valid) {
-    console.error(`Artifact validation failed for ${values.gate}:`);
+    console.error(`Artifact validation failed for ${values.approval}:`);
     result.errors.forEach(error => console.error(`  - ${error}`));
-    process.stdout.write(JSON.stringify({ id: values.id, gate: values.gate, ...result }) + '\n');
+    process.stdout.write(JSON.stringify({ id: values.id, approval: values.approval, ...result }) + '\n');
     process.exit(1);
   }
-  console.error(`Artifact validation passed for ${values.gate}.`);
-  process.stdout.write(JSON.stringify({ id: values.id, gate: values.gate, ...result }) + '\n');
+  console.error(`Artifact validation passed for ${values.approval}.`);
+  process.stdout.write(JSON.stringify({ id: values.id, approval: values.approval, ...result }) + '\n');
 } catch (error) {
   console.error(`Error: ${error.message}`);
   process.exit(1);

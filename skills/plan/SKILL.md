@@ -1,11 +1,11 @@
 ---
 name: plan
-description: Use after specify gate is approved to break confirmed outcomes into a traceable implementation checklist. Produces plan.md with sections, seam-firmness test labels, acceptance-criterion traceability, and one bounded review cycle without prescribing private control flow. Do not run unless the specify gate is approved.
+description: Use after specify approval is approved to break confirmed outcomes into a traceable implementation checklist. Produces plan.md with sections, seam-firmness test labels, acceptance-criterion traceability, and one bounded review cycle without prescribing private control flow. Do not run unless the specify approval is approved.
 ---
 
 # Plan
 
-You are running the **plan** stage of the agent-toolkit pipeline. Spine stage 3. Your job is to decompose confirmed `architecture.md` + `decisions.md` decisions into a complete, detailed task checklist in `plan.md`. No unresolved material ambiguity survives into `implement`.
+You are running the **plan** phase of the agent-toolkit pipeline. Spine phase 3. Your job is to decompose confirmed `architecture.md` + `decisions.md` decisions into a complete, detailed task checklist in `plan.md`. No unresolved material ambiguity survives into `implement`.
 
 ## Running the helper scripts
 
@@ -28,13 +28,13 @@ The plan is a functional specification, not an implementation artifact. Describe
 ## Preconditions
 
 Load `manifest.yaml`. Verify:
-- `stage` is `plan` (specify gate approved).
-- `gates.plan` is `pending`.
+- `phase` is `plan` (specify approval approved).
+- `approvals.plan` is `pending`.
 - Both `architecture.md` and `decisions.md` exist.
 
 If preconditions fail, tell the user what's wrong.
 
-Load `architecture.md`, `decisions.md`, and `references/engineering-fundamentals.md` fully. Load `references/idioms/<lang>.md` for every language in scope when available; if a pack is unavailable, use repository conventions and tooling. Use this guidance to avoid planning against the language, not to micromanage private expression.
+Load `change-brief.md` first, then open `architecture.md` and `decisions.md` only for the decisions or seams needed by the plan. Read `references/engineering-fundamentals.md`. Use the `idioms` skill for every language represented in scope when available; if a pack is unavailable, use repository conventions and tooling. Use this guidance to avoid planning against the language, not to micromanage private expression.
 
 ## Phase 1: Section breakdown
 
@@ -91,7 +91,7 @@ If planning exposes one or more missing material decisions, batch them and stop.
 
 Log the kickback:
 ```
-  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --stage plan --impact specify --missed "<description>"
+  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect --phase plan --impact specify --missed "<description>"
 ```
 
 Use `--impact specify` when a material decision is missing. Use `--impact plan` when only checklist traceability or task detail must change; that preserves the specify approval. Do not invent answers or continue until the affected artifact is resolved.
@@ -100,15 +100,15 @@ Use `--impact specify` when a material decision is missing. Use `--impact plan` 
 
 Write to: `.changes/active/<id>/plan.md`
 
-## Phase 6: Gate
+## Phase 6: Approval
 
 Present the section count, total task count, firm-seam test count, and traceability check results. Ask:
 
-> "Traceability check passed. All firm seams have test tasks. The deterministic artifact validation will run before approval. Do you approve the plan gate? (This will advance to `implement`.)"
+> "Traceability check passed. All firm seams have test tasks. The deterministic artifact validation will run before approval. Do you approve the plan approval? (This will advance to `implement`.)"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate plan --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval plan --approve
 ```
 
 Tell the user: **run `implement` next.**
@@ -120,5 +120,5 @@ Tell the user: **run `implement` next.**
 - `references/change-lifecycle.md` — what implement expects
 - `references/adversarial-review.md` — bounded review cycle and `RV-*` findings
 - `references/templates/plan.md.tmpl`
-- `references/idioms/<lang>.md` — load every available pack represented in scope
+- `idioms` skill — load every available pack represented in scope
 - `references/engineering-fundamentals.md` — cross-language data, state, abstraction, and bounded-resource guidance

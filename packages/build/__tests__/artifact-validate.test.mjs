@@ -4,18 +4,18 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { appendReview, validateGateArtifacts, writeManifest } from '../lib/index.mjs';
+import { appendReview, validateApprovalArtifacts, writeManifest } from '../lib/index.mjs';
 
-describe('validateGateArtifacts', () => {
+describe('validateApprovalArtifacts', () => {
   let cwd;
   let manifest;
 
   beforeEach(() => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-artifacts-'));
     manifest = {
-      id: '2026-08-06-artifacts', title: 'Artifacts', class: 'feature', stage: 'specify',
+      id: '2026-08-06-artifacts', title: 'Artifacts', class: 'feature', phase: 'specify',
       artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
-      gates: {}, context_targets: [], kickbacks: [],
+      approvals: {}, context_targets: [], kickbacks: [],
     };
     writeManifest(manifest.id, manifest, cwd);
   });
@@ -31,7 +31,7 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none |  | unresolved |  |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'specify', cwd);
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /not explicitly confirmed/);
   });
@@ -45,7 +45,7 @@ describe('validateGateArtifacts', () => {
       '| A-001 | q | r | none |  | unresolved |  |',
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'architect', cwd);
+    const result = validateApprovalArtifacts(manifest, 'architect', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /architecture confirmation ledger row is not explicitly confirmed/);
   });
@@ -60,7 +60,7 @@ describe('validateGateArtifacts', () => {
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
       '## Review Cycle Reference', 'Cycle: architect-1',
     ].join('\n'));
-    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'architect', cwd).valid, true);
   });
 
   it('allows non-blocking dry-run findings after explicit confirmation', () => {
@@ -74,7 +74,7 @@ describe('validateGateArtifacts', () => {
       '**Classification:** assumption', '**Disposition:** accepted-assumption',
       '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
-    assert.equal(validateGateArtifacts(manifest, 'specify', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'specify', cwd).valid, true);
   });
 
   it('rejects unresolved blocker findings', () => {
@@ -88,7 +88,7 @@ describe('validateGateArtifacts', () => {
       '**Classification:** blocker', '**Disposition:** unresolved',
       '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'specify', cwd);
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /unresolved dry-run blocker/);
   });
@@ -106,7 +106,7 @@ describe('validateGateArtifacts', () => {
       '  - Errors and invariants: Do not persist any record when validation fails.',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
   });
 
   it('rejects a fenced source-code function in a plan', () => {
@@ -123,7 +123,7 @@ describe('validateGateArtifacts', () => {
       '```',
     ].join('\n'));
 
-    const result = validateGateArtifacts(manifest, 'plan', cwd);
+    const result = validateApprovalArtifacts(manifest, 'plan', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /fenced source-code block/);
   });
@@ -138,7 +138,7 @@ describe('validateGateArtifacts', () => {
       '- [ ] Add `import_records(records: Vec<Record>) -> Result<(), ImportError>` to `src/import.rs`.',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
   });
 
   it('requires review-cycle references for feature architecture and decisions', () => {
@@ -158,8 +158,8 @@ describe('validateGateArtifacts', () => {
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
     ].join('\n'));
 
-    assert.match(validateGateArtifacts(manifest, 'architect', cwd).errors.join('\n'), /Review Cycle Reference/);
-    assert.match(validateGateArtifacts(manifest, 'specify', cwd).errors.join('\n'), /Review Cycle Reference/);
+    assert.match(validateApprovalArtifacts(manifest, 'architect', cwd).errors.join('\n'), /Review Cycle Reference/);
+    assert.match(validateApprovalArtifacts(manifest, 'specify', cwd).errors.join('\n'), /Review Cycle Reference/);
   });
 
   it('does not require N/A review boilerplate for exempt bug artifacts', () => {
@@ -173,7 +173,7 @@ describe('validateGateArtifacts', () => {
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'architect', cwd).valid, true);
   });
 
   it('accepts empty confirmation ledgers without placeholder N/A rows', () => {
@@ -193,8 +193,8 @@ describe('validateGateArtifacts', () => {
       '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
-    assert.equal(validateGateArtifacts(manifest, 'specify', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'architect', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'specify', cwd).valid, true);
   });
 
   it('requires artifact finding IDs to match the structured review log', () => {
@@ -208,14 +208,14 @@ describe('validateGateArtifacts', () => {
       '## Validity Check Results', '**Status:** passed',
     ].join('\n'));
     appendReview(manifest.id, {
-      version: 2, cycle: 'architect-1', stage: 'architect', role: 'auditor', reviewer: 'critic-a',
+      version: 2, cycle: 'architect-1', phase: 'architect', role: 'auditor', reviewer: 'critic-a',
       verdict: 'changes-requested', findings: [{
         id: 'AV-001', severity: 'major', category: 'correctness', location: 'architecture.md:1',
         impact: 'contract is incomplete', alternative: 'define the missing contract',
       }], at: new Date().toISOString(),
     }, cwd);
 
-    let result = validateGateArtifacts(manifest, 'architect', cwd);
+    let result = validateApprovalArtifacts(manifest, 'architect', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /missing: AV-001/);
 
@@ -224,7 +224,7 @@ describe('validateGateArtifacts', () => {
       '|---|---|---|---|---|---|---|---|',
       '| AV-001 | major | correctness | architecture.md:1 | contract is incomplete | define it | complete | reviews.json |',
     ].join('\n'));
-    result = validateGateArtifacts(manifest, 'architect', cwd);
+    result = validateApprovalArtifacts(manifest, 'architect', cwd);
     assert.equal(result.valid, true, result.errors.join('\n'));
   });
 });

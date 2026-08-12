@@ -8,29 +8,31 @@ This document describes how a change moves from idea to merged code, what artifa
 Optional discovery for unformed ideas:
 brainstorm → optional architect-seed.md → architect
 
-Entry ramp (map | reforge | triage | architect)
+Intake: goal/outcome, affected area, constraints/anti-goals, requirements readiness
+    ↓
+Entry ramp (map optional | reforge | triage | architect)
     ↓
 .changes/active/<id>/ created with manifest.yaml
     ↓
-architect gate approved
+architect approval approved
     ↓
 specify  → decisions.md, reconcile architecture.md
     ↓
-specify gate approved
+specify approval approved
     ↓
 plan     → plan.md (live checklist)
     ↓
-plan gate approved
+plan approval approved
     ↓
 implement → per section: code + tests green, live checklist updated
     ↓         then once, over the whole change: bounded RV discovery →
     ↓         one finding batch/remediation → focused verifier closure
     ↓
-implement gate approved
+implement approval approved
     ↓
 docs reconciliation → CONTEXT hierarchy updated + verified
     ↓
-docs gate approved (user confirms happy)
+docs approval approved (user confirms happy)
     ↓
 change-archive.mjs → .changes/archive/<id>.zip, active dir removed
     ↓
@@ -44,6 +46,7 @@ While a change is in progress, all artifacts live at:
 ```
 .changes/active/<id>/
   manifest.yaml
+  change-brief.md     (intake record)
   architecture.md    (created by architect)
   decisions.md       (created by specify)
   plan.md            (created by plan, updated live by implement)
@@ -55,7 +58,7 @@ While a change is in progress, all artifacts live at:
 
 ## Archive
 
-When a change reaches `done` (docs gate approved, user confirms happy), `change-archive.mjs` runs:
+When a change reaches `done` (docs approval approved, user confirms happy), `change-archive.mjs` runs:
 1. Zips `.changes/active/<id>/` to `.changes/archive/<id>.zip`.
 2. Removes `.changes/active/<id>/`.
 3. Commits the zip (or leaves it for the user to commit — configurable).
@@ -69,15 +72,15 @@ Humans can unzip any archive to understand historical context.
 When `implement` discovers a gap the spec didn't anticipate:
 1. Stop immediately. Do not improvise.
 2. Run `kickback-log.mjs` with an impact: `specify` for a material decision, `plan` for a stale checklist, or `implementation` when no upstream artifact is stale.
-3. Amend only the affected artifact at the recorded restart stage and record the actual resolution in the kickback entry.
-4. Re-approve only invalidated gates; `plan.md` retains completed unaffected checklist items.
+3. Amend only the affected artifact at the recorded restart phase and record the actual resolution in the kickback entry.
+4. Re-approve only invalidated approvals; `plan.md` retains completed unaffected checklist items.
 5. `implement` resumes from the checkpoint.
 
-Kickback does not mean restart. It means stop-classify-fix-continue. Record `specify`, `plan`, or `implementation` impact; amend only affected artifacts and re-approve only invalidated gates. The checklist survives; already-completed unaffected tasks are not re-done.
+Record `specify`, `plan`, or `implementation` impact; amend only affected artifacts and re-approve only invalidated approvals.
 
-## Docs reconciliation (docs gate)
+## Docs reconciliation (docs approval)
 
-Reconciliation is not optional. It is a hard gate.
+Reconciliation is not optional. It is a required approval.
 
 The reconciliation process:
 1. Walk `manifest.yaml context_targets`.
@@ -85,9 +88,9 @@ The reconciliation process:
 3. Update each CONTEXT.md to reflect the change: new seams, updated interfaces, graduated firmness, new known-soft-spots.
 4. Re-stamp provenance (`validated-at: <current HEAD sha>`).
 5. Adversarial verifier subagent: confirm CONTEXT claims match the implemented code.
-6. Present summary to user. User approves (docs gate → approved) or requests corrections.
+6. Present summary to user. User approves (docs approval → approved) or requests corrections.
 
-Only after docs gate is approved does `change-archive.mjs` run.
+Only after docs approval is approved does `change-archive.mjs` run.
 
 ## Bounded adversarial reviews
 
@@ -95,20 +98,20 @@ Formal architecture, specification, implementation, and refactor review follows 
 
 - `architect`: one `AV-*` cycle over `architecture.md`.
 - Standard and epic `specify`: one `SV-*` cycle over the implement-as-if contract walk.
-- Standard implementation and refactor execution: one `RV-*` cycle over the completed diff, with gate attestations in `reviews.json`.
+- Standard implementation and refactor execution: one `RV-*` cycle over the completed diff, with approval attestations in `reviews.json`.
 - `triage`: lightweight challenge and self-check only. It has no formal review cycle or review-log requirement.
 
 Each formal cycle has exactly one broad discovery pass, one consolidated blocker/major finding batch, one remediation, focused verification of original IDs, and at most one targeted correction/reverification. Verification does not broaden scope or introduce new low/major findings.
 
-## Independent implementation review (implement gate)
+## Independent implementation review (implement approval)
 
-Before the implement gate can be approved, each full-spine feature and refactor execution passes one independent bounded `RV-*` cycle over the finished work, described in `implementation-review.md`:
+Before the implement approval can be approved, each full-spine feature and refactor execution passes one independent bounded `RV-*` cycle over the finished work, described in `implementation-review.md`:
 
 1. Bring all implementation to a green test baseline (standard changes do this per plan section; a refactor's selected cleanup is the work itself).
 2. A **fresh auditor subagent** makes one broad applicable review and records one consolidated `RV-*` blocker/major batch with concrete impact and alternatives.
 3. Apply one behavior-preserving remediation for the batch. Firm-seam tests stay green throughout; a firm-seam failure is a kickback, never a test edit.
 4. Run the full suite green, then a **distinct fresh verifier subagent** checks only the original IDs. At most one targeted correction/reverification is allowed.
-5. `manifest-gate.mjs --gate implement --approve` refuses until that approved verifier review exists.
+5. `manifest-approval.mjs --approval implement --approve` refuses until that approved verifier review exists.
 
 This is intentionally snapshot-free: `.changes/active/<id>/reviews.json` is an attestation, while structured `RV-*` findings live in the active artifact. There is no per-file hashing, locking, or index check.
 
@@ -118,6 +121,6 @@ A `class: refactor` change skips the spec spine: `refactor` (read-only opportuni
 
 ## Tracking multiple concurrent changes
 
-Each change has its own isolated directory. Multiple `active/<id>/` directories can coexist. `change-status.mjs` lists all active changes and their current stages.
+Each change has its own isolated directory. Multiple `active/<id>/` directories can coexist. `change-status.mjs` lists all active changes and their current phases.
 
 It is the user's responsibility to ensure concurrent changes don't create conflicting edits. The toolkit does not prevent concurrent work, but `architect` will flag when a proposed change touches seams already being modified by another active change.

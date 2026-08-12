@@ -17,7 +17,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 |---|---|---|
 | AC-{{id}}-01 | Section N, Task M | Section N, Task K |
 
-<!-- Fill before plan gate is approved. -->
+<!-- Fill before plan approval is approved. -->
 
 ---
 
@@ -80,7 +80,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 > **Triggered by:** all implementation sections green.
 > **Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
-> **Goal:** one bounded `RV-*` cycle over the whole change. Gates the implement gate.
+> **Goal:** one bounded `RV-*` cycle over the whole change. Required for implement approval.
 > **Cycle:** `implement-1`
 
 - [ ] Launch a **fresh auditor subagent** for one broad applicable discovery pass across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms; no mandatory N/A boilerplate.
@@ -89,7 +89,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Run the full test suite — must be green after remediation.
 - [ ] Launch a **distinct fresh verifier subagent** to check only original RV IDs; no broad rediscovery or new low/major findings. A remediation-caused blocker regression may be recorded through `--regression`; at most one targeted correction/reverification closes it through `--regression-resolution`.
 - [ ] Record structured auditor and verifier attestations under cycle `implement-1`; verifier resolutions reference every original RV ID.
-- [ ] User approves → implement gate → approved (blocked until the verifier approval is recorded)
+- [ ] User approves → implement approval → approved (blocked until the verifier approval is recorded)
 
 | ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Focused verification |
 |---|---|---|---|---|---|---|---|
@@ -104,7 +104,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ## Final section: Documentation reconciliation
 
-> **Triggered by:** `implement` gate approved, user confirms happy.
+> **Triggered by:** `implement` approval approved, user confirms happy.
 > **Goal:** Update all CONTEXT.md files in `manifest.context_targets` to reflect this change.
 
 - [ ] Run `context-verify.mjs` — baseline drift report
@@ -113,5 +113,5 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Re-stamp provenance on all updated CONTEXT.md files (`validated-at: <HEAD sha>`)
 - [ ] Verifier subagent: confirm CONTEXT claims match implemented code
 - [ ] Present reconciliation summary to user
-- [ ] User approves → docs gate → approved
+- [ ] User approves → docs approval → approved
 - [ ] Run `change-archive.mjs` → zip to `.changes/archive/{{id}}.zip`

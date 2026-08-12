@@ -254,11 +254,10 @@ export function listActiveChanges(repoRoot = process.cwd()) {
 }
 
 // ── Independent review log ──────────────────────────────────────────────────
-// Each change stores an append-only list of review entries. Version 1 entries
-// retain their original attestation semantics. Version 2 entries form bounded,
-// structured cycles that the gate validates independently of the recording CLI.
+// Each change stores an append-only list of structured review entries. Version 2
+// forms bounded cycles that the approval validates independently of the recording CLI.
 
-export const REVIEW_STAGES = ['architect', 'specify', 'implement', 'refactor'];
+export const REVIEW_PHASES = ['architect', 'specify', 'implement', 'refactor'];
 export const REVIEW_ROLES = ['auditor', 'verifier'];
 export const REVIEW_VERDICTS = ['approved', 'changes-requested'];
 export const REVIEW_SEVERITIES = ['blocker', 'major'];
@@ -302,21 +301,21 @@ export function appendReview(id, entry, repoRoot = process.cwd()) {
 }
 
 /**
- * The most recent review entry for a stage, or null.
+ * The most recent review entry for a phase, or null.
  */
-export function latestReview(id, stage, repoRoot = process.cwd()) {
-  const reviews = readReviews(id, repoRoot).filter(r => r.stage === stage);
+export function latestReview(id, phase, repoRoot = process.cwd()) {
+  const reviews = readReviews(id, repoRoot).filter(r => r.phase === phase);
   return reviews.length ? reviews[reviews.length - 1] : null;
 }
 
-function validateStructuredFinding(finding, stage, regression = false) {
+function validateStructuredFinding(finding, phase, regression = false) {
   const errors = [];
-  const prefix = REVIEW_PREFIXES[stage];
+  const prefix = REVIEW_PREFIXES[phase];
   if (!finding || typeof finding !== 'object' || Array.isArray(finding)) {
     return ['finding must be a JSON object'];
   }
   if (typeof finding.id !== 'string' || !new RegExp(`^${prefix}-[0-9]{3}$`).test(finding.id)) {
-    errors.push(`finding id must match ${prefix}-NNN for stage '${stage}'`);
+    errors.push(`finding id must match ${prefix}-NNN for phase '${phase}'`);
   }
   if (!REVIEW_SEVERITIES.includes(finding.severity)) {
     errors.push(`finding '${finding.id || '?'}' severity must be one of: ${REVIEW_SEVERITIES.join(', ')}`);
@@ -339,11 +338,11 @@ function validateStructuredFinding(finding, stage, regression = false) {
  * Validate and summarize one structured v2 cycle. Incomplete cycles are valid
  * but not ready; malformed or over-budget cycles are invalid and never ready.
  */
-export function structuredReviewCycleState(entries, stage, cycle) {
-  const staged = entries.filter(entry => entry.version === 2 && entry.stage === stage && entry.cycle === cycle);
+export function structuredReviewCycleState(entries, phase, cycle) {
+  const staged = entries.filter(entry => entry.version === 2 && entry.phase === phase && entry.cycle === cycle);
   const errors = [];
   if (staged.length === 0) {
-    return { valid: true, ready: false, reason: `no ${stage} review recorded for cycle '${cycle}'`, errors };
+    return { valid: true, ready: false, reason: `no ${phase} review recorded for cycle '${cycle}'`, errors };
   }
 
   const auditors = staged.filter(entry => entry.role === 'auditor');
@@ -363,7 +362,7 @@ export function structuredReviewCycleState(entries, stage, cycle) {
   if (auditor) {
     if (!Array.isArray(auditor.findings)) errors.push(`cycle '${cycle}' auditor findings must be an array`);
     for (const finding of Array.isArray(auditor.findings) ? auditor.findings : []) {
-      errors.push(...validateStructuredFinding(finding, stage));
+      errors.push(...validateStructuredFinding(finding, phase));
       if (originalIds.has(finding?.id)) errors.push(`cycle '${cycle}' repeats original finding id '${finding?.id}'`);
       originalIds.add(finding?.id);
     }
@@ -427,7 +426,7 @@ export function structuredReviewCycleState(entries, stage, cycle) {
 
     if (!Array.isArray(verifier.regressions)) errors.push(`cycle '${cycle}' verifier regressions must be an array`);
     for (const regression of Array.isArray(verifier.regressions) ? verifier.regressions : []) {
-      errors.push(...validateStructuredFinding(regression, stage, true));
+      errors.push(...validateStructuredFinding(regression, phase, true));
       if (allIds.has(regression?.id)) errors.push(`cycle '${cycle}' reuses finding id '${regression?.id}'`);
       allIds.add(regression?.id);
       regressionStatuses.set(regression?.id, 'unresolved');
@@ -442,7 +441,7 @@ export function structuredReviewCycleState(entries, stage, cycle) {
   }
   const latest = verifiers[verifiers.length - 1];
   if (latest.verdict !== 'approved') {
-    return { valid: true, ready: false, reason: `latest ${stage} verifier verdict for cycle '${cycle}' is not approved`, errors };
+    return { valid: true, ready: false, reason: `latest ${phase} verifier verdict for cycle '${cycle}' is not approved`, errors };
   }
   const unresolvedOriginal = [...originalStatuses].find(([, status]) => status !== 'resolved');
   if (unresolvedOriginal) {
@@ -456,42 +455,26 @@ export function structuredReviewCycleState(entries, stage, cycle) {
 }
 
 /**
- * Whether a stage's review gate is satisfied.
- *
- * Version 1 uses the original latest-verifier plus distinct-auditor rule.
+ * Whether a phase's review approval is satisfied.
  * Version 2 validates the one fixed bounded cycle and all of its structured
  * findings, resolutions, regressions, reviewer separation, and pass budget.
  * Returns { ready, reason }.
  */
-export function reviewGateReady(id, stage, repoRoot = process.cwd()) {
-  const staged = readReviews(id, repoRoot).filter(r => r.stage === stage);
-  if (staged.length === 0) {
-    return { ready: false, reason: `no ${stage} review recorded` };
+export function reviewApprovalReady(id, phase, repoRoot = process.cwd()) {
+  const reviews = readReviews(id, repoRoot);
+  const unsupported = reviews.find(entry => entry.version !== 2);
+  if (unsupported) {
+    return { ready: false, reason: `reviews.json contains unsupported review version '${unsupported.version ?? 'missing'}'; only version 2 is supported` };
   }
-  const latest = staged[staged.length - 1];
-  if (staged.some(entry => entry.version === 2) && latest.version !== 2) {
-    return { ready: false, reason: `latest ${stage} entry cannot use legacy readiness after a structured review cycle` };
+  const phased = reviews.filter(entry => entry.phase === phase);
+  if (phased.length === 0) return { ready: false, reason: `no ${phase} review recorded` };
+  const expectedCycle = `${phase}-1`;
+  const cycles = new Set(phased.map(entry => entry.cycle));
+  if (cycles.size !== 1 || !cycles.has(expectedCycle)) {
+    return { ready: false, reason: `${phase} structured review must contain exactly one cycle named '${expectedCycle}'` };
   }
-  if (latest.version === 2) {
-    const expectedCycle = `${stage}-1`;
-    const cycles = new Set(staged.filter(entry => entry.version === 2).map(entry => entry.cycle));
-    if (cycles.size !== 1 || !cycles.has(expectedCycle)) {
-      return { ready: false, reason: `${stage} structured review must contain exactly one cycle named '${expectedCycle}'` };
-    }
-    const state = structuredReviewCycleState(staged, stage, expectedCycle);
-    return { ready: state.ready, reason: state.reason };
-  }
-  if (latest.version !== undefined && latest.version !== 1) {
-    return { ready: false, reason: `latest ${stage} review uses unsupported version '${latest.version}'` };
-  }
-  if (latest.verdict !== 'approved' || latest.role !== 'verifier') {
-    return { ready: false, reason: `latest ${stage} review is not an approved verifier verdict (got ${latest.role}/${latest.verdict})` };
-  }
-  const auditor = staged.find(r => r.role === 'auditor' && r.reviewer && r.reviewer !== latest.reviewer);
-  if (!auditor) {
-    return { ready: false, reason: `no auditor review from a reviewer distinct from the approving verifier '${latest.reviewer}'` };
-  }
-  return { ready: true, reason: `approved by verifier '${latest.reviewer}'` };
+  const state = structuredReviewCycleState(phased, phase, expectedCycle);
+  return { ready: state.ready, reason: state.reason };
 }
 
 // ── Git utilities ─────────────────────────────────────────────────────────────
@@ -555,19 +538,19 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
   return id;
 }
 
-// ── Stage ordering ─────────────────────────────────────────────────────────────
+// ── Phase ordering ─────────────────────────────────────────────────────────────
 
-export const STAGES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'done'];
-export const GATES  = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
+export const PHASES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'done'];
+export const APPROVALS = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
 export const KICKBACK_IMPACTS = ['specify', 'plan', 'implementation'];
 
-export function stageIndex(stage) {
-  return STAGES.indexOf(stage);
+export function phaseIndex(phase) {
+  return PHASES.indexOf(phase);
 }
 
-export function gateStage(manifest, gate) {
-  if (gate === 'docs') return 'implement';
-  return gate;
+export function phaseForApproval(manifest, approval) {
+  if (approval === 'docs') return 'implement';
+  return approval;
 }
 
 export function artifactPath(manifest, artifact, repoRoot = process.cwd()) {
@@ -580,12 +563,12 @@ export function kickbackImpact(impact) {
     throw new Error(`impact must be one of: ${KICKBACK_IMPACTS.join(', ')}`);
   }
   if (impact === 'specify') {
-    return { impact, invalidatedGates: ['specify', 'plan'], restartStage: 'specify' };
+    return { impact, invalidatedApprovals: ['specify', 'plan'], restartPhase: 'specify' };
   }
   if (impact === 'plan') {
-    return { impact, invalidatedGates: ['plan'], restartStage: 'plan' };
+    return { impact, invalidatedApprovals: ['plan'], restartPhase: 'plan' };
   }
-  return { impact, invalidatedGates: [], restartStage: 'implement' };
+  return { impact, invalidatedApprovals: [], restartPhase: 'implement' };
 }
 
 function readArtifact(manifest, artifact, repoRoot, errors) {
@@ -619,11 +602,11 @@ function reviewFindingIds(content, prefix) {
     .filter(Boolean));
 }
 
-function validateArtifactReviewIds(manifest, stage, content, repoRoot, errors) {
+function validateArtifactReviewIds(manifest, phase, content, repoRoot, errors) {
   const entries = readReviews(manifest.id, repoRoot)
-    .filter(entry => entry.version === 2 && entry.stage === stage && entry.cycle === `${stage}-1`);
+    .filter(entry => entry.version === 2 && entry.phase === phase && entry.cycle === `${phase}-1`);
   if (entries.length === 0) return;
-  const prefix = REVIEW_PREFIXES[stage];
+  const prefix = REVIEW_PREFIXES[phase];
   const artifactIds = reviewFindingIds(content, prefix);
   const logIds = new Set(entries
     .flatMap(entry => [...(entry.findings || []), ...(entry.regressions || [])])
@@ -631,19 +614,19 @@ function validateArtifactReviewIds(manifest, stage, content, repoRoot, errors) {
   const missing = [...logIds].filter(id => !artifactIds.has(id));
   const extra = [...artifactIds].filter(id => !logIds.has(id));
   if (missing.length > 0 || extra.length > 0) {
-    errors.push(`${stage} artifact review IDs must match reviews.json cycle '${stage}-1' (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
+    errors.push(`${phase} artifact review IDs must match reviews.json cycle '${phase}-1' (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
   }
 }
 
 /**
- * Check only structural evidence required before a gate is approved. Semantic
+ * Check only structural evidence required before an approval is granted. Semantic
  * design review remains the responsibility of the user and review subagents.
  */
-export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) {
+export function validateApprovalArtifacts(manifest, approval, repoRoot = process.cwd()) {
   const errors = [];
-  if (!['architect', 'specify', 'plan'].includes(gate)) return { valid: true, errors };
+  if (!['architect', 'specify', 'plan'].includes(approval)) return { valid: true, errors };
 
-  if (gate === 'architect') {
+  if (approval === 'architect') {
     const architecture = readArtifact(manifest, 'architecture', repoRoot, errors);
     const sections = ['## Summary', '## Architecture Confirmation Ledger', '## Architectural Decisions', '## Seams', '## Validity Check Results'];
     for (const section of sections) {
@@ -671,7 +654,7 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
     }
   }
 
-  if (gate === 'specify') {
+  if (approval === 'specify') {
     const decisions = readArtifact(manifest, 'decisions', repoRoot, errors);
     const sections = ['## Confirmation Ledger', '## Interface Changes', '## Decision Log', '## Dry-Run Findings'];
     for (const section of sections) {
@@ -696,7 +679,7 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
     }
   }
 
-  if (gate === 'plan') {
+  if (approval === 'plan') {
     const plan = readArtifact(manifest, 'plan', repoRoot, errors);
     if (plan && !plan.includes('## Traceability check')) errors.push('plan.md missing required section: ## Traceability check');
     if (plan && !/^\|\s*AC ID\s*\|\s*Task\(s\)\s*\|\s*Firm-seam test task\s*\|/mi.test(plan)) {
@@ -715,10 +698,10 @@ export function validateGateArtifacts(manifest, gate, repoRoot = process.cwd()) 
 }
 
 export function nextSkill(manifest) {
-  const stage = manifest.stage;
-  const gates = manifest.gates || {};
+  const phase = manifest.phase;
+  const approvals = manifest.approvals || {};
 
-  if (stage === 'done') return null;
+  if (phase === 'done') return null;
 
   // Epics: architect → specify → decompose → done (no plan/implement)
   if (manifest.class === 'epic') {
@@ -729,53 +712,55 @@ export function nextSkill(manifest) {
   // cleanup with independent review, and reconcile docs without entering the
   // spec spine.
   if (manifest.class === 'refactor') {
-    if (stage === 'refactor' && gates.refactor !== 'approved') return 'refactor (audit and selection)';
-    if (stage === 'implement' && gates.implement !== 'approved') return 'refactor (execute selected batches)';
-    if (stage === 'implement' && gates.implement === 'approved' && gates.docs !== 'approved') return 'refactor (docs reconciliation)';
+    if (phase === 'refactor' && approvals.refactor !== 'approved') return 'refactor (audit and selection)';
+    if (phase === 'implement' && approvals.implement !== 'approved') return 'refactor (execute selected batches)';
+    if (phase === 'implement' && approvals.implement === 'approved' && approvals.docs !== 'approved') return 'refactor (docs reconciliation)';
     return null;
   }
 
-  if (stage === 'architect' && gates.architect !== 'approved') return 'architect';
-  if (stage === 'architect' && gates.architect === 'approved') return 'specify';
-  if (stage === 'specify'   && gates.specify !== 'approved')  return 'specify';
-  if (stage === 'specify'   && gates.specify === 'approved')  return 'plan';
-  if (stage === 'plan'      && gates.plan !== 'approved')     return 'plan';
-  if (stage === 'plan'      && gates.plan === 'approved')     return 'implement';
-  if (stage === 'implement' && gates.implement !== 'approved') return 'implement';
-  if (stage === 'implement' && gates.implement === 'approved' && gates.docs !== 'approved') return 'implement (docs reconciliation)';
+  if (phase === 'architect' && approvals.architect !== 'approved') return 'architect';
+  if (phase === 'architect' && approvals.architect === 'approved') return 'specify';
+  if (phase === 'specify'   && approvals.specify !== 'approved')  return 'specify';
+  if (phase === 'specify'   && approvals.specify === 'approved')  return 'plan';
+  if (phase === 'plan'      && approvals.plan !== 'approved')     return 'plan';
+  if (phase === 'plan'      && approvals.plan === 'approved')     return 'implement';
+  if (phase === 'implement' && approvals.implement !== 'approved') return 'implement';
+  if (phase === 'implement' && approvals.implement === 'approved' && approvals.docs !== 'approved') return 'implement (docs reconciliation)';
   return null;
 }
 
 // ── Epic helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Epic stage progression:
- *   architect → specify → decompose (epic-split) → done
+ * Epic phase progression:
+ *   architect → specify → decomposed (epic-split) → done
  *
  * Epics never run plan or implement. They plan; their children implement.
  */
 export function epicNextAction(manifest) {
-  const gates  = manifest.gates  || {};
-  const stage  = manifest.stage  || 'architect';
+  const approvals  = manifest.approvals  || {};
+  const phase  = manifest.phase  || 'architect';
   const children = manifest.children || [];
 
-  if (stage === 'done') return null;
+  if (phase === 'done') return null;
 
-  // architect gate
-  if (gates.architect !== 'approved') return 'architect (identify children + overall design)';
+  // architect approval
+  if (approvals.architect !== 'approved') return 'architect (identify children + overall design)';
 
-  // specify gate — cross-cutting contracts
-  if (stage === 'architect' || stage === 'specify') {
-    if (gates.specify !== 'approved') return 'specify (cross-cutting contracts)';
+  // specify approval — cross-cutting contracts
+  if (phase === 'architect' || phase === 'specify') {
+    if (approvals.specify !== 'approved') return 'specify (cross-cutting contracts)';
   }
 
   // decompose — create child manifests from the approved arch+decisions
-  if (gates.specify === 'approved' && children.length === 0) {
+  if (approvals.specify === 'approved' && children.length === 0) {
     return 'epic-split (decompose into child changes)';
   }
 
-  // children exist — track their progress
-  if (children.length > 0 && gates.specify === 'approved') {
+  // Children exist — track their progress and complete the parent once delivered.
+  if (children.length > 0 && approvals.specify === 'approved') {
+    const status = epicStatus(manifest);
+    if (status.done === children.length) return 'complete epic';
     return null; // children drive completion; use change-status to track
   }
 
@@ -784,7 +769,7 @@ export function epicNextAction(manifest) {
 
 /**
  * Compute epic completion status from child manifests.
- * Returns { total, done, inProgress, pending, byStage }
+ * Returns { total, done, inProgress, pending, byPhase }
  */
 export function epicStatus(epicManifest, repoRoot = process.cwd()) {
   const children = epicManifest.children || [];
@@ -793,7 +778,7 @@ export function epicStatus(epicManifest, repoRoot = process.cwd()) {
     done: 0,
     inProgress: 0,
     pending: 0,
-    byStage: {},
+    byPhase: {},
   };
 
   for (const childId of children) {
@@ -803,17 +788,29 @@ export function epicStatus(epicManifest, repoRoot = process.cwd()) {
     } catch {
       // Child may be archived
       result.done++;
-      result.byStage['archived'] = (result.byStage['archived'] || 0) + 1;
+      result.byPhase.archived = (result.byPhase.archived || 0) + 1;
       continue;
     }
-    const stage = child.stage || 'architect';
-    result.byStage[stage] = (result.byStage[stage] || 0) + 1;
-    if (stage === 'done') result.done++;
-    else if (stage === 'architect') result.pending++;
+    const phase = child.phase || 'architect';
+    result.byPhase[phase] = (result.byPhase[phase] || 0) + 1;
+    if (phase === 'done') result.done++;
+    else if (phase === 'architect') result.pending++;
     else result.inProgress++;
   }
 
   return result;
+}
+
+/** Mark a decomposed epic done after every child has completed or been archived. */
+export function completeEpicIfDelivered(epicId, repoRoot = process.cwd()) {
+  const epic = readManifest(epicId, repoRoot);
+  if (epic.class !== 'epic' || epic.phase !== 'decomposed') return epic;
+  const status = epicStatus(epic, repoRoot);
+  if (status.total > 0 && status.done === status.total) {
+    epic.phase = 'done';
+    writeManifest(epicId, epic, repoRoot);
+  }
+  return epic;
 }
 
 /**

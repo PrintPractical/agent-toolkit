@@ -1,11 +1,11 @@
 ---
 name: implement
-description: Use after plan gate is approved to execute plan.md. Implements each section to a green baseline, then runs one bounded independent RV review and behavior-preserving remediation over the whole change before the implement gate. Enforces the firm-seam tripwire, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan gate is approved.
+description: Use after plan approval is approved to execute plan.md. Implements each section to a green baseline, then runs one bounded independent RV review and behavior-preserving remediation over the whole change before the implement approval. Enforces the firm-seam tripwire, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan approval is approved.
 ---
 
 # Implement
 
-You are running the **implement** stage of the agent-toolkit pipeline. Spine stage 4. Your job is to execute `plan.md` faithfully. You make no new decisions about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Those are kickbacks. You do select conventional idiomatic local/private/reversible implementation choices.
+You are running the **implement** phase of the agent-toolkit pipeline. Spine phase 4. Your job is to execute `plan.md` faithfully. You make no new decisions about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Those are kickbacks. You do select conventional idiomatic local/private/reversible implementation choices.
 
 ## Running the helper scripts
 
@@ -26,11 +26,11 @@ Code quality is still your job, but it is **not** reviewed per section. Each sec
 ## Preconditions
 
 Load `manifest.yaml`. Verify:
-- `stage` is `implement` (plan gate approved).
-- `gates.implement` is `pending`.
+- `phase` is `implement` (plan approval approved).
+- `approvals.implement` is `pending`.
 - `plan.md` exists.
 
-Read `references/engineering-fundamentals.md`. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for implementation and review. If no matching pack exists, state that and use repository conventions and tooling.
+Read `change-brief.md` first, then `references/engineering-fundamentals.md`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for implementation and review. If no matching pack is installed, state that and use repository conventions and tooling.
 
 ## The loop: per section (implement → tests green)
 
@@ -52,12 +52,12 @@ Write any test tasks labeled `[firmness: soft]` in this section. Run the tests; 
 
 ### Bounded independent review & behavior-preserving remediation (L3)
 
-This runs **once**, over the whole change, and gates the implement gate. Full detail is in `references/implementation-review.md`.
+This runs **once**, over the whole change, and is required for implement approval. Full detail is in `references/implementation-review.md`.
 
-1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, and every language idiom pack. Following `references/adversarial-review.md`, it reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` boilerplate.
+1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, and only idiom packs applicable to the effective scope. Following `references/adversarial-review.md`, it reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` boilerplate.
 2. **One consolidated batch.** Deduplicate all blocker/major findings. Record stable `RV-NNN` IDs in the plan's review table with severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and concrete alternative. Do not emit nits or later batches. Attest with:
    ```
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --cycle implement-1 --role auditor \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-1 --role auditor \
       --reviewer "<auditor label>" --verdict changes-requested \
       --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
    ```
@@ -66,22 +66,22 @@ This runs **once**, over the whole change, and gates the implement gate. Full de
 4. **Full green run.** Run the full applicable suite after remediation.
 5. **Focused verification.** Launch a distinct fresh read-only verifier. It checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
    ```
-   node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage implement --cycle implement-1 --role verifier \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-1 --role verifier \
       --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
    ```
    A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.
 
-### Implement gate
+### Implement approval
 
 When all sections are green, the bounded review/remediation is done, and an approved verifier review is recorded:
 
-> "All implementation sections are complete, tests pass, and the independent review is approved. Do you approve the implement gate?"
+> "All implementation sections are complete, tests pass, and the independent review is approved. Do you approve the implement approval?"
 
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate implement --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
 ```
 
-The gate refuses unless an approved verifier review (backed by a distinct auditor review) exists for this change.
+The approval refuses unless an approved verifier review (backed by a distinct auditor review) exists for this change.
 
 ## Kickback protocol
 
@@ -97,14 +97,14 @@ When you encounter:
 2. Classify: is this a `defect` (spec should have caught it) or `amendment` (legitimate new info)?
 3. Log the kickback:
 ```
-  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --stage implement --impact specify|plan|implementation \
+  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --phase implement --impact specify|plan|implementation \
   --missed "<what the spec didn't cover>"
 ```
-   Choose `specify` when a material decision changes, `plan` when only the checklist is stale, and `implementation` when no upstream artifact is invalidated. The script records the precise restart stage and invalidated gates.
-4. Tell the user to resume at the recorded restart stage and re-approve only invalidated gates.
+   Choose `specify` when a material decision changes, `plan` when only the checklist is stale, and `implementation` when no upstream artifact is invalidated. The script records the precise `restart_phase` and `invalidated_approvals`.
+4. Tell the user to resume at the recorded phase and re-approve only invalidated approvals.
 5. Do not continue this session until the kickback is resolved.
 
-### Docs reconciliation (docs gate)
+### Docs reconciliation (docs approval)
 
 Load `manifest.context_targets` from `manifest.yaml`. For each target CONTEXT.md:
 1. Run `context-verify.mjs` for baseline:
@@ -125,11 +125,11 @@ node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
 5. Present the reconciliation summary. Address any verifier findings.
 
 Ask the user:
-> "CONTEXT.md files have been updated and verified. Are you happy with this change? (Approving the docs gate will archive the change.)"
+> "CONTEXT.md files have been updated and verified. Are you happy with this change? (Approving the docs approval will archive the change.)"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate docs --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
 ```
 
 ### Archive
@@ -144,7 +144,7 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 
 **Never edit a firm-seam test to make a refactor pass.** That is the tripwire. It means:
 - The refactor is not a pure refactor (behavior changed) → kickback with `--impact specify`.
-- Or the firm seam itself needs to change → this requires the full firm-change protocol (see `references/firm-change-protocol.md`), a `Firm-Change:` kickback, and scoped re-approval of affected gates.
+- Or the firm seam itself needs to change → this requires the full firm-change protocol (see `references/firm-change-protocol.md`), a `Firm-Change:` kickback, and scoped re-approval of affected approvals.
 
 ## Reference files
 
@@ -155,5 +155,5 @@ The change is done. The archive zip is in `.changes/archive/<id>.zip`.
 - `references/change-lifecycle.md` — docs reconciliation + archive
 - `references/firm-change-protocol.md` — if a firm seam must change
 - `references/drift-control.md` — CONTEXT.md update rules
-- `references/idioms/<lang>.md` — implementation and review guidance
+- `idioms` skill — matching implementation and review guidance
 - `references/engineering-fundamentals.md` — cross-language data, state, abstraction, and bounded-resource guidance

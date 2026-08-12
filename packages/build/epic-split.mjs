@@ -124,10 +124,10 @@ for (const childDef of childDefs) {
     id,
     title: childDef.title,
     class: cls,
-    stage: 'architect',
+    phase: 'architect',
     language: lang,
     parent: values.epic,
-    gates: {
+    approvals: {
       architect: 'pending',
       specify:   'pending',
       plan:      'pending',
@@ -135,6 +135,7 @@ for (const childDef of childDefs) {
       docs:      'pending',
     },
     artifacts: {
+      change_brief: 'change-brief.md',
       architecture: 'architecture.md',
       decisions:    'decisions.md',
       plan:         'plan.md',
@@ -176,9 +177,14 @@ for (const childDef of childDefs) {
   createdChildren.push({ id, title: childDef.title, dir, class: cls, language: lang });
 }
 
-// Re-read updated epic manifest for final status
+// Mark the approved epic as decomposed once it has child manifests.
 const updatedEpic = readManifest(values.epic, repoRoot);
-console.error(`\nEpic '${values.epic}' now has ${(updatedEpic.children || []).length} child(ren) total.`);
+updatedEpic.phase = 'decomposed';
+writeManifest(values.epic, updatedEpic, repoRoot);
+
+// Re-read updated epic manifest for final status
+const completedEpic = readManifest(values.epic, repoRoot);
+console.error(`\nEpic '${values.epic}' now has ${(completedEpic.children || []).length} child(ren) total.`);
 console.error(`\nNext steps:`);
 console.error(`  For each child, run: architect (pointing to the child's change ID)`);
 console.error(`  To check epic progress: node change-status.mjs --id ${values.epic}`);

@@ -3,7 +3,7 @@
  * kickback-log.mjs — Log a kickback entry to a change manifest.
  *
  * Usage:
- *   node kickback-log.mjs --id <id> --type defect|amendment --stage specify|plan|implement \
+ *   node kickback-log.mjs --id <id> --type defect|amendment --phase specify|plan|implement \
  *     --impact specify|plan|implementation --missed "What the spec should have caught"
  *
  * Output (stdout): JSON { id, kickback, total_defects, frequency }
@@ -23,7 +23,7 @@ const { values } = parseArgs({
     help:       { type: 'boolean', short: 'h', default: false },
     id:         { type: 'string' },
     type:       { type: 'string' },   // defect | amendment
-    stage:      { type: 'string' },   // specify | plan | implement
+    phase:      { type: 'string' },   // specify | plan | implement
     missed:     { type: 'string' },
     resolution: { type: 'string', default: '' },
     impact:     { type: 'string', default: 'specify' },
@@ -32,12 +32,12 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
+  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --phase <phase> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
   process.exit(0);
 }
 
-if (!values.id || !values.type || !values.stage || !values.missed) {
-  console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
+if (!values.id || !values.type || !values.phase || !values.missed) {
+  console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --phase <phase> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
   process.exit(1);
 }
 
@@ -46,8 +46,8 @@ if (!['defect', 'amendment'].includes(values.type)) {
   process.exit(1);
 }
 
-if (!['specify', 'plan', 'implement'].includes(values.stage)) {
-  console.error('--stage must be specify, plan, or implement');
+if (!['specify', 'plan', 'implement'].includes(values.phase)) {
+  console.error('--phase must be specify, plan, or implement');
   process.exit(1);
 }
 
@@ -71,20 +71,20 @@ try {
 
 const entry = {
   type:       values.type,
-  stage:      values.stage,
+  phase:      values.phase,
   at:         new Date().toISOString(),
   missed:     values.missed,
   resolution: values.resolution || '',
   impact: impact.impact,
-  invalidated_gates: impact.invalidatedGates.join(','),
-  restart_stage: impact.restartStage,
+  invalidated_approvals: impact.invalidatedApprovals.join(','),
+  restart_phase: impact.restartPhase,
 };
 
 manifest.kickbacks = manifest.kickbacks || [];
 manifest.kickbacks.push(entry);
-manifest.gates = manifest.gates || {};
-for (const gate of impact.invalidatedGates) manifest.gates[gate] = 'pending';
-manifest.stage = impact.restartStage;
+manifest.approvals = manifest.approvals || {};
+for (const approval of impact.invalidatedApprovals) manifest.approvals[approval] = 'pending';
+manifest.phase = impact.restartPhase;
 
 writeManifest(values.id, manifest, repoRoot);
 
@@ -94,19 +94,19 @@ const frequency = defectCount; // raw count; ratio requires total completed chan
 
 console.error(`Kickback logged for change '${values.id}':`);
 console.error(`  Type:       ${values.type}`);
-console.error(`  Stage:      ${values.stage}`);
+  console.error(`  Phase:      ${values.phase}`);
 console.error(`  Missed:     ${values.missed}`);
 if (values.resolution) console.error(`  Resolution: ${values.resolution}`);
 console.error(`  Total defect kickbacks this change: ${defectCount}`);
 console.error(`  Impact:     ${impact.impact}`);
-console.error(`  Stage:      ${impact.restartStage} (${impact.invalidatedGates.length ? `${impact.invalidatedGates.join(', ')} gate(s) reset` : 'no upstream gates reset'})`);
+console.error(`  Restart:    ${impact.restartPhase} (${impact.invalidatedApprovals.length ? `${impact.invalidatedApprovals.join(', ')} approval(s) reset` : 'no upstream approvals reset'})`);
 
 if (values.type === 'defect') {
   console.error(`\nThis is a DEFECT kickback — the spec process should have caught this.`);
-  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
+  console.error(`Resume at '${impact.restartPhase}' and re-approve only the invalidated approvals.`);
 } else {
   console.error(`\nThis is an AMENDMENT kickback — legitimate requirement evolution.`);
-  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
+  console.error(`Resume at '${impact.restartPhase}' and re-approve only the invalidated approvals.`);
 }
 
 process.stdout.write(JSON.stringify({
@@ -114,6 +114,6 @@ process.stdout.write(JSON.stringify({
   kickback: entry,
   total_defects: defectCount,
   frequency,
-  stage: manifest.stage,
-  reset_gates: impact.invalidatedGates,
+  phase: manifest.phase,
+  reset_approvals: impact.invalidatedApprovals,
 }) + '\n');

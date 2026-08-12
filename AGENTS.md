@@ -28,7 +28,7 @@ Canonical source ownership is strict: shared guidance belongs in `_shared/`, tem
 ## SKILL.md rules
 
 - `name`: lowercase hyphen-separated, ≤64 chars, matches folder name.
-- `description`: required. Embed trigger keywords. Third person. Cover what AND when. Gate narrow skills with "Use ONLY when...". Skills without a description are never surfaced.
+- `description`: required. Embed trigger keywords. Third person. Cover what AND when. Limit narrow skills with "Use ONLY when...". Skills without a description are never surfaced.
 - Keep SKILL.md under 500 lines. Move detailed reference material to `references/`.
 - Progressive disclosure: only `name` + `description` load at agent startup. Full SKILL.md loads when relevant. Supporting files load on demand.
 - Prefer scripts over inline code blocks — script execution output consumes context; the script file itself does not.
@@ -45,7 +45,7 @@ Canonical source ownership is strict: shared guidance belongs in `_shared/`, tem
 **Canonical source of truth:** `packages/build/*.mjs` (the scripts) and `packages/build/lib/index.mjs` (shared lib). Author them here.
 
 - Scripts import the shared lib via `./lib/index.mjs`. This path resolves identically in the dev repo (`packages/build/`) and in an installed skill (`skills/<name>/scripts/`).
-- `npm run build` (sync-shared) bundles every script + `lib/` into each `skills/<name>/scripts/` directory. **Do not hand-edit the copies under `skills/*/scripts/`** — they are overwritten by the build.
+- `npm run build` (sync-shared) bundles only the helper scripts each skill invokes, plus `lib/` when needed. **Do not hand-edit the copies under `skills/*/scripts/`** — they are overwritten by the build.
 - SKILL.md invokes scripts as `node "$SKILL_DIR/scripts/<script>.mjs"` where `$SKILL_DIR` is the skill's install directory. Never reference `packages/build/` from a SKILL.md — that path does not exist in an installed skill.
 - Shebang: `#!/usr/bin/env node`
 - Status/progress → `stderr`. Machine-readable JSON output → `stdout`.
@@ -56,17 +56,17 @@ Canonical source ownership is strict: shared guidance belongs in `_shared/`, tem
 ## Manifest state machine
 
 ```
-stages:   architect → specify → plan → implement → done
-gates:    architect | specify | plan | implement | docs
+phases:   architect → specify → plan → implement → done
+approvals: architect | specify | plan | implement | docs
 
 refactor class: refactor → implement → done
-refactor gates: refactor | implement | docs
+refactor approvals: refactor | implement | docs
 ```
 
-- No skill auto-advances past a gate without `approved` status.
-- Each spine skill self-checks the prior gate before proceeding.
-- Standard `implement` and the `refactor` class require an approved independent review (fresh auditor + distinct fresh verifier, recorded via `review-log.mjs`) before their gate. No per-file snapshot tracking.
-- `change-status.mjs` prints current stage + recommended next skill.
+- No skill advances past an approval without `approved` status.
+- Each spine skill self-checks the prior approval before proceeding.
+- Standard `implement` and the `refactor` class require an approved independent review (fresh auditor + distinct fresh verifier, recorded via `review-log.mjs --phase`) before approval. No per-file snapshot tracking.
+- `change-status.mjs` prints the current phase and recommended next skill.
 
 ## Kickback types
 

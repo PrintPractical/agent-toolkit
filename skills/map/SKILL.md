@@ -1,6 +1,6 @@
 ---
 name: map
-description: Use on a brownfield codebase that has no CONTEXT.md files yet. Reverse-engineers the system and component architecture from existing code to produce a CONTEXT.md hierarchy — root system context plus per-component context files. Run this once before using architect or triage on an existing project. Also use when CONTEXT.md files exist but are severely out of date.
+description: Use on a brownfield codebase that needs a CONTEXT.md hierarchy. After intake, reverse-engineers the system and component architecture from existing code to produce root and component CONTEXT.md files. Use when that context would materially help; architect and triage do not require it. Also use when CONTEXT.md files are severely out of date.
 ---
 
 # Map
@@ -25,6 +25,10 @@ Descriptive, not prescriptive. Map the codebase as it exists. When you see somet
 - Do NOT recommend changes to the user — this session produces documentation, not a refactor plan.
 
 Conservative firmness: when in doubt, tag `soft`. It is easy to earn `firm` later; it is disruptive to downgrade a wrongly-designated `firm` seam.
+
+## Intake
+
+Before any context scan, repository discovery, subagent, or reference read, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. Map only the scope needed to support that intake.
 
 ## Phase 1: Discovery
 

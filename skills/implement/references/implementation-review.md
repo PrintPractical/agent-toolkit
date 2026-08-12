@@ -24,14 +24,14 @@ all scoped work green
   -> tests green
   -> distinct fresh VERIFIER checks only original RV IDs
   -> at most one targeted correction and focused reverification
-  -> implement gate
+   -> implement approval
 ```
 
 The auditor and verifier are distinct fresh read-only subagents, neither of which implemented the work. The verifier performs closure, not a second broad review.
 
 ## Discovery coverage
 
-The auditor loads the idiom pack for every language in scope and reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` report is required. The pass must also catch unsafe or panic-prone recoverable paths, swallowed errors, wrong ownership or dependency direction, monolithic responsibilities, duplication, leaky abstractions, dead/debug/placeholder code, and operational risks from persistence, concurrency, resources, networking, or deployment.
+The auditor receives only idiom packs applicable to the effective scope and reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` report is required. The pass must also catch unsafe or panic-prone recoverable paths, swallowed errors, wrong ownership or dependency direction, monolithic responsibilities, duplication, leaky abstractions, dead/debug/placeholder code, and operational risks from persistence, concurrency, resources, networking, or deployment.
 
 Specialized lenses may run in parallel as one coordinated discovery pass:
 
@@ -53,14 +53,14 @@ After tests are green, the verifier checks only the original `RV-*` IDs and reco
 
 ## Review log
 
-`review-log.mjs` records the structured gate attestation. Use cycle `implement-1` for a feature or `refactor-1` for refactor execution. Put the same `RV-*` details in `plan.md` or `refactor.md`:
+`review-log.mjs` records the structured approval attestation. Use cycle `implement-1` for a feature or `refactor-1` for refactor execution. Put the same `RV-*` details in `plan.md` or `refactor.md`:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> --cycle <implement-1|refactor-1> \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-1|refactor-1> \
   --role auditor --reviewer "<fresh label>" --verdict changes-requested \
   --finding '{"id":"RV-001","severity":"blocker","category":"correctness","location":"src/io.rs:42","impact":"request panic","alternative":"return a typed error"}'
 
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --stage <implement|refactor> --cycle <implement-1|refactor-1> \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-1|refactor-1> \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved \
   --resolution RV-001=resolved
 ```
