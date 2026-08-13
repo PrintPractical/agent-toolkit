@@ -50,12 +50,12 @@ The cycle therefore permits at most one broad pass, one finding batch, one remed
 
 Every formal cycle uses structured version-2 entries in `reviews.json` through `review-log.mjs`. The artifact records the same cycle name, findings, remediation, and verification evidence so humans can read the decision trail.
 
-- `architect`: use cycle `architect-1`; record `AV-*` findings under `Validity Check Results`.
-- `specify`, standard and epic: use cycle `specify-1`; record `SV-*` findings under `Dry-Run Findings`.
-- `implement`: use cycle `implement-1`; record `RV-*` findings in the plan review section.
-- Refactor execution: use cycle `refactor-1`; record `RV-*` findings in `refactor.md`.
+- `architect`: use the current `architect-N` manifest epoch; record `AV-*` findings under `Validity Check Results`.
+- `specify`, standard and epic: use the current `specify-N` manifest epoch; record `SV-*` findings under `Dry-Run Findings`.
+- `implement`: use the current `implement-N` manifest epoch; record `RV-*` findings in the plan review section.
+- Refactor execution: use the current `refactor-N` manifest epoch; record `RV-*` findings in `refactor.md`.
 
-The recording CLI permits one discovery auditor and at most two verifier entries in a cycle. Verifiers use `--resolution` for original IDs, `--regression` only for a blocker regression introduced by remediation, and `--regression-resolution` to close it. Historical version-1 records remain readable, but all new records use the fixed named structured cycle.
+The recording CLI permits one discovery auditor and at most two verifier entries in each cycle. Verifiers use `--resolution` for original IDs, `--regression` only for a blocker regression introduced by remediation, and `--regression-resolution` to close it. A kickback advances its affected review epoch; retain earlier cycles as history and use the manifest's current epoch for the resumed review.
 
 Apply the cross-language review criteria in `engineering-fundamentals.md` together with every applicable language idiom pack.
 

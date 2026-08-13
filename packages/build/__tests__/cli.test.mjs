@@ -18,6 +18,7 @@ function runScript(script, args, cwd) {
 
 function writeApprovedArtifacts(id, cwd) {
   const dir = path.join(cwd, '.changes', 'active', id);
+  const specifyCycle = `specify-${readManifest(id, cwd).review_epochs?.specify || 1}`;
   fs.writeFileSync(path.join(dir, 'architecture.md'), [
     '## Summary', 'x', '## Architecture Confirmation Ledger',
     '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
@@ -33,7 +34,7 @@ function writeApprovedArtifacts(id, cwd) {
     '|---|---|---|---|---|---|---|',
     '| D-001 | q | recommendation | none | accept | confirmed | yes |',
     '## Interface Changes', 'None.', '## Decision Log', 'None.', '## Dry-Run Findings', '**Dry-run status:** clean',
-    '## Review Cycle Reference', 'Cycle: specify-1',
+    '## Review Cycle Reference', `Cycle: ${specifyCycle}`,
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'plan.md'), [
     '## Traceability check', '| AC ID | Task(s) | Firm-seam test task |',
@@ -136,6 +137,8 @@ describe('kickback flow', () => {
     assert.equal(manifest.approvals.specify, 'pending');
     assert.equal(manifest.approvals.plan, 'pending');
     assert.equal(manifest.approvals.implement, 'pending');
+    assert.equal(manifest.review_epochs.specify, 2);
+    assert.equal(manifest.review_epochs.implement, 2);
     assert.equal(manifest.kickbacks[0].phase, 'implement');
     assert.equal(manifest.kickbacks[0].resolution, '');
     assert.equal(manifest.kickbacks[0].invalidated_approvals, 'specify,plan,implement,docs');

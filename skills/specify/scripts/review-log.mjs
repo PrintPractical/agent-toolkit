@@ -124,12 +124,10 @@ if (command === 'record') {
     const expectedCycle = expectedReviewCycle(manifest, values.phase);
     if (cycle !== expectedCycle) fail(`--cycle for phase '${values.phase}' must be '${expectedCycle}'`);
     const cycleEntries = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle === cycle);
-    const otherCycles = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle !== cycle);
     const auditors = cycleEntries.filter(item => item.role === 'auditor');
     const verifiers = cycleEntries.filter(item => item.role === 'verifier');
 
     if (values.role === 'auditor') {
-      if (otherCycles.length > 0) fail(`phase '${values.phase}' already used its bounded discovery cycle`);
       if (cycleEntries.length > 0) fail(`cycle '${cycle}' already exists; exactly one discovery auditor is allowed`);
       if (structuredArgs > 0) fail('auditor entries cannot contain resolutions or regressions');
       if (values.verdict === 'changes-requested' && values.finding.length === 0) fail('a changes-requested verdict requires at least one --finding');

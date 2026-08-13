@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   writeManifest,
+  readManifest,
   appendReview,
   readReviews,
   reviewApprovalReady,
@@ -151,6 +152,34 @@ describe('review-log.mjs', () => {
     assert.equal(status.status, 0, status.stderr);
     const parsed = JSON.parse(status.stdout);
     assert.equal(parsed.phases.implement.approval.ready, true);
+  });
+
+  it('records and approves the current epoch while retaining prior review history', () => {
+    const manifest = {
+      ...readManifest(id, cwd),
+      review_epochs: { implement: 2 },
+    };
+    writeManifest(id, manifest, cwd);
+    appendReview(id, {
+      version: 2, cycle: 'implement-1', phase: 'implement', role: 'auditor', reviewer: 'prior-auditor',
+      verdict: 'approved', findings: [], at: new Date().toISOString(),
+    }, cwd);
+    appendReview(id, {
+      version: 2, cycle: 'implement-1', phase: 'implement', role: 'verifier', reviewer: 'prior-verifier',
+      verdict: 'approved', verification: 'initial', resolutions: [], regressions: [], regressionResolutions: [], at: new Date().toISOString(),
+    }, cwd);
+
+    const audit = run([
+      'record', '--id', id, '--phase', 'implement', '--cycle', 'implement-2', '--role', 'auditor',
+      '--reviewer', 'current-auditor', '--verdict', 'approved',
+    ], cwd);
+    assert.equal(audit.status, 0, audit.stderr);
+    const verify = run([
+      'record', '--id', id, '--phase', 'implement', '--cycle', 'implement-2', '--role', 'verifier',
+      '--reviewer', 'current-verifier', '--verdict', 'approved',
+    ], cwd);
+    assert.equal(verify.status, 0, verify.stderr);
+    assert.equal(reviewApprovalReady(id, 'implement', cwd).ready, true);
   });
 
   it('keeps implement and refactor phases independent', () => {
@@ -317,7 +346,7 @@ describe('review-log.mjs', () => {
     assert.match(reused.stderr, /exactly one discovery auditor/);
   });
 
-  it('rejects an injected additional structured cycle at approval evaluation', () => {
+  it('rejects a future structured cycle at approval evaluation', () => {
     run([
       'record', '--id', id, '--phase', 'implement', '--cycle', 'implement-1', '--role', 'auditor',
       '--reviewer', 'critic-a', '--verdict', 'approved',
@@ -332,7 +361,7 @@ describe('review-log.mjs', () => {
     }, cwd);
     const approval = reviewApprovalReady(id, 'implement', cwd);
     assert.equal(approval.ready, false);
-    assert.match(approval.reason, /exactly one cycle named 'implement-1'/);
+    assert.match(approval.reason, /current or historical epochs through 'implement-1'/);
   });
 
   it('rejects version-1 and unversioned logs as unsupported', () => {

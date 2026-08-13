@@ -8,11 +8,15 @@ This document describes how a change moves from idea to merged code, what artifa
 Optional discovery for unformed ideas:
 brainstorm → optional architect-seed.md → architect
 
+Explicit seed (when supplied) → targeted intake for missing or uncertain fields
+    ↓
 Intake: goal/outcome, affected area, constraints/anti-goals, requirements readiness
     ↓
 Entry ramp (map optional | reforge | triage | architect)
     ↓
 .changes/active/<id>/ created with manifest.yaml
+    ↓
+change-brief.md records the seed and intake context
     ↓
 architect approval approved
     ↓

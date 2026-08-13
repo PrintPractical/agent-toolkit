@@ -1,6 +1,6 @@
 # Behavior-Preserving Implementation Review
 
-This document applies the bounded cycle in `adversarial-review.md` to completed standard implementation and refactor execution. It is snapshot-free: no per-file hashes, locks, epochs, or Git-index state are tracked.
+This document applies the bounded cycle in `adversarial-review.md` to completed standard implementation and refactor execution. It is snapshot-free: no per-file hashes, locks, or Git-index state are tracked. Logical manifest review epochs identify a fresh cycle after a kickback.
 
 ## Core rule
 
@@ -53,14 +53,14 @@ After tests are green, the verifier checks only the original `RV-*` IDs and reco
 
 ## Review log
 
-`review-log.mjs` records the structured approval attestation. Use cycle `implement-1` for a feature or `refactor-1` for refactor execution. Put the same `RV-*` details in `plan.md` or `refactor.md`:
+`review-log.mjs` records the structured approval attestation. Use the current manifest epoch, `implement-N` for a feature or `refactor-N` for refactor execution. Put the same `RV-*` details in `plan.md` or `refactor.md`:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-1|refactor-1> \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-N|refactor-N> \
   --role auditor --reviewer "<fresh label>" --verdict changes-requested \
   --finding '{"id":"RV-001","severity":"blocker","category":"correctness","location":"src/io.rs:42","impact":"request panic","alternative":"return a typed error"}'
 
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-1|refactor-1> \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase <implement|refactor> --cycle <implement-N|refactor-N> \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved \
   --resolution RV-001=resolved
 ```

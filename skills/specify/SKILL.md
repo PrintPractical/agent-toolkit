@@ -76,12 +76,12 @@ Consolidate every finding into one batch. Each finding has a stable `SV-NNN` ID,
 
 Remediate the complete batch once. Obtain user confirmation only for remediation crossing the materiality boundary; auto-select local/private/reversible conventional idiomatic choices. Then launch a fresh verifier to check only the original IDs. Verification does not repeat discovery, expand scope, or introduce new low/major findings. A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad investigation, stop instead of extending the cycle.
 
-Record the discovery and verification under structured cycle `specify-1` with `review-log.mjs`. The auditor uses structured `--finding` JSON from the shared policy; the verifier supplies one `--resolution SV-NNN=resolved|unresolved` for every original finding. An approved clean auditor still requires a distinct verifier:
+Record the discovery and verification under the current manifest `specify-N` epoch with `review-log.mjs`. The auditor uses structured `--finding` JSON from the shared policy; the verifier supplies one `--resolution SV-NNN=resolved|unresolved` for every original finding. An approved clean auditor still requires a distinct verifier:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-N \
   --role auditor --reviewer "<fresh label>" --verdict approved
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-N \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved
 ```
 
@@ -122,7 +122,7 @@ Tell the user: **run `plan` next.**
 If you are running `specify` because `implement` kicked back (not a fresh session), treat it as an amendment session:
 - Load the kickback entry from `manifest.yaml`.
 - Address only the gap identified in the kickback.
-- Run targeted review covering only that recorded gap; do not restart broad discovery. If it reveals a new material decision, confirm that decision and record it under the kickback rather than manufacturing another formal review cycle.
+- Run the current `specify-N` formal cycle scoped only to that recorded gap; do not restart broad discovery. If it reveals a new material decision, confirm that decision and record it under the kickback rather than broadening the cycle.
 - Update `decisions.md` with the new resolution.
 - Reconcile `architecture.md` if needed.
 - Set the latest kickback entry's `resolution` in `manifest.yaml` to the actual decision. Do not leave it empty or use a placeholder such as `pending`.
@@ -179,7 +179,7 @@ Use the standard materiality boundary and confirmation discipline, scoped strict
 
 Run exactly one `SV-*` cycle over all cross-child contracts. One fresh critic makes one broad implement-as-if pass across every child boundary and all applicable review dimensions. Present one consolidated blocker/major batch using stable `SV-NNN` IDs, the required categories, evidence, concrete impact, and alternatives. Remediate once, asking the user only for material decisions. A fresh verifier checks only original IDs; allow at most one targeted correction/reverification, with no repeated discovery or new low/major findings. Record the cycle under `Dry-Run Findings`. If an original blocker remains, do not decompose the epic.
 
-Record the auditor and verifier through `review-log.mjs` under cycle `specify-1` exactly as in the standard path.
+Record the auditor and verifier through `review-log.mjs` under the current `specify-N` epoch exactly as in the standard path.
 
 **Phase E4: Write epic decisions.md**
 

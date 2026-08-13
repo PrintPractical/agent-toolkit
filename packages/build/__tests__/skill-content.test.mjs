@@ -28,4 +28,15 @@ describe('spine skill discovery policy', () => {
       assert.match(content, /blocker regression/i, `${skill} must document the verifier regression exception`);
     }
   });
+
+  it('reads an explicitly supplied architect seed before intake questions', () => {
+    const content = fs.readFileSync(path.join(REPO_ROOT, 'skills', 'architect', 'SKILL.md'), 'utf8');
+    const seed = content.indexOf('**Explicit seed before intake.**');
+    const intake = content.indexOf('**Record the resulting intake.**');
+
+    assert.ok(seed >= 0, 'architect must define explicit seed handling');
+    assert.ok(intake > seed, 'architect must handle an explicit seed before intake');
+    assert.match(content, /ask only about fields that are missing or uncertain/i);
+    assert.match(content, /change-brief\.md.*seed and intake context/i);
+  });
 });

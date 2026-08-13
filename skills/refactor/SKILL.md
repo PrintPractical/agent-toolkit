@@ -121,7 +121,7 @@ After all selected batches are green, run exactly one `RV-*` cycle from `referen
 
 1. A **fresh auditor subagent** makes one broad discovery pass over the complete diff, using only applicable idiom packs and covering every applicable review dimension. Consolidate all blocker/major findings into one batch in `refactor.md`; each needs stable `RV-NNN`, severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and alternative. Record the attestation:
     ```bash
-    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase refactor --cycle refactor-1 --role auditor \
+    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase refactor --cycle refactor-N --role auditor \
       --reviewer "<auditor label>" --verdict changes-requested \
       --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
     ```
@@ -130,7 +130,7 @@ After all selected batches are green, run exactly one `RV-*` cycle from `referen
 3. Run the complete project verification for the effective scope (format, lint/static, type check, build, tests, firm-seam and characterization tests).
 4. A **distinct fresh verifier subagent** checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
     ```bash
-    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase refactor --cycle refactor-1 --role verifier \
+    node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase refactor --cycle refactor-N --role verifier \
       --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
     ```
     A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or broad review is needed, stop and route upstream rather than extending the cycle.

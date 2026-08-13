@@ -57,7 +57,7 @@ This runs **once**, over the whole change, and is required for implement approva
 1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, and only idiom packs applicable to the effective scope. Following `references/adversarial-review.md`, it reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` boilerplate.
 2. **One consolidated batch.** Deduplicate all blocker/major findings. Record stable `RV-NNN` IDs in the plan's review table with severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and concrete alternative. Do not emit nits or later batches. Attest with:
    ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-1 --role auditor \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-N --role auditor \
       --reviewer "<auditor label>" --verdict changes-requested \
       --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
    ```
@@ -66,7 +66,7 @@ node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cy
 4. **Full green run.** Run the full applicable suite after remediation.
 5. **Focused verification.** Launch a distinct fresh read-only verifier. It checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
    ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-1 --role verifier \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-N --role verifier \
       --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
    ```
    A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.

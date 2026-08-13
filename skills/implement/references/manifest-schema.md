@@ -29,6 +29,12 @@ approvals:
   implement:  pending | approved
   docs:       pending | approved
 
+# Formal-review cycle epoch. Omit until a kickback advances an affected phase;
+# the implicit starting epoch is 1. Keep prior reviews.json cycles as history.
+review_epochs:
+  specify: 2
+  implement: 2
+
 artifacts:
   change_brief:  change-brief.md      # intake captured before discovery
   architecture: architecture.md     # relative to this directory
@@ -87,7 +93,7 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 - `change-status.mjs` prints the current phase and the recommended next skill.
 - `archive-ready` is active, not terminal. The only terminal state is a verified archive; the active workspace is removed only after archive verification succeeds.
 - Cancellation may occur from any active phase. Record `archive.outcome: cancelled` and a specific `archive.reason`, then create a verified cancellation archive. It bypasses unfinished approvals but never silently discards the workspace.
-- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream approval. Re-approve only invalidated approvals without losing unaffected checklist work.
+- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream approval. It advances the affected formal review epochs, so resumed reviews use the current `phase-N` epoch while prior cycles remain history. Re-approve only invalidated approvals without losing unaffected checklist work.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs`; the epic enters `decomposed`, and its `architecture.md` + `decisions.md` become parent context for each child's `architect` session. Keep completed children at `archive-ready` until the epic is ready to archive them together.
 

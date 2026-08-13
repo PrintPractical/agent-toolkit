@@ -227,4 +227,25 @@ describe('validateApprovalArtifacts', () => {
     result = validateApprovalArtifacts(manifest, 'architect', cwd);
     assert.equal(result.valid, true, result.errors.join('\n'));
   });
+
+  it('requires decisions to reference the current specify review epoch', () => {
+    manifest.review_epochs = { specify: 2 };
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    const decisions = cycle => [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| D-001 | q | r | none | accept | confirmed | yes |',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+      '## Review Cycle Reference', `Cycle: ${cycle}`,
+    ].join('\n');
+
+    fs.writeFileSync(path.join(dir, 'decisions.md'), decisions('specify-2'));
+    assert.equal(validateApprovalArtifacts(manifest, 'specify', cwd).valid, true);
+
+    fs.writeFileSync(path.join(dir, 'decisions.md'), decisions('specify-1'));
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /must be specify-2/);
+  });
 });

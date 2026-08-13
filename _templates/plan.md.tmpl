@@ -81,14 +81,14 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 > **Triggered by:** all implementation sections green.
 > **Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
 > **Goal:** one bounded `RV-*` cycle over the whole change. Required for implement approval.
-> **Cycle:** `implement-1`
+> **Cycle:** `implement-N` (use the current manifest review epoch)
 
 - [ ] Launch a **fresh auditor subagent** for one broad applicable discovery pass across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms; no mandatory N/A boilerplate.
 - [ ] Consolidate one complete blocker/major batch. Record each original finding below and attest with `review-log.mjs`; do not issue later batches.
 - [ ] Apply one behavior-preserving remediation for the complete batch (or record an evidence-based clean rationale). Firm-seam tests stay green; a firm-seam failure is a kickback, not a test edit.
 - [ ] Run the full test suite — must be green after remediation.
 - [ ] Launch a **distinct fresh verifier subagent** to check only original RV IDs; no broad rediscovery or new low/major findings. A remediation-caused blocker regression may be recorded through `--regression`; at most one targeted correction/reverification closes it through `--regression-resolution`.
-- [ ] Record structured auditor and verifier attestations under cycle `implement-1`; verifier resolutions reference every original RV ID.
+- [ ] Record structured auditor and verifier attestations under the current `implement-N` epoch; verifier resolutions reference every original RV ID.
 - [ ] User approves → implement approval → approved (blocked until the verifier approval is recorded)
 
 | ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Focused verification |

@@ -464,8 +464,10 @@ export function structuredReviewCycleState(entries, phase, cycle) {
 
 /**
  * Whether a phase's review approval is satisfied.
- * Version 2 validates the one fixed bounded cycle and all of its structured
+ * Version 2 validates the current bounded cycle and all of its structured
  * findings, resolutions, regressions, reviewer separation, and pass budget.
+ * Earlier cycles remain immutable review history after a kickback starts a new
+ * epoch.
  * Returns { ready, reason }.
  */
 export function reviewApprovalReady(id, phase, repoRoot = process.cwd()) {
@@ -478,16 +480,28 @@ export function reviewApprovalReady(id, phase, repoRoot = process.cwd()) {
   if (phased.length === 0) return { ready: false, reason: `no ${phase} review recorded` };
   const manifest = readManifest(id, repoRoot);
   const expectedCycle = expectedReviewCycle(manifest, phase);
-  const cycles = new Set(phased.map(entry => entry.cycle));
-  if (cycles.size !== 1 || !cycles.has(expectedCycle)) {
-    return { ready: false, reason: `${phase} structured review must contain exactly one cycle named '${expectedCycle}'` };
+  const currentEpoch = reviewEpoch(manifest, phase);
+  for (const entry of phased) {
+    const match = new RegExp(`^${phase}-(\\d+)$`).exec(entry.cycle || '');
+    if (!match || Number(match[1]) > currentEpoch) {
+      return { ready: false, reason: `${phase} review cycles must be current or historical epochs through '${expectedCycle}'` };
+    }
   }
-  const state = structuredReviewCycleState(phased, phase, expectedCycle);
+  const current = phased.filter(entry => entry.cycle === expectedCycle);
+  if (current.length === 0) {
+    return { ready: false, reason: `no ${phase} review recorded for current cycle '${expectedCycle}'` };
+  }
+  const state = structuredReviewCycleState(current, phase, expectedCycle);
   return { ready: state.ready, reason: state.reason };
 }
 
 export function expectedReviewCycle(manifest, phase) {
-  return `${phase}-${manifest.review_epochs?.[phase] || 1}`;
+  return `${phase}-${reviewEpoch(manifest, phase)}`;
+}
+
+function reviewEpoch(manifest, phase) {
+  const epoch = manifest.review_epochs?.[phase];
+  return epoch === undefined ? 1 : epoch;
 }
 
 // ── Git utilities ─────────────────────────────────────────────────────────────
@@ -600,6 +614,16 @@ export function validateManifestState(manifest) {
     if (!['pending', 'approved'].includes(status)) errors.push(`approval '${approval}' has invalid status '${status}'`);
   }
   for (const approval of allowed) if (!approvals[approval]) errors.push(`missing '${approval}' approval`);
+  if (manifest.review_epochs !== undefined) {
+    if (!manifest.review_epochs || typeof manifest.review_epochs !== 'object' || Array.isArray(manifest.review_epochs)) {
+      errors.push('review_epochs must be a mapping of review phases to positive integers');
+    } else {
+      for (const [phase, epoch] of Object.entries(manifest.review_epochs)) {
+        if (!REVIEW_PHASES.includes(phase)) errors.push(`review_epochs contains invalid review phase '${phase}'`);
+        if (!Number.isInteger(epoch) || epoch < 1) errors.push(`review_epochs.${phase} must be a positive integer`);
+      }
+    }
+  }
   if (manifest.class === 'epic' && !Array.isArray(manifest.children)) errors.push('epic children must be an array');
   if (manifest.class !== 'epic' && Array.isArray(manifest.children)) errors.push('only epics may have children');
   if (manifest.phase === 'archive-ready' && !isArchiveReady(manifest)) errors.push('archive-ready change does not satisfy archive preconditions');
@@ -702,8 +726,9 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (architecture && ['feature', 'epic'].includes(manifest.class) && !hasReviewCycleReference(architecture)) {
       errors.push('architecture.md missing required section: ## Review Cycle Reference');
     }
-    if (architecture && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(architecture) !== 'architect-1') {
-      errors.push('architecture.md review cycle reference must be architect-1');
+    const expectedCycle = expectedReviewCycle(manifest, 'architect');
+    if (architecture && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(architecture) !== expectedCycle) {
+      errors.push(`architecture.md review cycle reference must be ${expectedCycle}`);
     }
     const ledger = architecture.match(/## Architecture Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
     const rows = ledger.split('\n').filter(line => /^\|\s*A-\d+/i.test(line));
@@ -730,8 +755,9 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (decisions && ['feature', 'epic'].includes(manifest.class) && !hasReviewCycleReference(decisions)) {
       errors.push('decisions.md missing required section: ## Review Cycle Reference');
     }
-    if (decisions && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(decisions) !== 'specify-1') {
-      errors.push('decisions.md review cycle reference must be specify-1');
+    const expectedCycle = expectedReviewCycle(manifest, 'specify');
+    if (decisions && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(decisions) !== expectedCycle) {
+      errors.push(`decisions.md review cycle reference must be ${expectedCycle}`);
     }
     const ledger = decisions.match(/## Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
     const rows = ledger.split('\n').filter(line => /^\|\s*D-\d+/i.test(line));

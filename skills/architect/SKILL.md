@@ -29,13 +29,13 @@ You have strong architectural opinions. After intake establishes scope, read `re
 ## Preconditions
 
 Before starting, check:
-1. **Intake before discovery.** Obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. Do not read a seed, manifest, CONTEXT.md, repository references, or scan the repository first. Record the intake in `change-brief.md` from `references/templates/change-brief.md.tmpl` immediately after a workspace exists.
-2. **Check for an optional architect seed.** Read a seed path explicitly supplied by the user only after intake. If none was supplied and `architect-seed.md` exists at the project root, ask whether it applies before loading it. A seed is input to challenge, not an approved decision. Use it to confirm the title, class, and language before creating a manifest. A user may also supply a `reforge-seed.md` as the same kind of non-binding input.
+1. **Explicit seed before intake.** Read an `architect-seed.md` or `reforge-seed.md` path explicitly supplied by the user before asking intake questions. Treat it as provisional input to challenge, not an approved decision. Derive the goal and observable outcome, affected area, constraints and anti-goals, and requirements readiness from it; ask only about fields that are missing or uncertain. If no seed was explicitly supplied and `architect-seed.md` exists at the project root, ask whether it applies before loading it. Use a selected seed to confirm the title, class, and language before creating a manifest.
+2. **Record the resulting intake.** Do not read a manifest, CONTEXT.md, repository references, or scan the repository before the explicit seed and any needed intake clarifications. Record the combined seed and intake context in `change-brief.md` from `references/templates/change-brief.md.tmpl` immediately after a workspace exists.
 3. Is there an active change in `.changes/active/`? If yes, load `manifest.yaml`. If no, create one:
    ```
    node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" [--class feature|epic] [--language <lang>]
    ```
-4. Write `.changes/active/<id>/change-brief.md` from the intake and confirm `manifest.artifacts.change_brief` names it.
+4. Write `.changes/active/<id>/change-brief.md` from the seed and intake context and confirm `manifest.artifacts.change_brief` names it.
 5. If the manifest phase is not `architect` or the architect approval is already `approved`, inform the user and stop.
 6. **Check `manifest.class`.** If `epic`, follow the Epic Decomposition path below instead of the standard path.
 
@@ -70,7 +70,7 @@ node "$SKILL_DIR/scripts/context-discover.mjs"
 
 Read the root CONTEXT.md and any component CONTEXT.md files relevant to the epic's scope.
 
-Read any selected architect or reforge seed and treat it as provisional context. Record that seed in `architecture.md` under `Context Gathered`.
+Record any previously selected architect or reforge seed as provisional context in `architecture.md` under `Context Gathered`.
 
 ### Epic Phase 3: High-level architectural discussion
 
@@ -117,7 +117,7 @@ Write to: `.changes/active/<id>/architecture.md`
 
 Run exactly one `AV-*` cycle from `references/adversarial-review.md` over the whole epic architecture. A fresh critic makes one broad discovery pass, including child boundaries, ordering, cross-cutting contracts, and all applicable review dimensions. Consolidate every blocker/major finding into one batch with severity, category, evidence, concrete impact, and alternative. Remediate the batch once, asking the user only for material decisions. A fresh verifier then checks only the original IDs; allow at most one targeted correction/reverification. It must not broaden scope or introduce new low/major findings. Record the cycle under `Validity Check Results`.
 
-Record the auditor and verifier through `review-log.mjs` under structured cycle `architect-1`, using the standard-path commands below.
+Record the auditor and verifier through `review-log.mjs` under the current `architect-N` manifest epoch, using the standard-path commands below.
 
 ### Epic Phase 7: Architect approval
 
@@ -187,12 +187,12 @@ Consolidate all findings into one batch. Each has a stable `AV-NNN` ID, severity
 
 Launch a fresh verifier to check only the original IDs. It does not repeat discovery, broaden scope, or introduce new low/major findings. A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or broad review would be needed, stop. Record the full cycle in `Validity Check Results`; if clean, record a brief evidence-based rationale.
 
-Record the discovery and verification under structured cycle `architect-1`. For a clean pass:
+Record the discovery and verification under the current `architect-N` manifest epoch. For a clean pass:
 
 ```
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-N \
   --role auditor --reviewer "<fresh label>" --verdict approved
-node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-1 \
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase architect --cycle architect-N \
   --role verifier --reviewer "<distinct fresh label>" --verdict approved
 ```
 
