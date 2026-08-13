@@ -1,7 +1,7 @@
 id: "{{id}}"
 title: "{{title}}"
 class: feature  # feature | bug | small | epic | refactor
-phase: architect  # refactor | architect | specify | plan | implement | decomposed | done
+phase: architect  # refactor | architect | specify | plan | implement | decomposed | archive-ready
 language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty for language-agnostic
 
 # parent: "{{epic-id}}"   # uncomment for child changes; set to the epic's change ID
@@ -40,3 +40,8 @@ kickbacks: []
 #   impact:     specify | plan | implementation
 #   invalidated_approvals: "specify,plan"
 #   restart_phase: specify
+
+# Record this before a cancellation archive:
+# archive:
+#   outcome: cancelled
+#   reason: "Why this change will not continue"

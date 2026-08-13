@@ -16,6 +16,7 @@ import {
   readManifest,
   nextSkill,
   epicStatus,
+  validateManifestState,
 } from './lib/index.mjs';
 
 const { values } = parseArgs({
@@ -54,6 +55,8 @@ for (const id of ids) {
     continue;
   }
 
+  const stateErrors = validateManifestState(manifest);
+
   const skill = nextSkill(manifest);
   const defectKickbacks = (manifest.kickbacks || []).filter(k => k.type === 'defect').length;
   const totalKickbacks = (manifest.kickbacks || []).length;
@@ -68,6 +71,7 @@ for (const id of ids) {
     language: manifest.language || null,
     approvals: manifest.approvals,
     next_skill: skill,
+    ...(stateErrors.length ? { state_errors: stateErrors } : {}),
     kickbacks: { defect: defectKickbacks, amendment: totalKickbacks - defectKickbacks, total: totalKickbacks },
     ...(unresolvedKickback ? { unresolved_kickback: unresolvedKickback } : {}),
     ...(manifest.parent ? { parent: manifest.parent } : {}),
@@ -87,20 +91,20 @@ for (const id of ids) {
   if (isEpic) {
     const es = status.epic_status;
     const children = manifest.children || [];
-    console.error(`  Children:   ${children.length} total — ${es.done} done, ${es.inProgress} in-progress, ${es.pending} pending`);
+    console.error(`  Children:   ${children.length} total — ${es.ready} archive-ready, ${es.archived} archived, ${es.inProgress} in-progress, ${es.pending} pending, ${es.missing} missing`);
     if (children.length > 0) {
       // Show each child's phase
       for (const childId of children) {
-        let childPhase = 'archived';
+        let childPhase = 'missing';
         try {
           const child = readManifest(childId, repoRoot);
           childPhase = child.phase;
-        } catch { /* archived */ }
+        } catch { /* status includes verified archives separately */ }
         console.error(`    • ${childId} [${childPhase}]`);
       }
     }
-    if (es.done === children.length && children.length > 0) {
-      console.error(`  Status:     ALL CHILDREN DONE — epic complete`);
+    if (es.ready === children.length && children.length > 0) {
+      console.error(`  Status:     ALL CHILDREN ARCHIVE-READY — reconcile epic docs`);
     } else if (skill) {
       console.error(`  Next:       ${skill}`);
     }
@@ -109,7 +113,7 @@ for (const id of ids) {
     if (skill) {
       console.error(`  Next skill: ${skill}`);
     } else {
-      console.error(`  Status:     done`);
+      console.error(`  Status:     awaiting lifecycle repair`);
     }
   }
 
@@ -122,6 +126,7 @@ for (const id of ids) {
       : (unresolvedKickback.invalidated_approvals || 'specify,plan').split(',');
     console.error(`  Restart:    ${unresolvedKickback.restart_phase || 'specify'} (${invalidated.join(', ')})`);
   }
+  if (stateErrors.length) console.error(`  Invalid:    ${stateErrors.join('; ')}`);
 }
 
 process.stdout.write(JSON.stringify(results) + '\n');

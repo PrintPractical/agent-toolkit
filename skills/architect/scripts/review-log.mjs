@@ -30,6 +30,8 @@ import {
   REVIEW_VERDICTS,
   REVIEW_RESOLUTION_STATUSES,
   structuredReviewCycleState,
+  allowedApprovalsFor,
+  expectedReviewCycle,
 } from './lib/index.mjs';
 
 const USAGE =
@@ -82,8 +84,9 @@ if (!command || !['record', 'status'].includes(command)) {
 if (!values.id) fail('--id is required');
 
 // Confirm the change exists before touching its review log.
+let manifest;
 try {
-  readManifest(values.id, repoRoot);
+  manifest = readManifest(values.id, repoRoot);
 } catch (e) {
   fail(e.message);
 }
@@ -102,6 +105,12 @@ if (command === 'record') {
     fail(`--verdict must be one of: ${REVIEW_VERDICTS.join(', ')}`);
   }
   if (!values.cycle) fail('--cycle is required for new review records');
+  const requiredApproval = values.phase === 'refactor' ? 'implement' : values.phase;
+  if (!allowedApprovalsFor(manifest).includes(requiredApproval)) fail(`review phase '${values.phase}' does not apply to a '${manifest.class}' change`);
+  const expectedPhase = values.phase === 'refactor' ? 'implement' : values.phase;
+  if (manifest.phase !== expectedPhase || manifest.approvals?.[requiredApproval] === 'approved') {
+    fail(`review phase '${values.phase}' is not pending at the current lifecycle stage`);
+  }
 
   const reviewer = values.reviewer.trim();
 
@@ -112,7 +121,7 @@ if (command === 'record') {
   {
     const cycle = values.cycle.trim();
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(cycle)) fail('--cycle must use letters, numbers, dot, underscore, or hyphen');
-    const expectedCycle = `${values.phase}-1`;
+    const expectedCycle = expectedReviewCycle(manifest, values.phase);
     if (cycle !== expectedCycle) fail(`--cycle for phase '${values.phase}' must be '${expectedCycle}'`);
     const cycleEntries = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle === cycle);
     const otherCycles = reviews.filter(item => item.version === 2 && item.phase === values.phase && item.cycle !== cycle);

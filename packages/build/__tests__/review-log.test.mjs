@@ -209,13 +209,13 @@ describe('review-log.mjs', () => {
     assert.equal(reviewApprovalReady(id, 'implement', cwd).ready, true);
   });
 
-  it('enforces phase prefixes and complete structured findings', () => {
+  it('rejects reviews outside the current lifecycle stage', () => {
     const wrongPrefix = run([
       'record', '--id', id, '--phase', 'architect', '--cycle', 'architect-1', '--role', 'auditor',
       '--reviewer', 'critic-a', '--verdict', 'changes-requested', '--finding', finding('RV-001'),
     ], cwd);
     assert.equal(wrongPrefix.status, 1);
-    assert.match(wrongPrefix.stderr, /AV-NNN/);
+    assert.match(wrongPrefix.stderr, /not pending/);
 
     const incomplete = run([
       'record', '--id', id, '--phase', 'specify', '--cycle', 'specify-1', '--role', 'auditor',
@@ -223,8 +223,7 @@ describe('review-log.mjs', () => {
       '--finding', JSON.stringify({ id: 'SV-001', severity: 'major', category: 'simplicity', location: 'x' }),
     ], cwd);
     assert.equal(incomplete.status, 1);
-    assert.match(incomplete.stderr, /non-empty impact/);
-    assert.match(incomplete.stderr, /non-empty alternative/);
+    assert.match(incomplete.stderr, /not pending/);
   });
 
   it('allows verifier resolutions only for original IDs and blocker-only regressions', () => {

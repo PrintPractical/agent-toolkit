@@ -122,23 +122,26 @@ node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
 4. Run a verifier subagent:
 > "Compare these CONTEXT.md files against the implementation. Do the claims match the code? List any discrepancy."
 
-5. Present the reconciliation summary. Address any verifier findings.
+5. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable, and address its findings.
+6. Present the reconciliation summary. Address any verifier findings.
 
 Ask the user:
-> "CONTEXT.md files have been updated and verified. Are you happy with this change? (Approving the docs approval will archive the change.)"
+> "CONTEXT.md files have been reconciled and verified. Are you happy with this change? (Approving the docs approval will move the change to `archive-ready`.)"
 
 On approval:
 ```
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
 ```
 
-### Archive
+### Archive-ready and verified archive
 
 ```
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
 
-The change is done. The archive zip is in `.changes/archive/<id>.zip`.
+Run this only after the docs approval has moved the change to `archive-ready`. The change is terminal only once archive verification succeeds and the zip is in `.changes/archive/<id>.zip`.
+
+To cancel instead, record a concrete `archive.reason` in `manifest.yaml` and archive the current artifacts rather than deleting them.
 
 ## Firm-seam tripwire (summary)
 

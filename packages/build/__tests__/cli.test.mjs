@@ -59,6 +59,7 @@ describe('CLI help', () => {
     'change-new.mjs',
     'change-status.mjs',
     'change-archive.mjs',
+    'change-recover.mjs',
     'manifest-approval.mjs',
     'artifact-validate.mjs',
     'context-scaffold.mjs',
@@ -137,10 +138,14 @@ describe('kickback flow', () => {
     assert.equal(manifest.approvals.implement, 'pending');
     assert.equal(manifest.kickbacks[0].phase, 'implement');
     assert.equal(manifest.kickbacks[0].resolution, '');
-    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'specify,plan');
+    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'specify,plan,implement,docs');
 
     writeApprovedArtifacts(id, cwd);
-    recordEmptyCycle(id, 'specify', 'specify-1', cwd);
+    recordEmptyCycle(id, 'specify', 'specify-2', cwd);
+    const resolved = runScript('kickback-log.mjs', [
+      '--id', id, '--resolve', '1', '--resolution', 'Updated the specification',
+    ], cwd);
+    assert.equal(resolved.status, 0, resolved.stderr);
 
     const specifyApproval = runScript('manifest-approval.mjs', [
       '--id', id,
@@ -173,7 +178,7 @@ describe('kickback flow', () => {
     assert.equal(manifest.phase, 'plan');
     assert.equal(manifest.approvals.specify, 'approved');
     assert.equal(manifest.approvals.plan, 'pending');
-    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'plan');
+    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'plan,implement,docs');
   });
 
   it('refuses specify approval when the confirmation ledger is absent', () => {
@@ -274,6 +279,8 @@ describe('architect and specify approval review enforcement', () => {
   it('applies architect review to epics but exempts bug changes', () => {
     let manifest = readManifest(id, cwd);
     manifest.class = 'epic';
+    manifest.approvals = { architect: 'pending', specify: 'pending', docs: 'pending' };
+    manifest.children = [];
     writeManifest(id, manifest, cwd);
     const epic = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'architect', '--approve'], cwd);
     assert.equal(epic.status, 1);
@@ -281,8 +288,11 @@ describe('architect and specify approval review enforcement', () => {
 
     manifest = readManifest(id, cwd);
     manifest.class = 'bug';
+    manifest.phase = 'implement';
+    manifest.approvals = { implement: 'pending', docs: 'pending' };
+    delete manifest.children;
     writeManifest(id, manifest, cwd);
-    const bug = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'architect', '--approve'], cwd);
+    const bug = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd);
     assert.equal(bug.status, 0, bug.stderr);
   });
 });

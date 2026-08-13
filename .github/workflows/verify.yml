@@ -1,0 +1,105 @@
+name: Verify
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build generated skill assets
+        run: npm run build
+
+      - name: Check generated skill assets
+        run: node packages/build/sync-shared.mjs --check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify context provenance and firm seams
+        id: context
+        shell: bash
+        run: |
+          set +e
+          node packages/build/context-verify.mjs --all --ci > "$RUNNER_TEMP/context-report.json"
+          status=$?
+          set -e
+          if [ "$status" -eq 1 ]; then
+            exit 1
+          fi
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+          printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
+
+      - name: Require acknowledgement for stale context
+        if: steps.context.outputs.status == '2'
+        env:
+          CONTEXT_REPORT: ${{ runner.temp }}/context-report.json
+          EVENT_PATH: ${{ github.event_path }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+
+          const report = JSON.parse(fs.readFileSync(process.env.CONTEXT_REPORT, 'utf8'));
+          const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, 'utf8'));
+          const messages = [event.pull_request.body || '', execFileSync('git', ['log', '--format=%B', `${process.env.BASE_SHA}..${process.env.HEAD_SHA}`], { encoding: 'utf8' })].join('\n');
+          const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const missing = report
+            .filter(result => result.isStale)
+            .map(result => result.path)
+            .filter(contextPath => !new RegExp(`^Context-Reviewed:\\s*${escapeRegExp(contextPath)}\\s*$`, 'm').test(messages));
+
+          if (missing.length > 0) {
+            console.error(`Stale CONTEXT.md files require matching Context-Reviewed trailers:\n${missing.join('\n')}`);
+            process.exit(1);
+          }
+          EOF
+
+      - name: Require authorization for firm-seam test changes
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'EOF'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+
+          const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, 'utf8'));
+          const messages = [event.pull_request.body || '', execFileSync('git', ['log', '--format=%B', `${process.env.BASE_SHA}..${process.env.HEAD_SHA}`], { encoding: 'utf8' })].join('\n');
+          const files = execFileSync('git', ['diff', '--name-only', `${process.env.BASE_SHA}..${process.env.HEAD_SHA}`], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+          const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const seamIds = new Set();
+
+          for (const file of files) {
+            for (const revision of [process.env.BASE_SHA, process.env.HEAD_SHA]) {
+              try {
+                const content = execFileSync('git', ['show', `${revision}:${file}`], { encoding: 'utf8' });
+                for (const match of content.matchAll(/\[SEAM-([^\]]+)\]/g)) seamIds.add(`SEAM-${match[1]}`);
+              } catch {
+                // The file may exist on only one side of the pull-request diff.
+              }
+            }
+          }
+
+          const missing = [...seamIds].filter(seamId => !new RegExp(`^Firm-Change:\\s*${escapeRegExp(seamId)}\\s*$`, 'm').test(messages));
+          if (missing.length > 0) {
+            console.error(`Firm-seam test changes require matching Firm-Change trailers:\n${missing.join('\n')}`);
+            process.exit(1);
+          }
+          EOF

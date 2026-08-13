@@ -1,97 +1,61 @@
 #!/usr/bin/env node
-/**
- * change-archive.mjs — Zip a completed change and remove the active directory.
- *
- * Usage: node change-archive.mjs --id <change-id>
- *
- * Precondition: manifest.approvals.docs must be 'approved'.
- * Output (stdout): JSON { id, archive }
- * Progress (stderr): human-readable status
- */
+/** Create a verified archive from archive-ready workspaces. */
 
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { parseArgs } from 'util';
-import {
-  readManifest,
-  writeManifest,
-  activeDir,
-  archiveDir,
-  changeDir,
-  completeEpicIfDelivered,
-} from './lib/index.mjs';
+import { readManifest, writeManifest, activeDir, archiveDir, changeDir, isArchiveReady } from './lib/index.mjs';
 
-const { values } = parseArgs({
-  options: {
-    help:  { type: 'boolean', short: 'h', default: false },
-    id:    { type: 'string' },
-    force: { type: 'boolean', default: false }, // bypass docs approval check (emergency use)
-  },
-  strict: true,
-});
-
-if (values.help) {
-  console.log('Usage: change-archive.mjs --id <change-id> [--force]');
-  process.exit(0);
-}
-
-if (!values.id) {
-  console.error('Usage: change-archive.mjs --id <change-id> [--force]');
-  process.exit(1);
-}
-
+const { values } = parseArgs({ options: {
+  help: { type: 'boolean', short: 'h', default: false }, id: { type: 'string' },
+  cancel: { type: 'boolean', default: false }, reason: { type: 'string' },
+}, strict: true });
+const usage = 'Usage: change-archive.mjs --id <change-id> [--cancel --reason "<reason>"]';
+if (values.help) { console.log(usage); process.exit(0); }
+if (!values.id) { console.error(usage); process.exit(1); }
+if (values.cancel && !values.reason?.trim()) { console.error('Cancellation requires --reason with a concrete explanation.'); process.exit(1); }
 const repoRoot = process.cwd();
-const id = values.id;
-
 let manifest;
+try { manifest = readManifest(values.id, repoRoot); } catch (error) { console.error(`Error: ${error.message}`); process.exit(1); }
+if (values.cancel) {
+  manifest.archive = { outcome: 'cancelled', reason: values.reason.trim(), at: new Date().toISOString() };
+  manifest.phase = 'archive-ready';
+  writeManifest(values.id, manifest, repoRoot);
+}
+if (manifest.phase !== 'archive-ready' || !isArchiveReady(manifest, repoRoot)) {
+  console.error(`Error: change '${values.id}' is not eligible for archival. Reach archive-ready or use --cancel --reason.`); process.exit(1);
+}
+const ids = manifest.class === 'epic' ? [values.id, ...(manifest.children || [])] : [values.id];
+if (manifest.class === 'epic') for (const childId of manifest.children || []) {
+  let child;
+  try { child = readManifest(childId, repoRoot); } catch (error) { console.error(`Error: child '${childId}' is unavailable: ${error.message}`); process.exit(1); }
+  if (child.phase !== 'archive-ready' || !isArchiveReady(child, repoRoot)) { console.error(`Error: child '${childId}' is not archive-ready.`); process.exit(1); }
+}
+const destination = archiveDir(repoRoot);
+fs.mkdirSync(destination, { recursive: true });
+const staged = [];
 try {
-  manifest = readManifest(id, repoRoot);
-} catch (e) {
-  console.error(`Error: ${e.message}`);
-  process.exit(1);
+  for (const id of ids) {
+    const finalPath = path.join(destination, `${id}.zip`);
+    if (fs.existsSync(finalPath)) throw new Error(`archive already exists: ${finalPath}`);
+    const source = changeDir(id, repoRoot);
+    const workspace = path.join(activeDir(repoRoot), `.${id}.archiving`);
+    if (fs.existsSync(workspace)) throw new Error(`recovery required for interrupted archive: ${workspace}`);
+    fs.renameSync(source, workspace);
+    const temporary = path.join(destination, `.${id}.${process.pid}.${Date.now()}.zip`);
+    execFileSync('zip', ['-q', '-r', temporary, '.'], { cwd: workspace, stdio: 'pipe' });
+    execFileSync('unzip', ['-tqq', temporary], { stdio: 'pipe' });
+    staged.push({ id, source, workspace, temporary, finalPath });
+  }
+  for (const archive of staged) fs.renameSync(archive.temporary, archive.finalPath);
+  for (const archive of staged) fs.rmSync(archive.workspace, { recursive: true });
+} catch (error) {
+  for (const archive of staged) {
+    if (fs.existsSync(archive.temporary)) fs.rmSync(archive.temporary, { force: true });
+    if (!fs.existsSync(archive.finalPath) && fs.existsSync(archive.workspace) && !fs.existsSync(archive.source)) fs.renameSync(archive.workspace, archive.source);
+  }
+  console.error(`Error: archive failed; run change-recover.mjs if an archiving workspace remains: ${error.message}`); process.exit(1);
 }
-
-if (!values.force && manifest.approvals?.docs !== 'approved') {
-  console.error(`Error: docs approval is not approved for change '${id}'.`);
-  console.error('Approve docs first (run verify + reconcile CONTEXT.md files), then archive.');
-  console.error('Use --force to bypass (not recommended).');
-  process.exit(1);
-}
-
-const srcDir = changeDir(id, repoRoot);
-const archDir = archiveDir(repoRoot);
-const zipPath = path.join(archDir, `${id}.zip`);
-
-fs.mkdirSync(archDir, { recursive: true });
-
-console.error(`Archiving change: ${id}`);
-console.error(`  Source:  ${srcDir}`);
-console.error(`  Archive: ${zipPath}`);
-
-// Update manifest phase before zipping
-manifest.phase = 'done';
-writeManifest(id, manifest, repoRoot);
-
-try {
-  // Use system zip (available on macOS/Linux); fallback message for Windows
-  execSync(`zip -r "${zipPath}" .`, { cwd: srcDir, stdio: ['pipe', 'pipe', 'pipe'] });
-} catch (e) {
-  console.error(`Error: zip failed: ${e.message}`);
-  console.error('Ensure zip is installed (macOS/Linux: built-in; Windows: use WSL or install zip).');
-  process.exit(1);
-}
-
-console.error(`Zip created: ${zipPath}`);
-
-// Remove active directory
-fs.rmSync(srcDir, { recursive: true, force: true });
-console.error(`Active directory removed: ${srcDir}`);
-console.error(`Change '${id}' archived successfully.`);
-
-if (manifest.parent) {
-  const parent = completeEpicIfDelivered(manifest.parent, repoRoot);
-  if (parent.phase === 'done') console.error(`Parent epic '${manifest.parent}' is complete.`);
-}
-
-process.stdout.write(JSON.stringify({ id, archive: zipPath }) + '\n');
+console.error(`Archived ${ids.length} change workspace(s): ${ids.join(', ')}`);
+process.stdout.write(JSON.stringify({ id: values.id, archives: staged.map(archive => archive.finalPath), outcome: manifest.archive?.outcome || 'completed' }) + '\n');

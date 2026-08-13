@@ -223,7 +223,7 @@ Each child gets an `architect-seed.md` with its notes and implicit access to the
 After epic-split completes, tell the user:
 > "Epic decomposed. [N] child changes created. Each child's `architect` session will inherit this epic's architecture and decisions as parent context.
 >
-> **Work depth-first: take one child all the way to `done` (architect → specify → plan → implement) before starting the next.** Do not architect/specify all children up front — the cross-cutting contracts are already locked here at the epic level, so each child is insulated from the others. Finishing one child gives working software and lessons that inform the next.
+> **Work depth-first: take one child all the way to `archive-ready` (architect → specify → plan → implement → archive-ready) before starting the next.** Do not archive a completed child independently: the epic retains all archive-ready children and archives them in one coordinated verified operation after every child is ready.
 >
 > Suggested order (based on dependencies):
 > 1. `[child-id-1]` — [title] (no dependencies, start here)

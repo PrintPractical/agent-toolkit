@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Classifies the change, runs a lightweight challenge-and-plan flow, and escalates to architect if scope is larger than expected. Same adversarial discipline as architect but far less ceremony.
+description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Runs the direct implement→archive-ready lifecycle with implement and docs approvals, and escalates to architect if scope is larger than expected.
 ---
 
 # Triage
@@ -101,20 +101,30 @@ Run tests — must pass.
 
 If the fix grows beyond a small isolated change, stop and route it to the full `architect` spine or the `refactor` skill instead.
 
-## Phase 6: Docs (if needed)
+## Phase 6: Docs reconciliation
 
-If the change affects a CONTEXT.md claim (rare for small fixes, common for bugs that reveal incorrect spec claims):
+Reconciliation and verification are required before docs approval. For every relevant `CONTEXT.md` target:
 - Update the relevant CONTEXT.md section.
 - Re-stamp provenance.
+- Run verification and resolve any finding:
+  ```
+  node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
+  ```
 
-## Phase 7: Archive
+## Phase 7: Archive-ready and verified archive
 
-Approve the docs approval (even if no CONTEXT changes — the approval is always required):
+After the lightweight self-check and docs reconciliation, approve implement then docs. This moves the direct triage lifecycle to `archive-ready`:
 ```
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
+```
+
+Create the verified archive only after the change is archive-ready:
+```
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
+
+For cancellation, record a concrete `archive.reason` in `manifest.yaml` and archive the current workspace rather than deleting it.
 
 ## Escalation conditions (summary)
 

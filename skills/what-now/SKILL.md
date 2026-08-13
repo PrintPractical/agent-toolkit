@@ -31,7 +31,7 @@ Parse the JSON output. If no active changes exist, go to the "No active changes"
 
 ## Step 3: For each active change, interpret and advise
 
-### Standard change (class: feature | bug | small)
+### Feature change (class: feature)
 
 Use this decision tree:
 
@@ -45,11 +45,28 @@ Use this decision tree:
 | `plan` | plan approved | "Run `implement` to execute the task checklist." |
 | `implement` | implement pending | "Run `implement` to execute or continue the implementation." |
 | `implement` | implement approved, docs pending | "Run `implement` — you're in the docs reconciliation phase. Update CONTEXT.md files and approve the docs approval." |
-| `done` | — | "This change is complete and archived." |
+| `archive-ready` | docs approved | "Create the verified archive; this is the last active state." |
 
 **If there are kickbacks logged:**
 - Read the kickback entries from the manifest.
 - If the most recent kickback has an empty `resolution`, it is unresolved. Tell the user: "There's an unresolved kickback in `[phase]`: [missed]. Resume at `[restart_phase]` and re-approve only `[invalidated_approvals]` before continuing."
+
+### Triage change (class: bug | small)
+
+| Phase | Approval state | What to tell the user |
+|---|---|---|
+| `implement` | implement pending | "Run `triage` to execute or continue the direct fix." |
+| `implement` | implement approved, docs pending | "Run `triage` to reconcile and verify CONTEXT.md, then approve docs." |
+| `archive-ready` | docs approved | "Create the verified archive." |
+
+### Refactor change (class: refactor)
+
+| Phase | Approval state | What to tell the user |
+|---|---|---|
+| `refactor` | refactor pending | "Run `refactor` to complete the audit and obtain refactor approval." |
+| `implement` | implement pending | "Run `refactor` to execute the selected cleanup." |
+| `implement` | implement approved, docs pending | "Run `refactor` to reconcile and verify docs, then approve docs." |
+| `archive-ready` | — | "Create the verified archive. For audit-only, it contains the approved audit report." |
 
 ### Epic change (class: epic)
 
@@ -57,11 +74,11 @@ Use this decision tree:
 |---|---|
 | architect approval pending | "Run `architect` on the epic to design the overall shape and identify the child changes." |
 | architect approved, specify pending | "Run `specify` on the epic. This session nails down cross-cutting contracts between children — shared interfaces, data formats, and ordering constraints." |
-| specify approved, no children | "Run `specify` on the epic — when the specify session ends it will create child change manifests." |
-| specify approved, children exist | Show child progress table. **Work depth-first**: identify the single next child to take to `done`, not a batch. If a child is mid-spine (past architect), point the user at that child's next phase first — finish it before starting a new child. Otherwise: "Your epic has [N] children. [M] done. Next: run `[next-phase]` on `[in-progress-child]`" or "start `architect` on `[next-unblocked-child]` — [title]." |
-| all children done | "All children are complete. The epic is done." |
+| specify approved, no children | "Run `specify` on the epic — when the specify session ends it will create child change manifests and move the epic to `decomposed`." |
+| decomposed, children not all archive-ready | Show child progress table. **Work depth-first**: identify the single next child to take to `archive-ready`, not a batch. If a child is mid-spine, point the user at that child's next phase first. |
+| all children archive-ready | "Reconcile and verify epic context, approve docs, move the epic to `archive-ready`, then create one coordinated verified archive for the parent and children." |
 
-**Execution model — depth-first.** Children are taken one at a time all the way to `done` (architect → specify → plan → implement), in dependency order. Do NOT advise architect/specify-ing all children up front — the cross-cutting contracts were already locked at the epic's specify, so each child is independent. Prefer finishing an already-started child over starting a new one.
+**Execution model — depth-first.** Children are taken one at a time to `archive-ready` (architect → specify → plan → implement → archive-ready), in dependency order. Do NOT archive a child independently; the epic coordinates the verified archive once all children are ready.
 
 **Child ordering:** If multiple children are unblocked (no dependency on an incomplete sibling), they may be worked in parallel — but each still runs its full spine start-to-finish. Say so explicitly.
 
@@ -74,6 +91,8 @@ List all active changes in a table with their current phase and next action. Ask
 **Approval approved but phase not advanced:** The manifest may have been edited manually. Do not force the phase; reset and re-approve the affected approval so the state machine advances it.
 
 **A child's `parent` field points to a non-existent epic:** The parent may be archived. Confirm with the user and proceed with the child independently.
+
+**Cancellation:** Confirm that `manifest.archive.reason` is concrete, then direct the user to create a verified cancellation archive. Never silently delete an active workspace.
 
 ## No active changes
 

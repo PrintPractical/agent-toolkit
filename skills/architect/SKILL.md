@@ -47,9 +47,9 @@ Use this path when `manifest.class = epic`. Epics plan; their children implement
 
 **The epic pipeline:**
 ```
-architect (this session) → specify → decompose (epic-split) → done
-                                                    ↓
-                               child architect → specify → plan → implement
+architect (this session) → specify → decompose (epic-split) → decomposed
+                                                     ↓
+                               child architect → specify → plan → implement → archive-ready
 ```
 
 ### Epic Phase 1: Existing architecture.md check

@@ -144,6 +144,7 @@ function parseScalar(s) {
   if (t === 'true') return true;
   if (t === 'false') return false;
   if (t === '[]') return [];
+  if (t === '{}') return {};
   if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
   return t.replace(/^['"]|['"]$/g, '');
 }
@@ -160,8 +161,11 @@ export function stringifyYaml(obj, indent = 0) {
     if (v === null || v === undefined) {
       lines.push(`${pad}${k}: null`);
     } else if (typeof v === 'object' && !Array.isArray(v)) {
-      lines.push(`${pad}${k}:`);
-      lines.push(stringifyYaml(v, indent + 2));
+      if (Object.keys(v).length === 0) lines.push(`${pad}${k}: {}`);
+      else {
+        lines.push(`${pad}${k}:`);
+        lines.push(stringifyYaml(v, indent + 2));
+      }
     } else if (Array.isArray(v)) {
       if (v.length === 0) {
         lines.push(`${pad}${k}: []`);
@@ -239,7 +243,9 @@ export function readManifest(id, repoRoot = process.cwd()) {
 export function writeManifest(id, manifest, repoRoot = process.cwd()) {
   const mp = manifestPath(id, repoRoot);
   fs.mkdirSync(path.dirname(mp), { recursive: true });
-  fs.writeFileSync(mp, stringifyYaml(manifest) + '\n', 'utf8');
+  const temporary = `${mp}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporary, stringifyYaml(manifest) + '\n', 'utf8');
+  fs.renameSync(temporary, mp);
 }
 
 /**
@@ -296,7 +302,9 @@ export function appendReview(id, entry, repoRoot = process.cwd()) {
   reviews.push(entry);
   const rp = reviewsPath(id, repoRoot);
   fs.mkdirSync(path.dirname(rp), { recursive: true });
-  fs.writeFileSync(rp, JSON.stringify(reviews, null, 2) + '\n', 'utf8');
+  const temporary = `${rp}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify(reviews, null, 2) + '\n', 'utf8');
+  fs.renameSync(temporary, rp);
   return entry;
 }
 
@@ -468,13 +476,18 @@ export function reviewApprovalReady(id, phase, repoRoot = process.cwd()) {
   }
   const phased = reviews.filter(entry => entry.phase === phase);
   if (phased.length === 0) return { ready: false, reason: `no ${phase} review recorded` };
-  const expectedCycle = `${phase}-1`;
+  const manifest = readManifest(id, repoRoot);
+  const expectedCycle = expectedReviewCycle(manifest, phase);
   const cycles = new Set(phased.map(entry => entry.cycle));
   if (cycles.size !== 1 || !cycles.has(expectedCycle)) {
     return { ready: false, reason: `${phase} structured review must contain exactly one cycle named '${expectedCycle}'` };
   }
   const state = structuredReviewCycleState(phased, phase, expectedCycle);
   return { ready: state.ready, reason: state.reason };
+}
+
+export function expectedReviewCycle(manifest, phase) {
+  return `${phase}-${manifest.review_epochs?.[phase] || 1}`;
 }
 
 // ── Git utilities ─────────────────────────────────────────────────────────────
@@ -527,11 +540,13 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
 
   let id = `${date}-${slug}`;
   const dir = activeDir(repoRoot);
+  const archive = archiveDir(repoRoot);
+  const exists = candidate => fs.existsSync(path.join(dir, candidate)) || fs.existsSync(path.join(archive, `${candidate}.zip`));
 
   // Collision avoidance
-  if (fs.existsSync(path.join(dir, id))) {
+  if (exists(id)) {
     let n = 2;
-    while (fs.existsSync(path.join(dir, `${id}-${n}`))) n++;
+    while (exists(`${id}-${n}`)) n++;
     id = `${id}-${n}`;
   }
 
@@ -540,17 +555,69 @@ export function generateChangeId(title, repoRoot = process.cwd()) {
 
 // ── Phase ordering ─────────────────────────────────────────────────────────────
 
-export const PHASES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'done'];
+export const PHASES = ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'archive-ready'];
 export const APPROVALS = ['refactor', 'architect', 'specify', 'plan', 'implement', 'docs'];
 export const KICKBACK_IMPACTS = ['specify', 'plan', 'implementation'];
 
-export function phaseIndex(phase) {
-  return PHASES.indexOf(phase);
+const LIFECYCLES = {
+  feature: { approvals: ['architect', 'specify', 'plan', 'implement', 'docs'], phases: ['architect', 'specify', 'plan', 'implement', 'archive-ready'] },
+  bug: { approvals: ['implement', 'docs'], phases: ['implement', 'archive-ready'] },
+  small: { approvals: ['implement', 'docs'], phases: ['implement', 'archive-ready'] },
+  epic: { approvals: ['architect', 'specify', 'docs'], phases: ['architect', 'specify', 'decomposed', 'archive-ready'] },
+  refactor: { approvals: ['refactor', 'implement', 'docs'], phases: ['refactor', 'implement', 'archive-ready'] },
+};
+
+export function allowedApprovalsFor(manifest) {
+  if (manifest.class === 'refactor' && manifest.refactor_mode === 'audit-only') return ['refactor'];
+  return LIFECYCLES[manifest.class]?.approvals || [];
 }
 
 export function phaseForApproval(manifest, approval) {
-  if (approval === 'docs') return 'implement';
+  if (approval === 'docs') return manifest.class === 'epic' ? 'decomposed' : 'implement';
   return approval;
+}
+
+export function nextPhaseForApproval(manifest, approval) {
+  if (approval === 'docs') return 'archive-ready';
+  if (manifest.class === 'refactor' && approval === 'refactor') {
+    return manifest.refactor_mode === 'audit-only' ? 'archive-ready' : 'implement';
+  }
+  if (approval === 'architect') return 'specify';
+  if (approval === 'specify') return manifest.class === 'epic' ? 'specify' : 'plan';
+  if (approval === 'plan') return 'implement';
+  return manifest.phase;
+}
+
+export function validateManifestState(manifest) {
+  const errors = [];
+  const lifecycle = LIFECYCLES[manifest.class];
+  if (!lifecycle) return [`invalid change class '${manifest.class}'`];
+  if (!lifecycle.phases.includes(manifest.phase)) errors.push(`phase '${manifest.phase}' is not valid for '${manifest.class}'`);
+  const allowed = new Set(allowedApprovalsFor(manifest));
+  const approvals = manifest.approvals || {};
+  for (const [approval, status] of Object.entries(approvals)) {
+    if (!allowed.has(approval)) errors.push(`approval '${approval}' does not apply to '${manifest.class}'`);
+    if (!['pending', 'approved'].includes(status)) errors.push(`approval '${approval}' has invalid status '${status}'`);
+  }
+  for (const approval of allowed) if (!approvals[approval]) errors.push(`missing '${approval}' approval`);
+  if (manifest.class === 'epic' && !Array.isArray(manifest.children)) errors.push('epic children must be an array');
+  if (manifest.class !== 'epic' && Array.isArray(manifest.children)) errors.push('only epics may have children');
+  if (manifest.phase === 'archive-ready' && !isArchiveReady(manifest)) errors.push('archive-ready change does not satisfy archive preconditions');
+  return errors;
+}
+
+export function isArchiveReady(manifest, repoRoot = process.cwd()) {
+  if (manifest.archive?.outcome === 'cancelled') return typeof manifest.archive.reason === 'string' && manifest.archive.reason.trim().length > 0;
+  if (manifest.class === 'refactor' && manifest.refactor_mode === 'audit-only') return manifest.approvals?.refactor === 'approved';
+  if (manifest.class === 'epic') {
+    const status = epicStatus(manifest, repoRoot);
+    return manifest.approvals?.architect === 'approved' && manifest.approvals?.specify === 'approved' && manifest.approvals?.docs === 'approved' && status.total > 0 && status.ready === status.total;
+  }
+  return manifest.approvals?.implement === 'approved' && manifest.approvals?.docs === 'approved';
+}
+
+export function phaseIndex(phase) {
+  return PHASES.indexOf(phase);
 }
 
 export function artifactPath(manifest, artifact, repoRoot = process.cwd()) {
@@ -563,12 +630,12 @@ export function kickbackImpact(impact) {
     throw new Error(`impact must be one of: ${KICKBACK_IMPACTS.join(', ')}`);
   }
   if (impact === 'specify') {
-    return { impact, invalidatedApprovals: ['specify', 'plan'], restartPhase: 'specify' };
+    return { impact, invalidatedApprovals: ['specify', 'plan', 'implement', 'docs'], restartPhase: 'specify', reviewPhases: ['specify', 'implement'] };
   }
   if (impact === 'plan') {
-    return { impact, invalidatedApprovals: ['plan'], restartPhase: 'plan' };
+    return { impact, invalidatedApprovals: ['plan', 'implement', 'docs'], restartPhase: 'plan', reviewPhases: ['implement'] };
   }
-  return { impact, invalidatedApprovals: [], restartPhase: 'implement' };
+  return { impact, invalidatedApprovals: ['implement', 'docs'], restartPhase: 'implement', reviewPhases: ['implement'] };
 }
 
 function readArtifact(manifest, artifact, repoRoot, errors) {
@@ -604,7 +671,7 @@ function reviewFindingIds(content, prefix) {
 
 function validateArtifactReviewIds(manifest, phase, content, repoRoot, errors) {
   const entries = readReviews(manifest.id, repoRoot)
-    .filter(entry => entry.version === 2 && entry.phase === phase && entry.cycle === `${phase}-1`);
+    .filter(entry => entry.version === 2 && entry.phase === phase && entry.cycle === expectedReviewCycle(manifest, phase));
   if (entries.length === 0) return;
   const prefix = REVIEW_PREFIXES[phase];
   const artifactIds = reviewFindingIds(content, prefix);
@@ -614,7 +681,7 @@ function validateArtifactReviewIds(manifest, phase, content, repoRoot, errors) {
   const missing = [...logIds].filter(id => !artifactIds.has(id));
   const extra = [...artifactIds].filter(id => !logIds.has(id));
   if (missing.length > 0 || extra.length > 0) {
-    errors.push(`${phase} artifact review IDs must match reviews.json cycle '${phase}-1' (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
+    errors.push(`${phase} artifact review IDs must match reviews.json cycle '${expectedReviewCycle(manifest, phase)}' (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
   }
 }
 
@@ -701,7 +768,7 @@ export function nextSkill(manifest) {
   const phase = manifest.phase;
   const approvals = manifest.approvals || {};
 
-  if (phase === 'done') return null;
+  if (phase === 'archive-ready') return 'change-archive';
 
   // Epics: architect → specify → decompose → done (no plan/implement)
   if (manifest.class === 'epic') {
@@ -718,6 +785,11 @@ export function nextSkill(manifest) {
     return null;
   }
 
+  if (['bug', 'small'].includes(manifest.class)) {
+    if (phase === 'implement' && approvals.implement !== 'approved') return 'triage (implement and self-check)';
+    if (phase === 'implement') return 'triage (docs reconciliation)';
+    return null;
+  }
   if (phase === 'architect' && approvals.architect !== 'approved') return 'architect';
   if (phase === 'architect' && approvals.architect === 'approved') return 'specify';
   if (phase === 'specify'   && approvals.specify !== 'approved')  return 'specify';
@@ -733,7 +805,7 @@ export function nextSkill(manifest) {
 
 /**
  * Epic phase progression:
- *   architect → specify → decomposed (epic-split) → done
+ *   architect → specify → decomposed (epic-split) → archive-ready
  *
  * Epics never run plan or implement. They plan; their children implement.
  */
@@ -742,7 +814,7 @@ export function epicNextAction(manifest) {
   const phase  = manifest.phase  || 'architect';
   const children = manifest.children || [];
 
-  if (phase === 'done') return null;
+  if (phase === 'archive-ready') return 'change-archive';
 
   // architect approval
   if (approvals.architect !== 'approved') return 'architect (identify children + overall design)';
@@ -760,7 +832,7 @@ export function epicNextAction(manifest) {
   // Children exist — track their progress and complete the parent once delivered.
   if (children.length > 0 && approvals.specify === 'approved') {
     const status = epicStatus(manifest);
-    if (status.done === children.length) return 'complete epic';
+    if (status.ready === children.length) return 'implement (epic docs reconciliation)';
     return null; // children drive completion; use change-status to track
   }
 
@@ -769,15 +841,17 @@ export function epicNextAction(manifest) {
 
 /**
  * Compute epic completion status from child manifests.
- * Returns { total, done, inProgress, pending, byPhase }
+ * Returns { total, ready, archived, inProgress, pending, missing, byPhase }
  */
 export function epicStatus(epicManifest, repoRoot = process.cwd()) {
   const children = epicManifest.children || [];
   const result = {
     total: children.length,
-    done: 0,
+    ready: 0,
+    archived: 0,
     inProgress: 0,
     pending: 0,
+    missing: 0,
     byPhase: {},
   };
 
@@ -786,14 +860,18 @@ export function epicStatus(epicManifest, repoRoot = process.cwd()) {
     try {
       child = readManifest(childId, repoRoot);
     } catch {
-      // Child may be archived
-      result.done++;
-      result.byPhase.archived = (result.byPhase.archived || 0) + 1;
+      if (fs.existsSync(path.join(archiveDir(repoRoot), `${childId}.zip`))) {
+        result.archived++;
+        result.byPhase.archived = (result.byPhase.archived || 0) + 1;
+      } else {
+        result.missing++;
+        result.byPhase.missing = (result.byPhase.missing || 0) + 1;
+      }
       continue;
     }
     const phase = child.phase || 'architect';
     result.byPhase[phase] = (result.byPhase[phase] || 0) + 1;
-    if (phase === 'done') result.done++;
+    if (phase === 'archive-ready') result.ready++;
     else if (phase === 'architect') result.pending++;
     else result.inProgress++;
   }
@@ -801,15 +879,11 @@ export function epicStatus(epicManifest, repoRoot = process.cwd()) {
   return result;
 }
 
-/** Mark a decomposed epic done after every child has completed or been archived. */
+/** Mark a decomposed epic archive-ready after every child is archive-ready. */
 export function completeEpicIfDelivered(epicId, repoRoot = process.cwd()) {
   const epic = readManifest(epicId, repoRoot);
   if (epic.class !== 'epic' || epic.phase !== 'decomposed') return epic;
   const status = epicStatus(epic, repoRoot);
-  if (status.total > 0 && status.done === status.total) {
-    epic.phase = 'done';
-    writeManifest(epicId, epic, repoRoot);
-  }
   return epic;
 }
 
@@ -821,6 +895,9 @@ export function addChildToEpic(epicId, childId, repoRoot = process.cwd()) {
   const epic = readManifest(epicId, repoRoot);
   if (epic.class !== 'epic') {
     throw new Error(`Change '${epicId}' is not an epic (class: ${epic.class})`);
+  }
+  if (epic.phase !== 'specify' || epic.approvals?.architect !== 'approved' || epic.approvals?.specify !== 'approved') {
+    throw new Error(`Epic '${epicId}' must have approved architect and specify approvals before children can be added`);
   }
   epic.children = epic.children || [];
   if (!epic.children.includes(childId)) {

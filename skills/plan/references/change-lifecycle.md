@@ -34,9 +34,9 @@ docs reconciliation → CONTEXT hierarchy updated + verified
     ↓
 docs approval approved (user confirms happy)
     ↓
-change-archive.mjs → .changes/archive/<id>.zip, active dir removed
+archive-ready
     ↓
-done
+change-archive.mjs verifies and archives → .changes/archive/<id>.zip, active dir removed
 ```
 
 ## Active workspace
@@ -58,7 +58,7 @@ While a change is in progress, all artifacts live at:
 
 ## Archive
 
-When a change reaches `done` (docs approval approved, user confirms happy), `change-archive.mjs` runs:
+When a standard change reaches `archive-ready` (docs approval approved, user confirms happy), `change-archive.mjs` verifies and runs:
 1. Zips `.changes/active/<id>/` to `.changes/archive/<id>.zip`.
 2. Removes `.changes/active/<id>/`.
 3. Commits the zip (or leaves it for the user to commit — configurable).
@@ -66,6 +66,16 @@ When a change reaches `done` (docs approval approved, user confirms happy), `cha
 Archived zips are **not readable by agents** without explicit unzipping. This is intentional: completed change rationale should live in CONTEXT.md (current state), not in raw session logs agents can drift-anchor on.
 
 Humans can unzip any archive to understand historical context.
+
+`archive-ready` remains an active phase. A change is terminal only after the archive has been verified and the active workspace removed. Do not treat a successful approval as an archive.
+
+## Cancellation
+
+Cancellation is an explicit, reasoned archive, not deletion. From any active phase, record `archive.outcome: cancelled` and a concrete `archive.reason` in `manifest.yaml`, preserve the current artifacts, and create a verified cancellation archive. Unfinished approvals do not block cancellation; an absent reason does.
+
+## Epic coordination
+
+After an epic's specify approval, `epic-split` puts the parent in `decomposed`. Each child follows its applicable lifecycle to `archive-ready`, but remains active so the parent can retain the full change set. When every child is archive-ready, reconcile and verify the epic's context, approve its docs, move it to `archive-ready`, and archive the parent and all children in one coordinated verified operation. A cancelled child must be explicitly reasoned before that coordinated archive.
 
 ## Kickback handling
 
@@ -88,9 +98,10 @@ The reconciliation process:
 3. Update each CONTEXT.md to reflect the change: new seams, updated interfaces, graduated firmness, new known-soft-spots.
 4. Re-stamp provenance (`validated-at: <current HEAD sha>`).
 5. Adversarial verifier subagent: confirm CONTEXT claims match the implemented code.
-6. Present summary to user. User approves (docs approval → approved) or requests corrections.
+6. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable. Resolve its findings.
+7. Present summary to user. User approves (docs approval → approved) or requests corrections.
 
-Only after docs approval is approved does `change-archive.mjs` run.
+`context-verify.mjs` and reconciliation are required before docs approval. After that approval, the change enters `archive-ready`; only then may `change-archive.mjs` create the verified archive.
 
 ## Bounded adversarial reviews
 
@@ -117,7 +128,7 @@ This is intentionally snapshot-free: `.changes/active/<id>/reviews.json` is an a
 
 ## Refactor class lifecycle
 
-A `class: refactor` change skips the spec spine: `refactor` (read-only opportunity audit, rank `RF-*` opportunities, record exact user selection) → `implement` (apply selected cleanup, then run one bounded `RV-*` cycle) → `docs`. It never changes observable behavior; anything that would is escalated to `architect`. The opportunity audit is not a second post-execution review cycle.
+A `class: refactor` change skips the spec spine. Execute mode is `refactor` (read-only opportunity audit, rank `RF-*` opportunities, record exact user selection and refactor approval) → `implement` (apply selected cleanup, run one bounded `RV-*` cycle, reconcile and verify docs) → `archive-ready`. Audit-only approves the `refactor` report, then moves directly to `archive-ready` and archives that report. It never changes observable behavior; anything that would is escalated to `architect`. The opportunity audit is not a second post-execution review cycle.
 
 ## Tracking multiple concurrent changes
 

@@ -247,16 +247,16 @@ describe('nextSkill', () => {
     assert.equal(nextSkill(m), 'implement');
   });
 
-  it('returns null when phase is done', () => {
-    const m = { phase: 'done', approvals: {} };
-    assert.equal(nextSkill(m), null);
+  it('returns archive command when phase is archive-ready', () => {
+    const m = { phase: 'archive-ready', approvals: {} };
+    assert.equal(nextSkill(m), 'change-archive');
   });
 
   it('routes a refactor class through audit → execute → docs', () => {
     assert.match(nextSkill({ class: 'refactor', phase: 'refactor', approvals: { refactor: 'pending' } }), /refactor \(audit/);
     assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'pending' } }), /execute/);
     assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'approved', docs: 'pending' } }), /docs/);
-    assert.equal(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), null);
+    assert.equal(nextSkill({ class: 'refactor', phase: 'archive-ready', approvals: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), 'change-archive');
   });
 });
 
@@ -264,7 +264,7 @@ describe('nextSkill', () => {
 
 describe('constants', () => {
   it('PHASES contains expected values in order', () => {
-    assert.deepEqual(PHASES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'done']);
+    assert.deepEqual(PHASES, ['refactor', 'architect', 'specify', 'plan', 'implement', 'decomposed', 'archive-ready']);
   });
 
   it('APPROVALS contains expected values', () => {

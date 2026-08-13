@@ -8,7 +8,7 @@ description: Use for behavior-preserving refactors, cleanup, technical debt redu
 You are running the **refactor** maintenance workflow. It has one hard constraint: preserve observable behavior. The sequence is:
 
 ```
-read-only audit → explicit user selection → verified execution → independent review → docs → archive
+read-only audit → refactor approval → verified execution when selected → docs → archive-ready → verified archive
 ```
 
 An audit may finish with no execution. Never turn a cleanup request into a feature, bug fix, migration, dependency upgrade, or contract redesign.
@@ -95,7 +95,9 @@ node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval refactor --
 
 This advances the manifest to `phase: implement` and keeps `refactor` as the orchestrator. Do not approve for a vague selection, an incomplete opportunity record, or a mismatched batch assignment.
 
-**Audit-only:** if the user chooses audit-only (or `refactor_mode: audit-only`), stop here — present the report, do not approve the refactor approval, and leave execution undone. Reconcile docs only if the audit revealed inaccurate context.
+**Audit-only:** if the user chooses audit-only (or `refactor_mode: audit-only`), preserve the completed report, approve the refactor approval, move directly to `archive-ready`, and archive the audit report. Do not execute selected work or require implement/docs approvals. If the audit reveals inaccurate context, record that separately for follow-up rather than changing documentation during an audit-only change.
+
+For audit-only, record the mode and use the same refactor approval command above before creating the verified archive. Do not treat the original cleanup request as execution approval.
 
 After selection, before implementation:
 
@@ -148,13 +150,15 @@ The approval refuses unless an approved verifier review (backed by a distinct au
 3. Reconcile developer docs describing changed internals, commands, or package layout. Do not churn user-facing behavior docs when behavior did not change.
 4. Re-stamp changed CONTEXT provenance at current HEAD, and have a fresh docs reviewer compare claims with code and `refactor.md`.
 
-Ask the user to approve the docs approval, then archive:
+Run `context-verify.mjs` after reconciliation and resolve its findings. Ask the user to approve the docs approval, which moves the change to `archive-ready`; then create the verified archive:
 ```bash
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
 
 The archive must contain the ranked audit, selection record, batch evidence, review records, escalations, and docs reconciliation.
+
+For cancellation, record a concrete `archive.reason` in `manifest.yaml` and archive the current artifacts rather than deleting them.
 
 ## Stop conditions
 

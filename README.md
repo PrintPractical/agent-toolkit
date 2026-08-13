@@ -24,6 +24,8 @@ Manual: copy any `skills/<name>/` folder into `~/.claude/skills/`, `~/.agents/sk
 
 Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads your active change state and tells you the next step.
 
+Active phases are `architect`, `specify`, `plan`, `implement`, `refactor`, `decomposed`, and `archive-ready`. `archive-ready` is not terminal: a change is complete only after its archive is verified. Cancellation records a concrete reason and archives the current artifacts rather than deleting them.
+
 ---
 
 ## Choosing your starting point
@@ -119,8 +121,8 @@ implement
  └─ firm-seam tests must stay green — failure = kickback, not a test edit
  └─ independent review recorded via review-log.mjs (no per-file snapshot tracking)
  └─ live checklist: checks off tasks as they complete
- └─ on completion: reconcile CONTEXT.md files, re-stamp provenance
-  └─ approves: implement approval → docs approval → archives change
+  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance, run context-verify.mjs
+   └─ approves: implement approval → docs approval → archive-ready → verified archive
 ```
 
 `brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or approval; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
@@ -157,15 +159,15 @@ specify (epic)
    └─ focuses on child-specific design
     └─ approves: architect approval
 
-  specify (child) → plan (child) → implement (child)
-  [standard pipeline per child]
+   specify (child) → plan (child) → implement (child) → archive-ready (child held by epic)
+   [standard pipeline per child]
 
-  Epic is complete when all children reach done.
+   When all children are archive-ready: reconcile and verify epic context → docs approval → epic archive-ready → coordinated verified archive.
 ```
 
 **Key rule:** epics never run plan or implement directly. Epics plan; children implement.
 
-**Execution order — depth-first, one child at a time.** Take each child all the way to `done` (architect → specify → plan → implement) before starting the next, in dependency order. Do **not** architect/specify all children up front. This is safe because the epic's `specify` already locked the cross-cutting contracts *between* children — so each child is insulated from the others, and finishing one gives working, tested software plus lessons that inform the next. Independent children (no dependency on an incomplete sibling) may run in parallel, but each still goes through its full spine start-to-finish — never batched by phase.
+**Execution order — depth-first, one child at a time.** Take each child to `archive-ready` (architect → specify → plan → implement → archive-ready) before starting the next, in dependency order. Do **not** archive an archive-ready child independently: the epic holds it for the coordinated verified archive. Do **not** architect/specify all children up front. This is safe because the epic's `specify` already locked the cross-cutting contracts *between* children. Independent children may run in parallel, but each still goes through its full spine start-to-finish — never batched by phase.
 
 If implementing a child reveals that a cross-cutting contract was wrong, that is a kickback to the **epic's** `specify` (firm-change protocol), which then propagates to any already-completed children. This should be rare — its frequency is a quality signal for the epic-level specify.
 
@@ -181,10 +183,10 @@ If implementing a child reveals that a cross-cutting contract was wrong, that is
 triage
  └─ classifies: is this actually small? (escalates to architect if not)
  └─ root cause analysis
- └─ writes failing test first (red), then fix (green)
- └─ quick refactor pass
- └─ updates CONTEXT.md if needed
- └─ archives
+  └─ writes failing test first (red), then fix (green)
+  └─ quick refactor pass
+  └─ reconciles CONTEXT.md and runs context-verify.mjs
+  └─ implement approval → docs approval → archive-ready → verified archive
 ```
 
 **Triage escalates to `architect` when:**
@@ -203,12 +205,14 @@ triage
 refactor
  └─ read-only parallel audit across architecture, behavior, tests, and idioms
  └─ produces a ranked inventory with stable RF-... opportunity IDs
- └─ asks you to select exact IDs; audit approval alone never authorizes edits
+  └─ asks you to select exact IDs for execution; audit-only approves and archives the report
  └─ blocks on relevant failing baseline tests or overlapping active work
  └─ adds minimal characterization tests when current behavior lacks coverage
  └─ executes selected work in small batches: baseline green → apply → tests stay green
  └─ fresh auditor records findings, then a distinct fresh verifier confirms (review-log.mjs)
- └─ reconciles CONTEXT.md and archives the full audit and evidence
+  └─ execute mode reconciles and verifies CONTEXT.md, then reaches archive-ready
+  └─ audit-only: refactor approval → archive-ready → verified audit archive
+  └─ execute mode: refactor approval → implement approval → docs approval → archive-ready → verified archive
 ```
 
 `refactor` preserves observable behavior. Bug fixes, product changes, public or firm contract changes, migrations, dependency upgrades, and cross-scope redesign are recorded as architect candidates and must follow the `architect` flow. Firm-seam tests remain immutable; a firm-seam failure during cleanup is a kickback, not a test edit. The independent review is recorded via `review-log.mjs` — no per-file snapshot tracking.
