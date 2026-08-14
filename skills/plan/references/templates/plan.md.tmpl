@@ -29,12 +29,12 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}, firmness: firm]
+- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}] [firmness: firm]
   - Target: `{{test file path}}`
   - Assert: `{{behavioral assertion from AC}}`
   - Traces to: `[SEAM-{{id}}-01]`
 
-- [ ] Write unit tests for {{component}} [seam: internal, firmness: soft]
+- [ ] Write unit tests for {{component}} [seam: internal] [firmness: soft]
   - Target: `{{test file path}}`
 
 ### Implementation
@@ -60,7 +60,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] {{test task}} [seam: {{seam-id}}, firmness: {{firm|soft}}]
+- [ ] {{test task}} [seam: {{seam-id}}] [firmness: {{firm|soft}}]
 
 ### Implementation
 
@@ -81,7 +81,8 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 > **Triggered by:** all implementation sections green.
 > **Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
 > **Goal:** one bounded `RV-*` cycle over the whole change. Required for implement approval.
-> **Cycle:** `implement-N` (use the current manifest review epoch)
+> **Cycle:** `implement-N`
+> Use the current manifest review epoch.
 
 - [ ] Launch a **fresh auditor subagent** for one broad applicable discovery pass across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms; no mandatory N/A boilerplate.
 - [ ] Consolidate one complete blocker/major batch. Record each original finding below and attest with `review-log.mjs`; do not issue later batches.
@@ -91,11 +92,10 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Record structured auditor and verifier attestations under the current `implement-N` epoch; verifier resolutions reference every original RV ID.
 - [ ] User approves → implement approval → approved (blocked until the verifier approval is recorded)
 
-| ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Focused verification |
-|---|---|---|---|---|---|---|---|
-| RV-001 | blocker / major | correctness / security / simplicity / maintainability / idioms | `{{file:line}}` | {{specific consequence}} | {{concrete direction}} | {{resolution}} | reviews.json entry |
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Focused verification |
+|---|---|---|---|---|---|---|---|---|
 
-<!-- Remove the example row when clean; use the clean-review rationale instead. -->
+<!-- Add a row only for each issued RV finding. Use Disposition: resolved | unresolved. -->
 
 **Targeted correction/reverification used:** no | yes - {{original RV IDs and any remediation-caused blocker regression}}
 **Clean-review rationale (if no findings):** {{brief evidence-based rationale}}

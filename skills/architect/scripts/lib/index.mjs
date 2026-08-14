@@ -672,7 +672,21 @@ function readArtifact(manifest, artifact, repoRoot, errors) {
 }
 
 function unresolvedBlockers(content) {
-  return /\*\*Classification:\*\* blocker[\s\S]{0,240}\*\*Disposition:\*\* unresolved/i.test(content);
+  if (/\*\*Classification:\*\* blocker[\s\S]{0,240}\*\*Disposition:\*\* unresolved/i.test(content)) return true;
+
+  const lines = content.split('\n');
+  for (let index = 0; index < lines.length - 2; index++) {
+    if (!/^\|/.test(lines[index]) || !/^\|[\s|:-]+\|\s*$/.test(lines[index + 1])) continue;
+    const headers = lines[index].split('|').slice(1, -1).map(cell => cell.trim().toLowerCase());
+    const severity = headers.indexOf('severity');
+    const disposition = headers.indexOf('disposition');
+    if (severity === -1 || disposition === -1) continue;
+    for (let row = index + 2; row < lines.length && /^\|/.test(lines[row]); row++) {
+      const cells = lines[row].split('|').slice(1, -1).map(cell => cell.trim().toLowerCase());
+      if (cells[severity] === 'blocker' && cells[disposition] === 'unresolved') return true;
+    }
+  }
+  return false;
 }
 
 function hasFencedSourceCode(content) {
@@ -778,8 +792,8 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (plan && !/^\|\s*AC ID\s*\|\s*Task\(s\)\s*\|\s*Firm-seam test task\s*\|/mi.test(plan)) {
       errors.push('plan.md missing traceability table');
     }
-    const firmSeams = [...plan.matchAll(/\[firmness:\s*firm\]/gi)].length;
-    const firmTasks = [...plan.matchAll(/\[seam:[^\]]+firmness:\s*firm\]/gi)].length;
+    const firmSeams = [...plan.matchAll(/\[firmness:\s*firm\]|\[seam:[^\]]+\bfirmness:\s*firm\]/gi)].length;
+    const firmTasks = [...plan.matchAll(/\[seam:[^\]]+\]\s*\[firmness:\s*firm\]|\[seam:[^\]]+\bfirmness:\s*firm\]/gi)].length;
     if (firmSeams > firmTasks) errors.push('plan.md has firm seams without matching firm-seam test tasks');
     if (plan && hasFencedSourceCode(plan)) {
       errors.push('plan.md contains a fenced source-code block; replace it with a concise functional specification');

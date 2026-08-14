@@ -54,7 +54,7 @@ function walk(dir) {
     } else if (entry.isFile() && entry.name === 'CONTEXT.md') {
       const filePath = path.join(dir, 'CONTEXT.md');
       const relativePath = path.relative(repoRoot, filePath);
-      const content = fs.readFileSync(filePath, 'utf8');
+      const content = fs.readFileSync(filePath, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
 
       // Extract provenance SHA
       const provMatch = content.match(/Provenance:\s*validated-at:\s*([a-f0-9]{7,40})/i);

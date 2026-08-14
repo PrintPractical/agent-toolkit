@@ -38,7 +38,7 @@ Work through `plan.md` one section at a time. For each section:
 
 ### Step 1: Write firm-seam tests first
 
-Find all test tasks labeled `[firmness: firm]` in this section. Write those tests first. They must be **red** (failing) before any implementation code is written. This is non-negotiable.
+Find all test tasks labeled `[seam: <id>] [firmness: firm]` in this section. Write those tests first. They must be **red** (failing) before any implementation code is written. This is non-negotiable.
 
 ### Step 2: Implement to green
 
@@ -46,7 +46,7 @@ Write the implementation tasks from the plan. Work the checklist top to bottom. 
 
 ### Step 3: Write soft-seam tests and reach a green baseline
 
-Write any test tasks labeled `[firmness: soft]` in this section. Run the tests; the section must reach a green baseline before you move on. Do **not** refactor here — that happens once, below. Check off the section's verify task and repeat for the next section.
+Write any test tasks labeled `[seam: <id>] [firmness: soft]` in this section. Run the tests; the section must reach a green baseline before you move on. Do **not** refactor here — that happens once, below. Check off the section's verify task and repeat for the next section.
 
 ## After all sections complete
 

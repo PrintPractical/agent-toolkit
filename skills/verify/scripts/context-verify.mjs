@@ -15,6 +15,16 @@ const usage = 'Usage: context-verify.mjs [--root <directory>] [--path <context-f
 if (values.help) { console.log(usage); process.exit(0); }
 const repoRoot = path.resolve(values.root);
 
+function isGitRepository() {
+  try {
+    return execFileSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+const gitRepository = isGitRepository();
+
 function discover() {
   const result = [];
   function walk(directory) {
@@ -45,8 +55,10 @@ for (const contextPath of contextFiles) {
     continue;
   }
   const content = fs.readFileSync(contextPath, 'utf8');
-  const sha = content.match(/Provenance:\s*validated-at:\s*([a-f0-9]{7,40})/i)?.[1] || null;
-  let provenanceValid = Boolean(sha);
+  const provenance = content.match(/Provenance:\s*validated-at:\s*(?:([a-f0-9]{7,40})|(<not-in-git-repo>))/i);
+  const sha = provenance?.[1] || null;
+  const untracked = Boolean(provenance?.[2]);
+  let provenanceValid = Boolean(sha || untracked);
   let changedFiles = [];
   if (sha) {
     try {
@@ -57,12 +69,18 @@ for (const contextPath of contextFiles) {
       provenanceValid = false;
     }
   }
-  const isStale = !provenanceValid || changedFiles.length > 0;
+  const isStale = !provenanceValid || changedFiles.length > 0 || (untracked && gitRepository);
   if (!provenanceValid) invalid = true;
   if (isStale) stale = true;
-  const firmSeams = [...content.matchAll(/\[SEAM-([^\]]+)\][^→\n]*(?:→|->)\s*enforced-by:\s*([^\n]+)/gi)]
+  const authoredContent = content.replace(/<!--[\s\S]*?-->/g, '');
+  const firmSeams = [...authoredContent.matchAll(/\[SEAM-([^\]]+)\][^→\n]*(?:→|->)\s*enforced-by:\s*([^\n]+)/gi)]
     .map(match => ({ id: `SEAM-${match[1]}`, testPath: match[2].trim() }));
-  const firmSeamResults = firmSeams.map(seam => ({ seamId: seam.id, testPath: seam.testPath, exists: fs.existsSync(path.resolve(path.dirname(contextPath), seam.testPath)), passed: null }));
+  const firmSeamResults = firmSeams.map(seam => ({
+    seamId: seam.id,
+    testPath: seam.testPath,
+    exists: fs.existsSync(path.resolve(repoRoot, seam.testPath)) || fs.existsSync(path.resolve(path.dirname(contextPath), seam.testPath)),
+    passed: null,
+  }));
   if (firmSeamResults.some(result => !result.exists)) {
     firmFailure = true;
     firmSeamResults.filter(result => !result.exists).forEach(result => { result.passed = false; result.note = 'test file not found'; });
@@ -77,7 +95,7 @@ for (const contextPath of contextFiles) {
       firmSeamResults.forEach(result => { result.passed = false; result.command = command; result.note = String(error.message); });
     }
   }
-  results.push({ path: relPath, sha, provenanceValid, isStale, changedFiles, firmSeams: firmSeams.length, firmSeamResults });
+  results.push({ path: relPath, sha, provenance: untracked ? 'untracked' : sha ? 'git' : null, provenanceValid, isStale, changedFiles, firmSeams: firmSeams.length, firmSeamResults });
 }
 process.stdout.write(JSON.stringify(results) + '\n');
 if (firmFailure || invalid) process.exit(1);

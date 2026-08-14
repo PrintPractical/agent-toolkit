@@ -21,7 +21,7 @@ They are **not** exhaustive documentation. Exhaustive docs rot. CONTEXT.md is a 
 ### Seam: <name>  [firmness: soft|firm]
 Description: what crosses this boundary and what doesn't.
 Criteria:
-  - [SEAM-<id>] <behavioral assertion> → enforced-by: <test path> (if firm)
+  - [SEAM-<id>] <behavioral assertion> → enforced-by: <repository-root-relative test path> (if firm)
 ```
 Firm seams have at least one enforcing test. Soft seams do not require one.
 
@@ -42,6 +42,7 @@ These become the source for firm-seam test generation.
 Provenance: validated-at: <full-git-sha>
 ```
 Agents and CI use this to detect staleness via `context-verify.mjs`.
+Outside a Git repository, `context-scaffold.mjs` writes `Provenance: validated-at: <not-in-git-repo>` instead. It is valid while Git is unavailable and becomes stale after Git is initialized; replace it with the current HEAD SHA during reconciliation.
 
 ### Recommended
 

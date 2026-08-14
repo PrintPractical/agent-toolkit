@@ -10,8 +10,6 @@ Every user-owned material decision must have an explicit response: public contra
 
 | ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
 |---|---|---|---|---|---|---|
-| D-001 | {{question}} | {{recommended decision and why}} | {{meaningful alternatives}} | {{accept | selected alternative | supplied decision}} | confirmed | {{selected decision}} |
-
 <!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, leave the table empty and state that no user-owned material decision was needed. -->
 
 ## Interface Changes
@@ -69,11 +67,10 @@ Every user-owned material decision must have an explicit response: public contra
 
 **Dry-run status:** clean | blockers-resolved
 
-| ID | Severity | Category | Evidence | Concrete impact | Alternative | Linked decision | Remediation | Verification |
-|---|---|---|---|---|---|---|---|---|
-| SV-001 | blocker / major | correctness / security / simplicity / maintainability / idioms | {{artifact/repository evidence}} | {{specific consequence}} | {{concrete direction}} | D-{{n}} / agent-owned | {{resolution}} | reviews.json entry |
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Linked decision | Disposition | Remediation | Verification |
+|---|---|---|---|---|---|---|---|---|---|
 
-<!-- Remove the example row when clean; use the clean-review rationale instead. -->
+<!-- Add a row only for each issued SV finding. Use Disposition: resolved | unresolved. -->
 
 **Discovery pass:** pending | complete
 **Consolidated batch issued:** {{timestamp or none-clean}}
@@ -84,7 +81,9 @@ Every user-owned material decision must have an explicit response: public contra
 
 ## Review Cycle Reference
 
-**Cycle:** `specify-N` (use the current manifest review epoch)
+**Cycle:** `specify-N`
+
+Use the current manifest review epoch.
 **Review log:** `reviews.json`, phase `specify`
 
 ## Architecture Reconciliation
