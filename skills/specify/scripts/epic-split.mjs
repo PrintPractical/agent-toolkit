@@ -28,7 +28,6 @@ import {
   writeManifest,
   generateChangeId,
   changeDir,
-  addChildToEpic,
   activeDir,
 } from './lib/index.mjs';
 
@@ -68,6 +67,14 @@ if (epicManifest.class !== 'epic') {
   console.error(`Error: '${values.epic}' is not an epic (class: ${epicManifest.class})`);
   process.exit(1);
 }
+if (epicManifest.phase !== 'specify' || epicManifest.approvals?.architect !== 'approved' || epicManifest.approvals?.specify !== 'approved') {
+  console.error(`Error: epic '${values.epic}' must be in specify with architect and specify approvals approved.`);
+  process.exit(1);
+}
+if ((epicManifest.children || []).length > 0) {
+  console.error(`Error: epic '${values.epic}' is already decomposed; create the complete child set in one split.`);
+  process.exit(1);
+}
 
 // Parse children list
 let childDefs;
@@ -97,15 +104,7 @@ for (const child of childDefs) {
   }
 }
 
-// Check for already-existing children (idempotency guard)
-const existingChildren = epicManifest.children || [];
-if (existingChildren.length > 0) {
-  console.error(`Warning: epic '${values.epic}' already has ${existingChildren.length} child(ren):`);
-  existingChildren.forEach(c => console.error(`  - ${c}`));
-  console.error('New children will be ADDED to the existing list, not replacing it.');
-}
-
-// Create child change manifests
+// Create child workspaces first, then publish the parent link as one transition.
 const createdChildren = [];
 const architectureDir = path.join(activeDir(repoRoot), values.epic);
 
@@ -124,23 +123,21 @@ for (const childDef of childDefs) {
     id,
     title: childDef.title,
     class: cls,
-    stage: 'architect',
+    phase: ['bug', 'small'].includes(cls) ? 'implement' : 'architect',
     language: lang,
     parent: values.epic,
-    gates: {
-      architect: 'pending',
-      specify:   'pending',
-      plan:      'pending',
-      implement: 'pending',
-      docs:      'pending',
-    },
+    approvals: ['bug', 'small'].includes(cls)
+      ? { implement: 'pending', docs: 'pending' }
+      : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
     artifacts: {
+      change_brief: 'change-brief.md',
       architecture: 'architecture.md',
       decisions:    'decisions.md',
       plan:         'plan.md',
     },
     context_targets: epicManifest.context_targets || ['CONTEXT.md'],
     kickbacks: [],
+    review_epochs: {},
   };
 
   writeManifest(id, manifest, repoRoot);
@@ -164,9 +161,6 @@ for (const childDef of childDefs) {
     fs.writeFileSync(seedPath, seedContent, 'utf8');
   }
 
-  // Link to epic
-  addChildToEpic(values.epic, id, repoRoot);
-
   console.error(`  ✓ ${id}`);
   console.error(`    Title:    ${childDef.title}`);
   console.error(`    Class:    ${cls}`);
@@ -176,9 +170,15 @@ for (const childDef of childDefs) {
   createdChildren.push({ id, title: childDef.title, dir, class: cls, language: lang });
 }
 
-// Re-read updated epic manifest for final status
+// Publish the complete child set only after every child workspace exists.
 const updatedEpic = readManifest(values.epic, repoRoot);
-console.error(`\nEpic '${values.epic}' now has ${(updatedEpic.children || []).length} child(ren) total.`);
+updatedEpic.children = createdChildren.map(child => child.id);
+updatedEpic.phase = 'decomposed';
+writeManifest(values.epic, updatedEpic, repoRoot);
+
+// Re-read updated epic manifest for final status
+const completedEpic = readManifest(values.epic, repoRoot);
+console.error(`\nEpic '${values.epic}' now has ${(completedEpic.children || []).length} child(ren) total.`);
 console.error(`\nNext steps:`);
 console.error(`  For each child, run: architect (pointing to the child's change ID)`);
 console.error(`  To check epic progress: node change-status.mjs --id ${values.epic}`);

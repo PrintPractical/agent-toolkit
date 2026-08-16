@@ -7,13 +7,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { execSync } from 'node:child_process';
+import { ALL_IDIOMS, SCRIPT_MAP, SYNC_MAP } from '../sync-shared.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..');
 const SYNC_SCRIPT = path.join(REPO_ROOT, 'packages/build/sync-shared.mjs');
 const IDIOMS_DIR = path.join(REPO_ROOT, '_idioms');
-const IDIOM_CONSUMERS = ['architect', 'specify', 'implement', 'triage', 'reforge'];
 
 describe('sync-shared.mjs', () => {
   it('runs without error in check mode when generated assets are current', () => {
@@ -80,18 +79,26 @@ describe('sync-shared.mjs', () => {
     assert.match(rust, /metadata-reported manifest path rather than assuming `~\/\.cargo`/);
   });
 
-  it('syncs every canonical idiom pack to every consuming skill', () => {
-    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+  it('distributes every canonical idiom pack only to the idioms skill', () => {
     const packNames = fs.readdirSync(IDIOMS_DIR).filter(name => name.endsWith('.md')).sort();
-
-    for (const skill of IDIOM_CONSUMERS) {
-      for (const name of packNames) {
-        const src = path.join(IDIOMS_DIR, name);
-        const dest = path.join(REPO_ROOT, 'skills', skill, 'references', 'idioms', name);
-        assert.ok(fs.existsSync(dest), `Expected ${skill} to receive idioms/${name}`);
-        assert.ok(fs.readFileSync(src).equals(fs.readFileSync(dest)), `${skill}/idioms/${name} must match canonical source`);
+    const expectedIdioms = packNames.map(name => ({
+      src: `_idioms/${name}`,
+      dest: `idioms/${name}`,
+    }));
+    assert.deepEqual(ALL_IDIOMS, expectedIdioms);
+    assert.deepEqual(SYNC_MAP.idioms, expectedIdioms);
+    for (const [skill, files] of Object.entries(SYNC_MAP)) {
+      if (skill !== 'idioms') {
+        assert.equal(files.some(({ src }) => src.startsWith('_idioms/')), false, `${skill} must not bundle idiom packs`);
       }
     }
+  });
+
+  it('uses explicit, minimal reference capabilities', () => {
+    assert.ok(SYNC_MAP.architect.length < 12, 'architect must not receive the complete shared bundle');
+    assert.ok(SYNC_MAP.plan.length < 8, 'plan must not receive the complete shared bundle');
+    assert.equal(SYNC_MAP.reforge.some(({ src }) => src === '_shared/adversarial-review.md'), false);
+    assert.equal(SYNC_MAP.implement.some(({ src }) => src.startsWith('_templates/')), false);
   });
 
   it('syncs the brainstorm architect seed template', () => {
@@ -121,30 +128,41 @@ describe('sync-shared.mjs', () => {
     }
   });
 
-  it('all 11 skills have a references/ directory after sync', () => {
+  it('all configured skills have a references/ directory after sync', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
+    const skills = Object.keys(SYNC_MAP);
     for (const skill of skills) {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
     }
   });
 
-  it('every skill bundles its helper scripts + lib (self-contained)', () => {
+  it('bundles only each skill capability scripts plus the shared lib', () => {
     execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
 
-    const skills = ['brainstorm', 'architect', 'specify', 'plan', 'implement', 'refactor', 'triage', 'map', 'reforge', 'verify', 'what-now'];
-    const expectedScripts = [
-      'lib/index.mjs', 'change-new.mjs', 'change-status.mjs', 'change-archive.mjs',
-      'manifest-gate.mjs', 'artifact-validate.mjs', 'context-scaffold.mjs', 'context-discover.mjs',
-      'context-verify.mjs', 'kickback-log.mjs', 'review-log.mjs', 'epic-split.mjs',
-    ];
-    for (const skill of skills) {
+    for (const [skill, scripts] of Object.entries(SCRIPT_MAP)) {
+      const expectedScripts = scripts.length > 0 ? ['lib/index.mjs', ...scripts] : [];
+      const scriptsDir = path.join(REPO_ROOT, 'skills', skill, 'scripts');
+      const actualScripts = fs.existsSync(scriptsDir)
+        ? fs.readdirSync(scriptsDir, { recursive: true }).filter(file => !fs.statSync(path.join(scriptsDir, file)).isDirectory()).sort()
+        : [];
+      assert.deepEqual(actualScripts, [...expectedScripts].sort(), `${skill} should bundle exactly its declared scripts`);
       for (const script of expectedScripts) {
         const p = path.join(REPO_ROOT, 'skills', skill, 'scripts', script);
         assert.ok(fs.existsSync(p), `Expected ${skill}/scripts/${script} to be bundled`);
       }
+    }
+  });
+
+  it('check mode detects stale generated files', () => {
+    execSync(`node "${SYNC_SCRIPT}"`, { cwd: REPO_ROOT, stdio: 'pipe' });
+    const stalePath = path.join(REPO_ROOT, 'skills/architect/references/stale.md');
+    fs.writeFileSync(stalePath, 'stale\n');
+    try {
+      assert.throws(() => execSync(`node "${SYNC_SCRIPT}" --check`, { cwd: REPO_ROOT, stdio: 'pipe' }));
+    } finally {
+      fs.rmSync(stalePath, { force: true });
     }
   });
 

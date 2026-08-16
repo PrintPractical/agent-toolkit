@@ -24,6 +24,8 @@ Manual: copy any `skills/<name>/` folder into `~/.claude/skills/`, `~/.agents/sk
 
 Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads your active change state and tells you the next step.
 
+Active phases are `architect`, `specify`, `plan`, `implement`, `refactor`, `decomposed`, and `archive-ready`. `archive-ready` is not terminal: a change is complete only after its archive is verified. Cancellation records a concrete reason and archives the current artifacts rather than deleting them.
+
 ---
 
 ## Choosing your starting point
@@ -31,7 +33,7 @@ Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads 
 | Your situation | Start with |
 |---|---|
 | Early idea or competing solution directions | `brainstorm` |
-| Existing repo with no CONTEXT.md files | `map` |
+| Existing repo where current code context would help | `map` (optional) |
 | You have a PoC you want to rebuild from scratch | `reforge` |
 | Bug or small isolated fix | `triage` |
 | Behavior-preserving cleanup, technical debt audit, or accumulated sloppiness | `refactor` |
@@ -39,9 +41,22 @@ Not sure what to do? Say **"what now"** at any time. The `what-now` skill reads 
 
 ---
 
-## Flow 1 — Brownfield onboarding (existing repo, no docs)
+## Intake first
 
-**Use when:** you have an existing codebase and want to start using this toolkit.
+Before a manifest, seed, context discovery, map scan, subagent, or bulk reference read, establish:
+
+- Goal and observable outcome
+- Affected area
+- Constraints and anti-goals
+- Whether requirements are formed, partially formed, or unformed
+
+Each active change records this in `change-brief.md`. Use `map` only when repository context is needed; missing `CONTEXT.md` files are not a prerequisite for `architect` or `triage`.
+
+---
+
+## Flow 1 — Optional brownfield map
+
+**Use when:** you have an existing codebase and need a derived CONTEXT.md hierarchy to support the work.
 
 ```
 map
@@ -50,7 +65,7 @@ map
  └─ per-component CONTEXT.md files
  └─ stamps provenance on each file
 
-  → now you can use architect, triage, or verify on the repo
+  → use architect, triage, or verify with the new context
 ```
 
 **What `map` produces:**
@@ -59,7 +74,7 @@ map
 - All seams tagged `soft` by default (conservative — easy to earn `firm` later)
 - `Known-soft-spots` section: explicit debt and candidates for improvement
 
-**After `map`:** use `architect` for new features, `triage` for bugs.
+`map` is optional. After intake, use `architect` for new features or `triage` for bugs whether or not a map exists.
 
 ---
 
@@ -78,25 +93,26 @@ brainstorm (optional)
 architect
   └─ gathers relevant CONTEXT.md files
   └─ batched architectural-topic confirmation with explicit user responses
-  └─ adversarial discussion: seams, decisions, refactors, idioms
- └─ validity-check subagent hunts for gaps
+  └─ bounded adversarial discussion: material seams, decisions, refactors, engineering fundamentals, idioms
+ └─ validity-check subagent tests material risks within the change scope
  └─ produces: .changes/active/<id>/architecture.md
- └─ approves: architect gate
+  └─ approves: architect approval
 
 specify
   └─ batched material-decision confirmation with explicit user responses
- └─ nails every interface change, error path, edge case
- └─ implement-as-if dry-run subagent: finds remaining gaps
+ └─ defines material interface changes, error paths, and edge cases
+ └─ implement-as-if dry-run subagent: finds unresolved material blockers within scope
  └─ produces: .changes/active/<id>/decisions.md
  └─ reconciles architecture.md
- └─ approves: specify gate
+  └─ approves: specify approval
 
 plan
  └─ decomposes into detailed task checklist
+ └─ applies engineering fundamentals and the target-language idiom pack to concrete task choices
  └─ test tasks labeled by seam firmness (firm = safety net, soft = disposable)
  └─ traceability: every acceptance criterion → at least one task
  └─ produces: .changes/active/<id>/plan.md
- └─ approves: plan gate
+  └─ approves: plan approval
 
 implement
  └─ per section: write firm-seam tests (red) → implement (green) → verify green baseline
@@ -105,13 +121,13 @@ implement
  └─ firm-seam tests must stay green — failure = kickback, not a test edit
  └─ independent review recorded via review-log.mjs (no per-file snapshot tracking)
  └─ live checklist: checks off tasks as they complete
- └─ on completion: reconcile CONTEXT.md files, re-stamp provenance
- └─ approves: implement gate → docs gate → archives change
+  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance, run context-verify.mjs
+   └─ approves: implement approval → docs approval → archive-ready → verified archive
 ```
 
-`brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or gate; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
+`brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or approval; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
 
-**Kickback protocol:** if `implement` hits a gap the spec didn't cover, it stops and logs a kickback to `manifest.yaml`. The logger returns the change to `specify` and resets the `specify` and `plan` gates, so both stages must be re-approved before implementation resumes. No improvising. This is a feature — kickback frequency is the toolkit's quality metric.
+**Kickback protocol:** if `implement` hits a gap the spec did not cover, it stops and logs a kickback to `manifest.yaml`. The entry records `restart_phase` and `invalidated_approvals`; resolve the gap, then re-approve only those approvals. No improvising. Kickback frequency is the toolkit's quality metric.
 
 ---
 
@@ -124,7 +140,7 @@ architect (epic)
  └─ high-level design: overall seams, major decisions
  └─ identifies child changes — documented in architecture.md
  └─ does NOT create child manifests yet
- └─ approves: architect gate
+  └─ approves: architect approval
 
 specify (epic)
  └─ cross-cutting contracts ONLY: shared interfaces between children
@@ -132,7 +148,7 @@ specify (epic)
  └─ ordering constraints between children
  └─ dry-run: "can all children be implemented without inter-child gaps?"
  └─ produces: .changes/active/<id>/decisions.md
- └─ approves: specify gate
+  └─ approves: specify approval
  └─ AUTO-RUNS epic-split: creates child change manifests
     └─ each child gets architect-seed.md seeded from the epic's context
 
@@ -141,21 +157,19 @@ specify (epic)
    └─ loads epic's architecture.md + decisions.md as parent context
    └─ does NOT re-litigate epic-level decisions
    └─ focuses on child-specific design
-   └─ approves: architect gate
+    └─ approves: architect approval
 
-  specify (child) → plan (child) → implement (child)
-  [standard pipeline per child]
+   specify (child) → plan (child) → implement (child) → archive-ready (child held by epic)
+   [standard pipeline per child]
 
-  Epic is complete when all children reach done.
+   When all children are archive-ready: reconcile and verify epic context → docs approval → epic archive-ready → coordinated verified archive.
 ```
 
 **Key rule:** epics never run plan or implement directly. Epics plan; children implement.
 
-**Execution order — depth-first, one child at a time.** Take each child all the way to `done` (architect → specify → plan → implement) before starting the next, in dependency order. Do **not** architect/specify all children up front. This is safe because the epic's `specify` already locked the cross-cutting contracts *between* children — so each child is insulated from the others, and finishing one gives working, tested software plus lessons that inform the next. Independent children (no dependency on an incomplete sibling) may run in parallel, but each still goes through its full spine start-to-finish — never batched by stage.
+**Execution order — depth-first, one child at a time.** Take each child to `archive-ready` (architect → specify → plan → implement → archive-ready) before starting the next, in dependency order. Do **not** archive an archive-ready child independently: the epic holds it for the coordinated verified archive. Do **not** architect/specify all children up front. This is safe because the epic's `specify` already locked the cross-cutting contracts *between* children. Independent children may run in parallel, but each still goes through its full spine start-to-finish — never batched by phase.
 
 If implementing a child reveals that a cross-cutting contract was wrong, that is a kickback to the **epic's** `specify` (firm-change protocol), which then propagates to any already-completed children. This should be rare — its frequency is a quality signal for the epic-level specify.
-
-**Your epic manifest's `plan`/`implement`/`docs` gates:** if your manifest has these from before this fix was applied, they are harmless — they are never read for epics. You can ignore them or delete them from the YAML manually.
 
 **Checking epic progress:** ask the agent **"what now"** — the `what-now` skill reads the epic manifest and reports child progress and the next step.
 
@@ -169,10 +183,10 @@ If implementing a child reveals that a cross-cutting contract was wrong, that is
 triage
  └─ classifies: is this actually small? (escalates to architect if not)
  └─ root cause analysis
- └─ writes failing test first (red), then fix (green)
- └─ quick refactor pass
- └─ updates CONTEXT.md if needed
- └─ archives
+  └─ writes failing test first (red), then fix (green)
+  └─ quick refactor pass
+  └─ reconciles CONTEXT.md and runs context-verify.mjs
+  └─ implement approval → docs approval → archive-ready → verified archive
 ```
 
 **Triage escalates to `architect` when:**
@@ -191,12 +205,14 @@ triage
 refactor
  └─ read-only parallel audit across architecture, behavior, tests, and idioms
  └─ produces a ranked inventory with stable RF-... opportunity IDs
- └─ asks you to select exact IDs; audit approval alone never authorizes edits
+  └─ asks you to select exact IDs for execution; audit-only approves and archives the report
  └─ blocks on relevant failing baseline tests or overlapping active work
  └─ adds minimal characterization tests when current behavior lacks coverage
  └─ executes selected work in small batches: baseline green → apply → tests stay green
  └─ fresh auditor records findings, then a distinct fresh verifier confirms (review-log.mjs)
- └─ reconciles CONTEXT.md and archives the full audit and evidence
+  └─ execute mode reconciles and verifies CONTEXT.md, then reaches archive-ready
+  └─ audit-only: refactor approval → archive-ready → verified audit archive
+  └─ execute mode: refactor approval → implement approval → docs approval → archive-ready → verified archive
 ```
 
 `refactor` preserves observable behavior. Bug fixes, product changes, public or firm contract changes, migrations, dependency upgrades, and cross-scope redesign are recorded as architect candidates and must follow the `architect` flow. Firm-seam tests remain immutable; a firm-seam failure during cleanup is a kickback, not a test edit. The independent review is recorded via `review-log.mjs` — no per-file snapshot tracking.
@@ -282,7 +298,8 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
 ```
 .changes/
   active/<id>/
-    manifest.yaml       # stage, class, gates, kickbacks — source of truth
+    manifest.yaml       # phase, class, approvals, kickbacks — source of truth
+    change-brief.md     # intake: outcome, area, constraints, readiness
     architecture.md     # architect output
     decisions.md        # specify output
     plan.md             # plan output (live checklist, updated by implement)
@@ -295,13 +312,19 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
 
 ### Idioms packs
 
-Consulted by `architect`, `specify`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
+Consulted by `architect`, `specify`, `plan`, `implement`, `triage`, `reforge`, and `refactor` based on `manifest.language` or the selected target language. Whole-stack refactor audits detect every scoped language and load every matching pack. Each pack is a power-checklist + smell-list for writing idiomatic code and rejecting language-specific anti-patterns. Shipped packs: **Rust**, **C**, **C++**, **Python**, **Go**, **Swift**, **JavaScript**, and **TypeScript**.
 
 The core principle: **use the language's own power; flag transliteration from another paradigm as a smell.** To add a pack, create `_idioms/<lang>.md` using a lowercase kebab-case filename and run `npm run build`; the build discovers and distributes canonical packs automatically. The filename stem is the `manifest.language` value.
+
+### Engineering review
+
+The shared engineering fundamentals guide workload-based data structure choices, asymptotic and resource bounds, legal state transitions, abstraction selection, standard algorithms, equality/hash/order contracts, and material domain duplication. Reviews are intentionally bounded to the requested change, affected seams, acceptance criteria, and credible workload or failure risks. They require evidence and concrete alternatives for material findings rather than an unbounded search for hypothetical issues.
 
 ---
 
 ## Development
+
+Canonical authored sources live in `_shared/`, `_templates/`, `_idioms/`, and `packages/build/`. Files under `skills/*/references/` and `skills/*/scripts/` are generated copies; do not edit them directly.
 
 ```bash
 npm install

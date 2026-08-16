@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * change-status.mjs — Print current stage and recommended next skill for active changes.
+ * change-status.mjs — Print current phase and recommended next skill for active changes.
  *
  * Usage:
  *   node change-status.mjs                    # list all active changes
@@ -16,6 +16,7 @@ import {
   readManifest,
   nextSkill,
   epicStatus,
+  validateManifestState,
 } from './lib/index.mjs';
 
 const { values } = parseArgs({
@@ -54,6 +55,8 @@ for (const id of ids) {
     continue;
   }
 
+  const stateErrors = validateManifestState(manifest);
+
   const skill = nextSkill(manifest);
   const defectKickbacks = (manifest.kickbacks || []).filter(k => k.type === 'defect').length;
   const totalKickbacks = (manifest.kickbacks || []).length;
@@ -64,10 +67,11 @@ for (const id of ids) {
     id,
     title: manifest.title,
     class: manifest.class,
-    stage: manifest.stage,
+    phase: manifest.phase,
     language: manifest.language || null,
-    gates: manifest.gates,
+    approvals: manifest.approvals,
     next_skill: skill,
+    ...(stateErrors.length ? { state_errors: stateErrors } : {}),
     kickbacks: { defect: defectKickbacks, amendment: totalKickbacks - defectKickbacks, total: totalKickbacks },
     ...(unresolvedKickback ? { unresolved_kickback: unresolvedKickback } : {}),
     ...(manifest.parent ? { parent: manifest.parent } : {}),
@@ -81,35 +85,35 @@ for (const id of ids) {
   console.error(`  Title:      ${manifest.title}`);
   console.error(`  Class:      ${manifest.class}`);
   if (manifest.parent) console.error(`  Parent:     ${manifest.parent}`);
-  console.error(`  Stage:      ${manifest.stage}`);
+  console.error(`  Phase:      ${manifest.phase}`);
   if (manifest.language) console.error(`  Language:   ${manifest.language}`);
 
   if (isEpic) {
     const es = status.epic_status;
     const children = manifest.children || [];
-    console.error(`  Children:   ${children.length} total — ${es.done} done, ${es.inProgress} in-progress, ${es.pending} pending`);
+    console.error(`  Children:   ${children.length} total — ${es.ready} archive-ready, ${es.archived} archived, ${es.inProgress} in-progress, ${es.pending} pending, ${es.missing} missing`);
     if (children.length > 0) {
-      // Show each child's stage
+      // Show each child's phase
       for (const childId of children) {
-        let childStage = 'archived';
+        let childPhase = 'missing';
         try {
           const child = readManifest(childId, repoRoot);
-          childStage = child.stage;
-        } catch { /* archived */ }
-        console.error(`    • ${childId} [${childStage}]`);
+          childPhase = child.phase;
+        } catch { /* status includes verified archives separately */ }
+        console.error(`    • ${childId} [${childPhase}]`);
       }
     }
-    if (es.done === children.length && children.length > 0) {
-      console.error(`  Status:     ALL CHILDREN DONE — epic complete`);
+    if (es.ready === children.length && children.length > 0) {
+      console.error(`  Status:     ALL CHILDREN ARCHIVE-READY — reconcile epic docs`);
     } else if (skill) {
       console.error(`  Next:       ${skill}`);
     }
   } else {
-    console.error(`  Gates:      ${Object.entries(manifest.gates || {}).map(([k, v]) => `${k}:${v}`).join(' ')}`);
+    console.error(`  Approvals:  ${Object.entries(manifest.approvals || {}).map(([k, v]) => `${k}:${v}`).join(' ')}`);
     if (skill) {
       console.error(`  Next skill: ${skill}`);
     } else {
-      console.error(`  Status:     done`);
+      console.error(`  Status:     awaiting lifecycle repair`);
     }
   }
 
@@ -117,11 +121,12 @@ for (const id of ids) {
     console.error(`  Kickbacks:  ${defectKickbacks} defect, ${totalKickbacks - defectKickbacks} amendment`);
   }
   if (unresolvedKickback) {
-    const invalidated = Array.isArray(unresolvedKickback.invalidated_gates)
-      ? unresolvedKickback.invalidated_gates
-      : (unresolvedKickback.invalidated_gates || 'specify,plan').split(',');
-    console.error(`  Restart:    ${unresolvedKickback.restart_stage || 'specify'} (${invalidated.join(', ')})`);
+    const invalidated = Array.isArray(unresolvedKickback.invalidated_approvals)
+      ? unresolvedKickback.invalidated_approvals
+      : (unresolvedKickback.invalidated_approvals || 'specify,plan').split(',');
+    console.error(`  Restart:    ${unresolvedKickback.restart_phase || 'specify'} (${invalidated.join(', ')})`);
   }
+  if (stateErrors.length) console.error(`  Invalid:    ${stateErrors.join('; ')}`);
 }
 
 process.stdout.write(JSON.stringify(results) + '\n');

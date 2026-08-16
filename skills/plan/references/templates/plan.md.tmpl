@@ -7,7 +7,7 @@
 
 > This plan is the single source of truth for implementation. Each task is a checkbox. `implement` marks tasks complete in real time. Do not add tasks during implementation — if new work is discovered, kick back to `specify`.
 >
-> Write functional specifications, not source code. Tasks may use precise ordered prose for behavior, inputs, outputs, state changes, validation, errors, invariants, and call ordering. Do not include function bodies, language-shaped pseudocode, control-flow implementations, or fenced source-code blocks. Inline one-line signatures are allowed only when needed to remove interface ambiguity.
+> Write functional specifications, not private implementation recipes. State required inputs, outputs, state transitions, validation, errors, invariants, ordering guarantees, and acceptance evidence. Do not prescribe private control flow, helper decomposition, local data structures, internal call sequences, function bodies, language-shaped pseudocode, or fenced source-code blocks. Inline one-line signatures are allowed only for contracts confirmed in decisions.md.
 
 ## Traceability check
 
@@ -17,7 +17,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 |---|---|---|
 | AC-{{id}}-01 | Section N, Task M | Section N, Task K |
 
-<!-- Fill before plan gate is approved. -->
+<!-- Fill before plan approval is approved. -->
 
 ---
 
@@ -29,21 +29,22 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}, firmness: firm]
+- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}] [firmness: firm]
   - Target: `{{test file path}}`
   - Assert: `{{behavioral assertion from AC}}`
   - Traces to: `[SEAM-{{id}}-01]`
 
-- [ ] Write unit tests for {{component}} [seam: internal, firmness: soft]
+- [ ] Write unit tests for {{component}} [seam: internal] [firmness: soft]
   - Target: `{{test file path}}`
 
 ### Implementation
 
 - [ ] {{specific task}} — `{{target file}}`
-  - Symbol/interface: `{{optional one-line signature or symbol name; no body}}`
-  - Behavior: 1. {{first functional step}} 2. {{next functional step}} 3. {{observable result}}
-  - Errors and invariants: {{validation, error mapping, and constraints}}
-  - {{concrete detail: what to add/change/delete. Complete enough for a cheap model to execute, expressed as prose rather than source code.}}
+  - Confirmed contract/symbol: `{{optional public one-line signature or symbol; no body}}`
+  - Required outcome: {{observable behavior and state transition}}
+  - Errors and invariants: {{confirmed validation, error semantics, ordering guarantees, and constraints}}
+  - Acceptance evidence: {{test/assertion or criterion proving completion}}
+  - Implementation freedom: {{private helpers, local representation, and control flow remain implementer-owned}}
 
 - [ ] {{specific task}} — `{{target file}}`
 
@@ -59,7 +60,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] {{test task}} [seam: {{seam-id}}, firmness: {{firm|soft}}]
+- [ ] {{test task}} [seam: {{seam-id}}] [firmness: {{firm|soft}}]
 
 ### Implementation
 
@@ -75,23 +76,35 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ---
 
-## Review section: Independent review & behavior-preserving refactor
+## Review section: Bounded independent review & behavior-preserving remediation
 
 > **Triggered by:** all implementation sections green.
-> **Goal:** one review-and-refactor pass over the whole change (see `references/implementation-review.md`). Gates the implement gate.
+> **Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
+> **Goal:** one bounded `RV-*` cycle over the whole change. Required for implement approval.
+> **Cycle:** `implement-N`
+> Use the current manifest review epoch.
 
-- [ ] Launch a **fresh auditor subagent** (separate context, not the implementer). It loads the idiom pack(s) for every language in scope and flags unsafe/panic-prone code, idiom violations, oversized/monolithic modules, and hygiene issues.
-- [ ] Record auditor findings: `review-log.mjs record --id {{id}} --stage implement --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding "<file:line> [category] <action>"`
-- [ ] Apply behavior-preserving cleanup for the findings (or record a substantive no-change rationale). Firm-seam tests stay green; a firm-seam failure is a kickback, not a test edit.
-- [ ] Run the full test suite — must be green after refactor.
-- [ ] Launch a **distinct fresh verifier subagent** (not the implementer or auditor). It confirms findings resolved and behavior preserved: `review-log.mjs record --id {{id}} --stage implement --role verifier --reviewer "<distinct label>" --verdict approved`
-- [ ] User approves → implement gate → approved (blocked until the verifier approval is recorded)
+- [ ] Launch a **fresh auditor subagent** for one broad applicable discovery pass across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms; no mandatory N/A boilerplate.
+- [ ] Consolidate one complete blocker/major batch. Record each original finding below and attest with `review-log.mjs`; do not issue later batches.
+- [ ] Apply one behavior-preserving remediation for the complete batch (or record an evidence-based clean rationale). Firm-seam tests stay green; a firm-seam failure is a kickback, not a test edit.
+- [ ] Run the full test suite — must be green after remediation.
+- [ ] Launch a **distinct fresh verifier subagent** to check only original RV IDs; no broad rediscovery or new low/major findings. A remediation-caused blocker regression may be recorded through `--regression`; at most one targeted correction/reverification closes it through `--regression-resolution`.
+- [ ] Record structured auditor and verifier attestations under the current `implement-N` epoch; verifier resolutions reference every original RV ID.
+- [ ] User approves → implement approval → approved (blocked until the verifier approval is recorded)
+
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Focused verification |
+|---|---|---|---|---|---|---|---|---|
+
+<!-- Add a row only for each issued RV finding. Use Disposition: resolved | unresolved. -->
+
+**Targeted correction/reverification used:** no | yes - {{original RV IDs and any remediation-caused blocker regression}}
+**Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
 
 ---
 
 ## Final section: Documentation reconciliation
 
-> **Triggered by:** `implement` gate approved, user confirms happy.
+> **Triggered by:** `implement` approval approved, user confirms happy.
 > **Goal:** Update all CONTEXT.md files in `manifest.context_targets` to reflect this change.
 
 - [ ] Run `context-verify.mjs` — baseline drift report
@@ -100,5 +113,5 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Re-stamp provenance on all updated CONTEXT.md files (`validated-at: <HEAD sha>`)
 - [ ] Verifier subagent: confirm CONTEXT claims match implemented code
 - [ ] Present reconciliation summary to user
-- [ ] User approves → docs gate → approved
+- [ ] User approves → docs approval → approved
 - [ ] Run `change-archive.mjs` → zip to `.changes/archive/{{id}}.zip`

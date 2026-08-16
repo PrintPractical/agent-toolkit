@@ -18,7 +18,7 @@
 <!--
 For firm seams, add:
 Criteria:
-  - [SEAM-{{component}}-{{name}}-01] {{behavioral assertion}} → enforced-by: {{test/path}}
+  - [SEAM-{{component}}-{{name}}-01] {{behavioral assertion}} → enforced-by: {{repository-root-relative test path}}
 -->
 
 ## Interfaces / Contracts
@@ -69,6 +69,14 @@ Example:
 <!--
 Be specific. Vague entries ("refactor someday") are useless. Specify what is wrong and what a better solution would look like.
 -->
+
+## Review Evidence
+
+{{Current review-cycle references that support material architecture, contract, or implementation claims in this context. Keep only useful current-state evidence; do not copy full historical finding logs.}}
+
+| Change ID | Cycle | Artifact | Relevant finding IDs / outcome |
+|---|---|---|---|
+| `{{change-id}}` | AV / SV / RV | `{{artifact path}}` | {{IDs or clean evidence-based outcome}} |
 
 {{#if root}}
 ## Children

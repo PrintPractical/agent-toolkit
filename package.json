@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node packages/build/sync-shared.mjs",
     "test": "node --test packages/build/__tests__/*.test.mjs",
-    "verify": "node packages/build/context-verify.mjs --all"
+    "verify": "node packages/build/context-verify.mjs --all --run-tests"
   },
   "engines": {
     "node": ">=18.0.0"

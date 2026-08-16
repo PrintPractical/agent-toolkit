@@ -78,7 +78,7 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 **Audit sources:** {{role names/report references}}
 **Disposition note:** {{selection, deferral, rejection, blocker, completion, or architect handoff reason}}
 
-## Selection gate
+## Selection approval
 
 **User response (verbatim):** {{exact response}}
 **Selected IDs:** `["{{RF-...}}"]` | audit-only
@@ -88,10 +88,10 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 **Escalated IDs:** {{list and architect handoff reason}}
 **Selected at:** {{timestamp}}
 
-**Selection gate:** pending | audit-only | approved-for-exact-IDs
-**Selection gate command:** `node "$SKILL_DIR/scripts/manifest-gate.mjs" --id {{id}} --gate refactor --approve`
+**Selection approval:** pending | audit-only | approved-for-exact-IDs
+**Selection approval command:** `node "$SKILL_DIR/scripts/manifest-approval.mjs" --id {{id}} --approval refactor --approve`
 
-<!-- Use --approve only after each selected RF ID has a complete ranked record with Status: selected and appears explicitly in the verbatim response, assigned once to a batch below. For audit-only, stop after recording the ranked inventory (or no-actionable-opportunities) and the verbatim audit-only selection; leave the refactor gate pending. -->
+<!-- Use --approve only after each selected RF ID has a complete ranked record with Status: selected and appears explicitly in the verbatim response, assigned once to a batch below. For audit-only, stop after recording the ranked inventory (or no-actionable-opportunities) and the verbatim audit-only selection; leave the refactor approval pending. -->
 
 ## Existing baseline
 
@@ -139,18 +139,28 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 
 **Notes:** {{scope amendments, findings, or none}}
 
-## Independent review (implement gate)
+## Bounded independent review (implement approval)
+
+**Policy:** `references/adversarial-review.md` and `references/implementation-review.md`
+**Cycle:** `refactor-N`
+
+Use the current manifest review epoch.
+**Cycle bound:** one broad discovery pass; one consolidated blocker/major batch; one remediation; focused verification of original `RV-*` IDs; at most one targeted correction/reverification
 
 **Auditor (fresh subagent):** {{self-declared label; not the implementer}}
-**Auditor command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding "<file:line> [category] <action>"`
+**Auditor command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --phase refactor --cycle refactor-N --role auditor --reviewer "<label>" --verdict <approved|changes-requested> --finding '<structured finding JSON>'`
 
-| Finding | Category | Evidence | Required action | Status |
-|---|---|---|---|---|
-| {{summary}} | safety / idioms / structure / hygiene | `{{file:line}}` | {{action}} | unresolved / resolved |
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Focused verification |
+|---|---|---|---|---|---|---|---|---|
+
+<!-- Add a row only for each issued RV finding. Use Disposition: resolved | unresolved. -->
 
 **Verifier (distinct fresh subagent):** {{self-declared label; not the implementer or auditor}}
 **Verifier verdict:** pending | approved | changes-requested
-**Verifier command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --stage refactor --role verifier --reviewer "<distinct label>" --verdict approved`
+**Verifier command:** `node "$SKILL_DIR/scripts/review-log.mjs" record --id {{id}} --phase refactor --cycle refactor-N --role verifier --reviewer "<distinct label>" --verdict approved --resolution RV-001=resolved`
+**Verification scope:** original RV IDs plus any remediation-caused blocker regression recorded through `--regression`; no broad rediscovery or new low/major findings
+**Targeted correction/reverification used:** no | yes - {{original RV IDs and blocker regression closed through `--regression-resolution`}}
+**Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
 
 ## Full verification
 
@@ -165,13 +175,13 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 
 **Skipped checks and justification:** {{none or explicit list}}
 
-## Implement gate
+## Implement approval
 
-**Implement-gate command:** `node "$SKILL_DIR/scripts/manifest-gate.mjs" --id {{id}} --gate implement --approve`
-**Implement-gate user response:** {{verbatim}}
-**Implement gate:** pending | approved
+**Implement-approval command:** `node "$SKILL_DIR/scripts/manifest-approval.mjs" --id {{id}} --approval implement --approve`
+**Implement-approval user response:** {{verbatim}}
+**Implement approval:** pending | approved
 
-<!-- The gate refuses until an approved verifier review (stage refactor) backed by a distinct auditor review exists. -->
+<!-- The approval refuses until an approved verifier review (phase refactor) backed by a distinct auditor review exists. -->
 
 ## Documentation reconciliation
 
@@ -179,8 +189,8 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 **CONTEXT files changed:** {{paths and exact sections, or none}}
 **Firm contracts/criteria changed:** none (otherwise this workflow must stop and route to architect)
 **Provenance stamps:** {{paths and SHA}}
-**Docs-gate user response:** {{verbatim}}
-**Docs gate:** pending | approved
+**Docs-approval user response:** {{verbatim}}
+**Docs approval:** pending | approved
 
 ## Outcome and archive
 

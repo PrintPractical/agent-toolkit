@@ -1,11 +1,11 @@
 ---
 name: specify
-description: Use after architect gate is approved to run the specification stage. Batches material decisions with recommendations, requires explicit confirmation of each, finalizes interface changes, then runs an adversarial implement-as-if dry run for unresolved blockers. Emits decisions.md and reconciles architecture.md. Do not run unless the architect gate is approved.
+description: Use after architect approval is approved to run the specification phase. Batches material decisions with recommendations, requires explicit confirmation of each, finalizes interface changes, then runs an adversarial implement-as-if dry run for unresolved blockers. Emits decisions.md and reconciles architecture.md. Do not run unless the architect approval is approved.
 ---
 
 # Specify
 
-You are running the **specify** stage of the agent-toolkit pipeline. Spine stage 2. Your job is to eliminate every implementation ambiguity before `plan` and `implement` run. If a question is not answered here, it becomes a kickback during `implement` — which means the spec process failed.
+You are running the **specify** phase of the agent-toolkit pipeline. Spine phase 2. Your job is to settle every material behavioral and contract decision before `plan` and `implement`, while preserving implementation freedom for local, reversible, idiomatic choices. An unresolved material decision becomes a kickback during `implement`.
 
 **If `manifest.class = epic`:** Follow the Epic Specify path at the bottom of this file. Epic specify is scoped to cross-cutting contracts only — not per-child implementation details.
 
@@ -21,13 +21,13 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-Same adversarial posture as `architect`. Re-read `references/challenge-protocol.md`. Here you are drilling down from architectural decisions to implementation specifics. Recommend the best solution for every material decision, including the rationale. The user makes every material decision explicitly; silence, omission, or an ambiguous grouped reply is never acceptance.
+Same adversarial posture as `architect`. Re-read `references/challenge-protocol.md`, `references/adversarial-review.md`, and `references/engineering-fundamentals.md`. Recommend the best solution for each user-owned material decision. Ask the user only about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, and meaningful architectural or operational tradeoffs. Auto-select conventional idiomatic choices that are local/private/reversible; silence is never acceptance for a decision that truly needs the user.
 
 ## Preconditions
 
 Load `manifest.yaml`. Verify:
-- `stage` is `specify` (i.e., architect gate was approved).
-- `gates.specify` is `pending`.
+- `phase` is `specify` (i.e., architect approval was approved).
+- `approvals.specify` is `pending`.
 - `architecture.md` exists and has a passed validity check.
 - **If `class = epic`:** jump to the Epic Specify section below.
 
@@ -35,7 +35,7 @@ If preconditions fail, tell the user what's wrong and which step to run instead.
 
 Load `architecture.md` fully. This is your spec baseline.
 
-If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for interface design guidance. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+If `manifest.language` is set, use the `idioms` skill to load its matching pack for interface design guidance. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## Phase 1: Interface inventory
 
@@ -44,18 +44,18 @@ Before the interview, extract from `architecture.md`:
 - All interfaces mentioned in the decisions
 - All refactors in scope
 
-List them. These are the ambiguity sources. Ask only about material decisions: contracts, behavior, compatibility, safety, configuration, observability, and firm seams. Use repository conventions for implementation details unless they conflict with a confirmed decision.
+List them as review scope. Ask only when a choice crosses the materiality boundary. Configuration or observability details are user-owned only when they define a public/operational contract, security policy, costly commitment, or meaningful tradeoff. Use repository conventions and idioms for local/private/reversible details.
 
 ## Phase 2: Batched decision confirmation
 
 Conduct a systematic confirmation interview in concise numbered batches. Rules:
-- Each item states the material question, the agent's recommendation, its rationale, and meaningful alternatives.
+- Each item states a user-owned material question, the agent's recommendation, its rationale, and meaningful alternatives.
 - Require an explicit response for every item: `accept`, choose an alternative, or provide a decision. The user may respond compactly by item number.
 - A missing, vague, or ambiguous answer stays `unresolved`. Follow up only on unresolved items; never infer acceptance from silence.
 - Challenge an answer only when it is vague, introduces a smell, or conflicts with the idioms pack. If the user overrides a challenge, record the recommendation, user decision, and reasoning if given.
-- Stop when every material item is explicitly confirmed. Do not create user questions for implementation details governed by repository convention.
+- Stop when every user-owned material item is explicitly confirmed. Do not create questions or ledger rows for local/private/reversible details governed by repository convention and idioms.
 
-Question categories (cover all that apply):
+Examine these categories, but ask only where the choice crosses the materiality boundary:
 1. **Interface definitions** — exact signatures, types, error conditions, edge cases
 2. **Data contracts** — field names, types, required vs optional, validation rules
 3. **Error handling** — every failure mode mentioned in `architecture.md`, what happens
@@ -68,23 +68,22 @@ Question categories (cover all that apply):
 
 Keep a confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status. You'll need it for `decisions.md`.
 
-## Phase 3: Implement-as-if dry run
+## Phase 3: Bounded implement-as-if review
 
-When every material item is confirmed, spin off a subagent to act as an implementer and attempt to implement the change *without writing any code* — only describe what they would do and where they get stuck.
+After confirmation, run exactly one `SV-*` cycle from `references/adversarial-review.md`. A fresh implementer-critic performs one broad, read-only implement-as-if pass over `architecture.md`, the draft decisions, and relevant repository context. It reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. It must not prescribe private control flow merely because implementation freedom remains.
 
-Subagent prompt:
-> "You are implementing the following change. You have architecture.md and decisions.md. Walk through the implementation step by step. At each step, describe what you would write. Flag any ambiguity, missing information, conflicting requirement, or decision you'd have to make on your own. Do not write code — only describe and flag."
+Consolidate every finding into one batch. Each finding has a stable `SV-NNN` ID, severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and concrete alternative. Do not emit low-severity findings or mandatory `N/A` rows.
 
-Hand the subagent: `architecture.md` + the interview log so far.
+Remediate the complete batch once. Obtain user confirmation only for remediation crossing the materiality boundary; auto-select local/private/reversible conventional idiomatic choices. Then launch a fresh verifier to check only the original IDs. Verification does not repeat discovery, expand scope, or introduce new low/major findings. A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad investigation, stop instead of extending the cycle.
 
-Classify every dry-run finding as one of:
-- `blocker` — cannot implement without a material decision. If it is not already covered by a confirmed choice, add it to the next confirmation batch.
-- `assumption` — a documented implementation assumption that does not change a confirmed decision. Record its disposition; do not reopen the interview.
-- `implementation-detail` — governed by repository convention or implementer judgment. Record its disposition; do not reopen the interview.
+Record the discovery and verification under the current manifest `specify-N` epoch with `review-log.mjs`. The auditor uses structured `--finding` JSON from the shared policy; the verifier supplies one `--resolution SV-NNN=resolved|unresolved` for every original finding. An approved clean auditor still requires a distinct verifier:
 
-If a finding contradicts a confirmed choice, present the conflict explicitly and obtain a new explicit confirmation before replacing that choice. Only unresolved blockers return to Phase 2. Record the iteration number.
-
-**If the dry run is clean:** proceed.
+```
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-N \
+  --role auditor --reviewer "<fresh label>" --verdict approved
+node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycle specify-N \
+  --role verifier --reviewer "<distinct fresh label>" --verdict approved
+```
 
 ## Phase 4: Write decisions.md
 
@@ -92,7 +91,7 @@ Fill `decisions.md` from `references/templates/decisions.md.tmpl`. Include:
 - A complete confirmation ledger before the prose decisions
 - All interface changes (complete, exact)
 - Full decision log (batch item → recommendation → explicit resolution, challenges, overrides)
-- Dry-run iteration results
+- The bounded `SV-*` review cycle and focused verification results
 - Architecture reconciliation notes (any disparities found in architecture.md and how they were fixed)
 
 Write to: `.changes/active/<id>/decisions.md`
@@ -105,15 +104,15 @@ Compare `decisions.md` against `architecture.md`. If any decision changes, clari
 - Update `architecture.md` to reflect the refined understanding.
 - Note the reconciliation in `decisions.md` under "Architecture Reconciliation."
 
-## Phase 6: Gate
+## Phase 6: Approval
 
 Present the confirmation ledger, interfaces finalized, and dry-run findings. Ask the user to confirm the ledger accurately represents their choices. Then ask:
 
-> "Every material decision is explicitly confirmed and the dry-run has no unresolved blockers. Do you approve the specify gate? (This will advance to `plan`.)"
+> "Every user-owned material decision is explicitly confirmed and the bounded specification review has no unresolved blockers. Do you approve the specify approval? (This will advance to `plan`.)"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate specify --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval specify --approve
 ```
 
 Tell the user: **run `plan` next.**
@@ -123,21 +122,22 @@ Tell the user: **run `plan` next.**
 If you are running `specify` because `implement` kicked back (not a fresh session), treat it as an amendment session:
 - Load the kickback entry from `manifest.yaml`.
 - Address only the gap identified in the kickback.
-- Run a targeted dry-run covering just that gap. Classify findings; only unresolved blockers reopen confirmation.
+- Run the current `specify-N` formal cycle scoped only to that recorded gap; do not restart broad discovery. If it reveals a new material decision, confirm that decision and record it under the kickback rather than broadening the cycle.
 - Update `decisions.md` with the new resolution.
 - Reconcile `architecture.md` if needed.
 - Set the latest kickback entry's `resolution` in `manifest.yaml` to the actual decision. Do not leave it empty or use a placeholder such as `pending`.
-- Re-approve only the invalidated gate(s). A specify-impacting kickback requires specify then plan; a plan-only kickback requires only plan.
-- Confirm the manifest's recommended next stage before telling the user to resume implementation.
+- Re-approve only the invalidated approval(s). A specify-impacting kickback requires specify then plan; a plan-only kickback requires only plan.
+- Confirm the manifest's recommended next phase before telling the user to resume implementation.
 
 ## Reference files
 
 - `references/challenge-protocol.md`
+- `references/adversarial-review.md` — bounded `SV-*` review cycle and finding schema
 - `references/seam-and-test-taxonomy.md`
 - `references/manifest-schema.md` — kickback types and epic model
 - `references/firm-change-protocol.md` — if a firm interface must change
 - `references/templates/decisions.md.tmpl`
-- `references/idioms/<lang>.md` — interface design guidance
+- `idioms` skill — matching interface-design guidance
 
 ---
 
@@ -167,20 +167,19 @@ From `architecture.md`, extract:
 
 List them. These are the only things this session covers.
 
-**Phase E2: One-question-at-a-time interview (cross-cutting only)**
+**Phase E2: Batched decisions (cross-cutting only)**
 
-Same adversarial discipline as standard specify, but scoped strictly:
+Use the standard materiality boundary and confirmation discipline, scoped strictly. Ask only about shared public contracts, security policy, compatibility/migration, firm seams, costly commitments, or meaningful cross-child architectural/operational tradeoffs. Auto-select local/private/reversible conventional choices. Examine:
 - Exact type signatures, message formats, error types for each shared interface
 - Which child owns (authors) each shared contract vs which children consume it
 - Versioning / evolution rules: can a shared interface change mid-epic without breaking other children?
 - Ordering constraints: if child A produces an interface that child B consumes, must A's interface be complete before B starts its `specify`?
 
-**Phase E3: Dry run**
+**Phase E3: Bounded cross-child review**
 
-Spin off a subagent:
-> "You are implementing these N child changes. You have the epic's architecture.md and decisions.md. Walk through the interface boundaries between children. Flag any gap, ambiguity, or contract that one child produces and another consumes that is not fully specified."
+Run exactly one `SV-*` cycle over all cross-child contracts. One fresh critic makes one broad implement-as-if pass across every child boundary and all applicable review dimensions. Present one consolidated blocker/major batch using stable `SV-NNN` IDs, the required categories, evidence, concrete impact, and alternatives. Remediate once, asking the user only for material decisions. A fresh verifier checks only original IDs; allow at most one targeted correction/reverification, with no repeated discovery or new low/major findings. Record the cycle under `Dry-Run Findings`. If an original blocker remains, do not decompose the epic.
 
-If ambiguities are found, loop back to Phase E2.
+Record the auditor and verifier through `review-log.mjs` under the current `specify-N` epoch exactly as in the standard path.
 
 **Phase E4: Write epic decisions.md**
 
@@ -193,11 +192,11 @@ Write `decisions.md` covering:
 
 Write to: `.changes/active/<id>/decisions.md`
 
-**Phase E5: Gate + auto-decompose (you run this, not the user)**
+**Phase E5: Approval + auto-decompose (you run this, not the user)**
 
-First, approve the specify gate:
+First, approve the specify approval:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate specify --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval specify --approve
 ```
 
 **Then immediately run epic-split automatically** — do not ask the user to do this manually. Read the "Proposed Child Changes" section from `architecture.md` and the ordering/ownership decisions from `decisions.md`, construct the children JSON, and run:
@@ -219,14 +218,12 @@ node "$SKILL_DIR/scripts/epic-split.mjs" --epic <id> --children '[
 ]'
 ```
 
-**Note on existing epic manifests with extra gates:** If the epic manifest has `plan`, `implement`, or `docs` gates (created before this fix), they are harmless — they are never read for epics. You can leave them as-is. Going forward, new epics only get `architect` and `specify` gates.
-
 Each child gets an `architect-seed.md` with its notes and implicit access to the epic's arch+decisions as parent context.
 
 After epic-split completes, tell the user:
 > "Epic decomposed. [N] child changes created. Each child's `architect` session will inherit this epic's architecture and decisions as parent context.
 >
-> **Work depth-first: take one child all the way to `done` (architect → specify → plan → implement) before starting the next.** Do not architect/specify all children up front — the cross-cutting contracts are already locked here at the epic level, so each child is insulated from the others. Finishing one child gives working software and lessons that inform the next.
+> **Work depth-first: take one child all the way to `archive-ready` (architect → specify → plan → implement → archive-ready) before starting the next.** Do not archive a completed child independently: the epic retains all archive-ready children and archives them in one coordinated verified operation after every child is ready.
 >
 > Suggested order (based on dependencies):
 > 1. `[child-id-1]` — [title] (no dependencies, start here)

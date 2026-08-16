@@ -65,12 +65,16 @@ if (values.class === 'refactor' && !['execute', 'audit-only'].includes(values.mo
 
 const repoRoot = process.cwd();
 
-// Validate parent exists and is an epic
+// Validate parent before creating anything so rejected requests leave no orphan.
 if (values.parent) {
   try {
     const parentManifest = readManifest(values.parent, repoRoot);
     if (parentManifest.class !== 'epic') {
       console.error(`Error: parent '${values.parent}' is not an epic (class: ${parentManifest.class}). Only epics can have children.`);
+      process.exit(1);
+    }
+    if (parentManifest.phase !== 'specify' || parentManifest.approvals?.architect !== 'approved' || parentManifest.approvals?.specify !== 'approved') {
+      console.error(`Error: parent '${values.parent}' must have approved architect and specify approvals before a child can be created.`);
       process.exit(1);
     }
   } catch (e) {
@@ -85,12 +89,16 @@ const dir = changeDir(id, repoRoot);
 console.error(`Creating change: ${id}`);
 fs.mkdirSync(dir, { recursive: true });
 
-// Epics only use architect + specify gates. They never run plan/implement/docs.
+// Epics only use architect + specify + coordinated docs approvals.
 // Refactors skip the spec spine: refactor (audit + selection) → implement → docs.
-const gates = values.class === 'epic'
-  ? { architect: 'pending', specify: 'pending' }
+const approvals = values.class === 'epic'
+  ? { architect: 'pending', specify: 'pending', docs: 'pending' }
   : values.class === 'refactor'
-  ? { refactor: 'pending', implement: 'pending', docs: 'pending' }
+  ? values.mode === 'audit-only'
+    ? { refactor: 'pending' }
+    : { refactor: 'pending', implement: 'pending', docs: 'pending' }
+  : ['bug', 'small'].includes(values.class)
+  ? { implement: 'pending', docs: 'pending' }
   : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' };
 
 const isRefactor = values.class === 'refactor';
@@ -99,21 +107,23 @@ const manifest = {
   id,
   title: values.title,
   class: values.class,
-  stage: isRefactor ? 'refactor' : 'architect',
+  phase: isRefactor ? 'refactor' : ['bug', 'small'].includes(values.class) ? 'implement' : 'architect',
   language: values.language,
   ...(values.parent ? { parent: values.parent } : {}),
   ...(values.class === 'epic' ? { children: [] } : {}),
   ...(isRefactor ? { refactor_mode: values.mode, refactor_selected_ids: [] } : {}),
-  gates,
+  approvals,
   artifacts: isRefactor
-    ? { refactor: 'refactor.md' }
+    ? { change_brief: 'change-brief.md', refactor: 'refactor.md' }
     : {
+        change_brief: 'change-brief.md',
         architecture: 'architecture.md',
         decisions:    'decisions.md',
         plan:         'plan.md',
       },
   context_targets: ['CONTEXT.md'],
   kickbacks: [],
+  review_epochs: {},
 };
 
 writeManifest(id, manifest, repoRoot);
@@ -123,15 +133,15 @@ console.error(`Manifest written: ${path.join(dir, 'manifest.yaml')}`);
 if (values.parent) {
   addChildToEpic(values.parent, id, repoRoot);
   console.error(`Linked as child of epic: ${values.parent}`);
-  console.error(`Stage: architect — run the 'architect' skill next (child change)`);
+  console.error(`Phase: ${manifest.phase} — run the '${manifest.phase === 'implement' ? 'triage' : 'architect'}' skill next (child change)`);
 } else if (values.class === 'epic') {
-  console.error(`Stage: architect — run the 'architect' skill next`);
+  console.error(`Phase: architect — run the 'architect' skill next`);
   console.error(`  Epic flow: architect → specify → (auto-decompose into children)`);
 } else if (isRefactor) {
-  console.error(`Stage: refactor — run the 'refactor' skill next`);
+  console.error(`Phase: refactor — run the 'refactor' skill next`);
   console.error(`  Refactor flow: refactor (audit + selection) → implement (execute + review) → docs`);
 } else {
-  console.error(`Stage: architect — run the 'architect' skill next`);
+  console.error(`Phase: ${manifest.phase} — run the '${manifest.phase === 'implement' ? 'triage' : 'architect'}' skill next`);
 }
 
 // Write to stdout as JSON for agent consumption

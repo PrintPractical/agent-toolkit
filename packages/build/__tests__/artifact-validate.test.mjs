@@ -4,18 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { validateGateArtifacts, writeManifest } from '../lib/index.mjs';
+import { appendReview, validateApprovalArtifacts, writeManifest } from '../lib/index.mjs';
 
-describe('validateGateArtifacts', () => {
+const templateDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..', '_templates');
+
+describe('validateApprovalArtifacts', () => {
   let cwd;
   let manifest;
 
   beforeEach(() => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-artifacts-'));
     manifest = {
-      id: '2026-08-06-artifacts', title: 'Artifacts', class: 'feature', stage: 'specify',
+      id: '2026-08-06-artifacts', title: 'Artifacts', class: 'feature', phase: 'specify',
       artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
-      gates: {}, context_targets: [], kickbacks: [],
+      approvals: {}, context_targets: [], kickbacks: [],
     };
     writeManifest(manifest.id, manifest, cwd);
   });
@@ -31,7 +33,7 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none |  | unresolved |  |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'specify', cwd);
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /not explicitly confirmed/);
   });
@@ -45,7 +47,7 @@ describe('validateGateArtifacts', () => {
       '| A-001 | q | r | none |  | unresolved |  |',
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'architect', cwd);
+    const result = validateApprovalArtifacts(manifest, 'architect', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /architecture confirmation ledger row is not explicitly confirmed/);
   });
@@ -58,8 +60,9 @@ describe('validateGateArtifacts', () => {
       '|---|---|---|---|---|---|---|',
       '| A-001 | q | r | none | accept | confirmed | yes |',
       '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+      '## Review Cycle Reference', 'Cycle: architect-1',
     ].join('\n'));
-    assert.equal(validateGateArtifacts(manifest, 'architect', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'architect', cwd).valid, true);
   });
 
   it('allows non-blocking dry-run findings after explicit confirmation', () => {
@@ -71,8 +74,9 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none | accept | confirmed | yes |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
       '**Classification:** assumption', '**Disposition:** accepted-assumption',
+      '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
-    assert.equal(validateGateArtifacts(manifest, 'specify', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'specify', cwd).valid, true);
   });
 
   it('rejects unresolved blocker findings', () => {
@@ -84,8 +88,22 @@ describe('validateGateArtifacts', () => {
       '| D-001 | q | r | none | accept | confirmed | yes |',
       '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
       '**Classification:** blocker', '**Disposition:** unresolved',
+      '## Review Cycle Reference', 'Cycle: specify-1',
     ].join('\n'));
-    const result = validateGateArtifacts(manifest, 'specify', cwd);
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /unresolved dry-run blocker/);
+  });
+
+  it('rejects unresolved blockers in canonical review tables', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'decisions.md'), [
+      '## Confirmation Ledger', '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+      '| ID | Severity | Disposition |', '|---|---|---|', '| SV-001 | blocker | unresolved |',
+      '## Review Cycle Reference', 'Cycle: specify-1',
+    ].join('\n'));
+
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /unresolved dry-run blocker/);
   });
@@ -103,7 +121,7 @@ describe('validateGateArtifacts', () => {
       '  - Errors and invariants: Do not persist any record when validation fails.',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
   });
 
   it('rejects a fenced source-code function in a plan', () => {
@@ -120,7 +138,7 @@ describe('validateGateArtifacts', () => {
       '```',
     ].join('\n'));
 
-    const result = validateGateArtifacts(manifest, 'plan', cwd);
+    const result = validateApprovalArtifacts(manifest, 'plan', cwd);
     assert.equal(result.valid, false);
     assert.match(result.errors.join('\n'), /fenced source-code block/);
   });
@@ -135,6 +153,159 @@ describe('validateGateArtifacts', () => {
       '- [ ] Add `import_records(records: Vec<Record>) -> Result<(), ImportError>` to `src/import.rs`.',
     ].join('\n'));
 
-    assert.equal(validateGateArtifacts(manifest, 'plan', cwd).valid, true);
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
+  });
+
+  it('accepts canonical and legacy firm-seam test labels', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    const plan = label => [
+      '## Traceability check', '| AC ID | Task(s) | Firm-seam test task |', '|---|---|---|',
+      '| AC-001 | Section 1, Task 1 | Section 1, Task 1 |', `- [ ] Write test ${label}`,
+    ].join('\n');
+
+    fs.writeFileSync(path.join(dir, 'plan.md'), plan('[seam: SEAM-001] [firmness: firm]'));
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
+    fs.writeFileSync(path.join(dir, 'plan.md'), plan('[seam: SEAM-001, firmness: firm]'));
+    assert.equal(validateApprovalArtifacts(manifest, 'plan', cwd).valid, true);
+  });
+
+  it('requires review-cycle references for feature architecture and decisions', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none | accept | confirmed | yes |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'decisions.md'), [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| D-001 | q | r | none | accept | confirmed | yes |',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+    ].join('\n'));
+
+    assert.match(validateApprovalArtifacts(manifest, 'architect', cwd).errors.join('\n'), /Review Cycle Reference/);
+    assert.match(validateApprovalArtifacts(manifest, 'specify', cwd).errors.join('\n'), /Review Cycle Reference/);
+  });
+
+  it('does not require N/A review boilerplate for exempt bug artifacts', () => {
+    manifest.class = 'bug';
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| A-001 | q | r | none | accept | confirmed | yes |',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+
+    assert.equal(validateApprovalArtifacts(manifest, 'architect', cwd).valid, true);
+  });
+
+  it('accepts empty confirmation ledgers without placeholder N/A rows', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', 'No material decisions.', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Architectural Decisions', '## Seams', '## Validity Check Results', '**Status:** passed',
+      '## Review Cycle Reference', 'Cycle: architect-1',
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'decisions.md'), [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+      '## Review Cycle Reference', 'Cycle: specify-1',
+    ].join('\n'));
+
+    const architectResult = validateApprovalArtifacts(manifest, 'architect', cwd);
+    const specifyResult = validateApprovalArtifacts(manifest, 'specify', cwd);
+    assert.equal(architectResult.valid, true, architectResult.errors.join('\n'));
+    assert.equal(specifyResult.valid, true, specifyResult.errors.join('\n'));
+  });
+
+  it('accepts clean canonical review templates with formal review attestations', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    const architecture = fs.readFileSync(path.join(templateDir, 'architecture.md.tmpl'), 'utf8')
+      .replace('`architect-N`', '`architect-1`')
+      .replace('**Status:** pending | passed | passed-after-resolution', '**Status:** passed');
+    const decisions = fs.readFileSync(path.join(templateDir, 'decisions.md.tmpl'), 'utf8')
+      .replace('`specify-N`', '`specify-1`');
+    const plan = fs.readFileSync(path.join(templateDir, 'plan.md.tmpl'), 'utf8');
+    fs.writeFileSync(path.join(dir, 'architecture.md'), architecture);
+    fs.writeFileSync(path.join(dir, 'decisions.md'), decisions);
+    fs.writeFileSync(path.join(dir, 'plan.md'), plan);
+    appendReview(manifest.id, { version: 2, cycle: 'architect-1', phase: 'architect', role: 'auditor', reviewer: 'critic-a', verdict: 'approved', findings: [], at: new Date().toISOString() }, cwd);
+    appendReview(manifest.id, { version: 2, cycle: 'specify-1', phase: 'specify', role: 'auditor', reviewer: 'critic-b', verdict: 'approved', findings: [], at: new Date().toISOString() }, cwd);
+
+    const architectResult = validateApprovalArtifacts(manifest, 'architect', cwd);
+    const specifyResult = validateApprovalArtifacts(manifest, 'specify', cwd);
+    const planResult = validateApprovalArtifacts(manifest, 'plan', cwd);
+    assert.equal(architectResult.valid, true, architectResult.errors.join('\n'));
+    assert.equal(specifyResult.valid, true, specifyResult.errors.join('\n'));
+    assert.equal(planResult.valid, true, planResult.errors.join('\n'));
+  });
+
+  it('keeps validator-recognized example finding IDs out of canonical templates', () => {
+    for (const [name, prefix] of [['architecture.md.tmpl', 'AV'], ['decisions.md.tmpl', 'SV'], ['plan.md.tmpl', 'RV'], ['refactor.md.tmpl', 'RV']]) {
+      const content = fs.readFileSync(path.join(templateDir, name), 'utf8');
+      assert.doesNotMatch(content, new RegExp(`^\\|\\s*${prefix}-[0-9]{3}\\s*\\|`, 'mi'));
+      assert.match(content, /^\| ID \| Severity \|.*\| Disposition \|/m);
+    }
+  });
+
+  it('requires artifact finding IDs to match the structured review log', () => {
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    fs.writeFileSync(path.join(dir, 'architecture.md'), [
+      '## Summary', 'x', '## Architecture Confirmation Ledger',
+      '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '## Architectural Decisions', 'x', '## Seams', 'x',
+      '## Review Cycle Reference', 'Cycle: architect-1',
+      '## Validity Check Results', '**Status:** passed',
+    ].join('\n'));
+    appendReview(manifest.id, {
+      version: 2, cycle: 'architect-1', phase: 'architect', role: 'auditor', reviewer: 'critic-a',
+      verdict: 'changes-requested', findings: [{
+        id: 'AV-001', severity: 'major', category: 'correctness', location: 'architecture.md:1',
+        impact: 'contract is incomplete', alternative: 'define the missing contract',
+      }], at: new Date().toISOString(),
+    }, cwd);
+
+    let result = validateApprovalArtifacts(manifest, 'architect', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /missing: AV-001/);
+
+    fs.appendFileSync(path.join(dir, 'architecture.md'), '\n' + [
+      '| ID | Severity | Category | Evidence | Concrete impact | Alternative | Remediation | Review log |',
+      '|---|---|---|---|---|---|---|---|',
+      '| AV-001 | major | correctness | architecture.md:1 | contract is incomplete | define it | complete | reviews.json |',
+    ].join('\n'));
+    result = validateApprovalArtifacts(manifest, 'architect', cwd);
+    assert.equal(result.valid, true, result.errors.join('\n'));
+  });
+
+  it('requires decisions to reference the current specify review epoch', () => {
+    manifest.review_epochs = { specify: 2 };
+    const dir = path.join(cwd, '.changes', 'active', manifest.id);
+    const decisions = cycle => [
+      '## Confirmation Ledger',
+      '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
+      '|---|---|---|---|---|---|---|',
+      '| D-001 | q | r | none | accept | confirmed | yes |',
+      '## Interface Changes', '## Decision Log', '## Dry-Run Findings',
+      '## Review Cycle Reference', `Cycle: ${cycle}`,
+    ].join('\n');
+
+    fs.writeFileSync(path.join(dir, 'decisions.md'), decisions('specify-2'));
+    assert.equal(validateApprovalArtifacts(manifest, 'specify', cwd).valid, true);
+
+    fs.writeFileSync(path.join(dir, 'decisions.md'), decisions('specify-1'));
+    const result = validateApprovalArtifacts(manifest, 'specify', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /must be specify-2/);
   });
 });

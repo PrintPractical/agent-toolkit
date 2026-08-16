@@ -19,7 +19,7 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-Read `references/drift-control.md` now. The core asymmetry:
+Before reading references, discovering context, or launching a subagent, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. Then read `references/drift-control.md`. The core asymmetry:
 - **Soft divergence:** the code changed; update the CONTEXT.md to match. Code is ground truth.
 - **Firm divergence:** do NOT silently rewrite. Surface to the user: intentional change (→ firm-change protocol) or regression (→ flag as bug)?
 

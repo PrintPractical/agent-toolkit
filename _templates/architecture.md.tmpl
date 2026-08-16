@@ -15,13 +15,11 @@
 
 ## Architecture Confirmation Ledger
 
-Every material architectural topic must have an explicit user response. `unresolved` rows block the architect gate; missing responses are never inferred as acceptance.
+Every user-owned material architectural topic must have an explicit response. User-owned means public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Local/private/reversible conventional choices are agent-owned and do not get ledger rows. `unresolved` rows block approval.
 
 | ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
 |---|---|---|---|---|---|---|
-| A-001 | {{question}} | {{recommended direction and why}} | {{meaningful alternatives}} | {{accept | selected alternative | supplied decision}} | confirmed | {{selected direction}} |
-
-<!-- Repeat for every material decision, seam, refactor, observability requirement, testability requirement, and epic child breakdown. Use `unresolved` until explicitly confirmed. If none, write one row with A-000 and status confirmed. -->
+<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, leave the table empty and state that no user-owned material decision was needed. -->
 
 ## Architectural Decisions
 
@@ -47,10 +45,34 @@ Every material architectural topic must have an explicit user response. `unresol
 
 {{#if firm}}
 **Criteria:**
-- [SEAM-{{id}}-{{seq}}] {{behavioral assertion}} → will-enforce-by: {{planned test path}}
+- [SEAM-{{id}}-{{seq}}] {{behavioral assertion}} → enforced-by: {{repository-root-relative planned test path}}
 {{/if}}
 
 <!-- Repeat for each seam -->
+
+## Data and State Strategy
+
+{{When applicable, describe domain state, ownership, legal transitions, persistence, and why the selected data structures fit the operations and scale. Keep local representations implementation-owned.}}
+
+## Interface and Ownership Strategy
+
+{{When applicable, describe public seams, dependency direction, lifecycle, and why an interface/trait/protocol is warranted. Do not prescribe private abstractions.}}
+
+## Error and Failure Model
+
+{{When applicable, describe observable error semantics, recovery, cancellation, partial failure, and resource cleanup.}}
+
+## Security and Trust Boundaries
+
+{{When applicable, describe validation, authorization, sensitive data, abuse boundaries, and security policy.}}
+
+## Simplicity and Maintainability
+
+{{Record material responsibility boundaries, dependency direction, and avoided complexity. Do not turn routine local choices into architecture.}}
+
+## Agent-Selected Defaults
+
+{{Optional concise record of consequential conventional choices selected without user confirmation. Omit incidental local choices.}}
 
 ## Refactors Taken On
 
@@ -67,7 +89,7 @@ Every material architectural topic must have an explicit user response. `unresol
 
 ## Observability Requirements
 
-{{What must be instrumented, traced, or metered as part of this change. Not optional.}}
+{{When operationally applicable, state what must be instrumented, traced, or metered. Otherwise give one concise reason; do not add an N/A checklist.}}
 
 ## Testability Requirements
 
@@ -77,16 +99,30 @@ Every material architectural topic must have an explicit user response. `unresol
 
 {{Known unknowns, external dependencies that could affect the design, areas where the dry-run in specify should probe hardest.}}
 
+## Review Cycle Reference
+
+**Policy:** `references/adversarial-review.md`
+**Cycle:** `architect-N`
+
+Use the current manifest review epoch.
+**Finding prefix:** `AV-`
+**Cycle bound:** one broad discovery pass; one consolidated blocker/major batch; one remediation; focused verification of original IDs; at most one targeted correction/reverification
+
 ## Validity Check Results
 
-{{Filled by the adversarial validity-check subagent. Do not edit manually.}}
+{{Record the bounded AV review. Review deeply where applicable; do not add mandatory N/A rows. Verification checks original IDs and introduces no new low/major findings; include a remediation-caused blocker regression only when recorded through the structured review log.}}
 
 **Findings:** {{0 | list of findings}}
 **Status:** pending | passed | passed-after-resolution
 
-<!-- Finding entries (if any):
-### Finding: {{description}}
-**Raised by:** validity-check subagent
-**Classification:** blocker | assumption | implementation-detail
-**Disposition:** resolved | accepted-assumption | follow-repository-convention
--->
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Verification |
+|---|---|---|---|---|---|---|---|---|
+
+<!-- Add a row only for each issued AV finding. Use Disposition: resolved | unresolved. -->
+
+**Discovery pass:** pending | complete
+**Consolidated batch issued:** {{timestamp or none-clean}}
+**Remediation:** pending | complete | not-needed
+**Focused verification:** pending | passed | targeted-correction-required
+**Targeted correction/reverification used:** no | yes - {{original AV IDs and any remediation-caused blocker regression}}
+**Clean-review rationale (if no findings):** {{brief evidence-based rationale}}

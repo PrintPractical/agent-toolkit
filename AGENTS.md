@@ -23,20 +23,29 @@ AgentToolkit/
 
 To add a new shared file, add it to `_shared/` (or `_templates/` / `_idioms/`), then update `packages/build/sync-shared.mjs` to specify which skills receive it.
 
+Canonical source ownership is strict: shared guidance belongs in `_shared/`, templates in `_templates/`, idiom deltas in `_idioms/`, scripts and sync configuration in `packages/build/`, and tests in `packages/build/__tests__/`. Generated `skills/*/references/` and `skills/*/scripts/` files are distribution outputs, never authoring locations.
+
 ## SKILL.md rules
 
 - `name`: lowercase hyphen-separated, ≤64 chars, matches folder name.
-- `description`: required. Embed trigger keywords. Third person. Cover what AND when. Gate narrow skills with "Use ONLY when...". Skills without a description are never surfaced.
+- `description`: required. Embed trigger keywords. Third person. Cover what AND when. Limit narrow skills with "Use ONLY when...". Skills without a description are never surfaced.
 - Keep SKILL.md under 500 lines. Move detailed reference material to `references/`.
 - Progressive disclosure: only `name` + `description` load at agent startup. Full SKILL.md loads when relevant. Supporting files load on demand.
 - Prefer scripts over inline code blocks — script execution output consumes context; the script file itself does not.
+
+## Bounded material review
+
+- Scope discovery to the requested change, affected seams, acceptance criteria, and credible workload or failure risks.
+- Require evidence and concrete alternatives for material findings. Do not instruct a skill to find every possible gap or eliminate every possible ambiguity.
+- Use `_shared/engineering-fundamentals.md` for cross-language engineering choices. Idiom packs should contain only the language-specific expression or trap, not copies of generic fundamentals.
+- Treat duplicated literals as material when they encode domain facts that must change together; do not force incidental logs, test prose, or unrelated UI text behind one constant merely because wording repeats.
 
 ## Scripts
 
 **Canonical source of truth:** `packages/build/*.mjs` (the scripts) and `packages/build/lib/index.mjs` (shared lib). Author them here.
 
 - Scripts import the shared lib via `./lib/index.mjs`. This path resolves identically in the dev repo (`packages/build/`) and in an installed skill (`skills/<name>/scripts/`).
-- `npm run build` (sync-shared) bundles every script + `lib/` into each `skills/<name>/scripts/` directory. **Do not hand-edit the copies under `skills/*/scripts/`** — they are overwritten by the build.
+- `npm run build` (sync-shared) bundles only the helper scripts each skill invokes, plus `lib/` when needed. **Do not hand-edit the copies under `skills/*/scripts/`** — they are overwritten by the build.
 - SKILL.md invokes scripts as `node "$SKILL_DIR/scripts/<script>.mjs"` where `$SKILL_DIR` is the skill's install directory. Never reference `packages/build/` from a SKILL.md — that path does not exist in an installed skill.
 - Shebang: `#!/usr/bin/env node`
 - Status/progress → `stderr`. Machine-readable JSON output → `stdout`.
@@ -47,17 +56,23 @@ To add a new shared file, add it to `_shared/` (or `_templates/` / `_idioms/`), 
 ## Manifest state machine
 
 ```
-stages:   architect → specify → plan → implement → done
-gates:    architect | specify | plan | implement | docs
+active phases: architect → specify → plan → implement → refactor → decomposed → archive-ready
+approvals: architect | specify | plan | implement | docs
 
-refactor class: refactor → implement → done
-refactor gates: refactor | implement | docs
+feature:        architect → specify → plan → implement → archive-ready → verified archive
+bug/small:      implement → archive-ready → verified archive
+refactor:       refactor → implement → archive-ready → verified archive
+refactor audit: refactor → archive-ready → verified archive
+epic:           architect → specify → decomposed → coordinated verified archive
+refactor approvals: refactor | implement | docs
 ```
 
-- No skill auto-advances past a gate without `approved` status.
-- Each spine skill self-checks the prior gate before proceeding.
-- Standard `implement` and the `refactor` class require an approved independent review (fresh auditor + distinct fresh verifier, recorded via `review-log.mjs`) before their gate. No per-file snapshot tracking.
-- `change-status.mjs` prints current stage + recommended next skill.
+- No skill advances past an approval without `approved` status.
+- Each spine skill self-checks the prior approval before proceeding.
+- Standard `implement` and the `refactor` class require an approved independent review (fresh auditor + distinct fresh verifier, recorded via `review-log.mjs --phase`) before approval. No per-file snapshot tracking.
+- `change-status.mjs` prints the current phase and recommended next skill.
+- `archive-ready` is active; only a verified archive is terminal. Cancellation records a concrete reason and archives the current artifacts rather than deleting them.
+- Docs approval requires reconciliation plus `context-verify.mjs`; include its script in a skill's distribution mapping whenever that skill documents the command.
 
 ## Kickback types
 
@@ -88,7 +103,7 @@ CI: firm-seam test failure = hard block. Soft-prose staleness = warning + `Conte
 ## Adding an idioms pack
 
 1. Create `_idioms/<lang>.md` following the structure of existing packs: applicability, core principle, power-checklist, and smell-list.
-2. Use a lowercase kebab-case filename. The build discovers packs automatically and syncs them to consuming skills.
+2. Use a lowercase kebab-case filename. The build discovers packs automatically and syncs them to consuming skills, including `plan` and `refactor`.
 3. Update `README.md` to list the new language.
 4. Add or update idiom structure/distribution tests when the pack introduces a new format requirement.
 5. Use the filename stem as `manifest.language` (for example, `rust`, `go`, or `typescript`).

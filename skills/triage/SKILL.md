@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Classifies the change, runs a lightweight challenge-and-plan flow, and escalates to architect if scope is larger than expected. Same adversarial discipline as architect but far less ceremony.
+description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Runs the direct implement→archive-ready lifecycle with implement and docs approvals, and escalates to architect if scope is larger than expected.
 ---
 
 # Triage
@@ -19,9 +19,11 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 ## Your stance
 
-Same adversarial discipline as `architect` — read `references/challenge-protocol.md`. Triage is not a shortcut for skipping thought. It is a shorter path when the thought genuinely does not take long.
+Use the constructive challenge stance in `references/challenge-protocol.md`, but keep this workflow lightweight. Triage does **not** run formal `AV-*`, `SV-*`, or `RV-*` review, does not launch auditor/verifier roles, and does not use `review-log.mjs`. Ask the user only when a choice reaches the materiality boundary; if it does, the change normally belongs in `architect`. Auto-select conventional idiomatic local/private/reversible choices.
 
 ## Preconditions
+
+Before checking status, creating a manifest, reading CONTEXT.md, or scanning code, obtain the goal and observable outcome, affected area, constraints and anti-goals, and whether requirements are formed, partially formed, or unformed. After selecting or creating the workspace, write `change-brief.md` from `references/templates/change-brief.md.tmpl`.
 
 Check for an active change:
 ```
@@ -33,7 +35,7 @@ If no active change, create one:
 node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" --class small|bug [--language <lang>]
 ```
 
-Load the active `manifest.yaml`. If `manifest.language` is set and `references/idioms/<lang>.md` exists, load it for the challenge and refactor passes. If no matching pack exists, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
+Load the active `manifest.yaml`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for the challenge and refactor passes. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
 ## Phase 1: Classify
 
@@ -88,9 +90,9 @@ For bugs: write a **failing test that reproduces the bug first** before fixing i
 
 Save to `.changes/active/<id>/plan.md` if using the full change workspace.
 
-## Phase 5: Execute + refactor
+## Phase 5: Execute + lightweight self-check
 
-Implement the tasks. Then do a quick refactor pass (triage is the lightweight ramp — no formal independent-review gate):
+Implement the tasks. Then do one quick implementer self-check, not a formal discovery/remediation/verification cycle:
 - Did the fix introduce any new debt?
 - Is there a cleaner way to express this?
 - Check the idioms pack for anything relevant — especially unsafe/panic-prone code (e.g. Rust `.unwrap()`/`.expect()` on I/O), swallowed errors, and oversized modules.
@@ -99,20 +101,30 @@ Run tests — must pass.
 
 If the fix grows beyond a small isolated change, stop and route it to the full `architect` spine or the `refactor` skill instead.
 
-## Phase 6: Docs (if needed)
+## Phase 6: Docs reconciliation
 
-If the change affects a CONTEXT.md claim (rare for small fixes, common for bugs that reveal incorrect spec claims):
+Reconciliation and verification are required before docs approval. For every relevant `CONTEXT.md` target:
 - Update the relevant CONTEXT.md section.
 - Re-stamp provenance.
+- Run verification and resolve any finding:
+  ```
+  node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
+  ```
 
-## Phase 7: Archive
+## Phase 7: Archive-ready and verified archive
 
-Approve the docs gate (even if no CONTEXT changes — the gate is always required):
+After the lightweight self-check and docs reconciliation, approve implement then docs. This moves the direct triage lifecycle to `archive-ready`:
 ```
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate implement --approve
-node "$SKILL_DIR/scripts/manifest-gate.mjs" --id <id> --gate docs --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
+```
+
+Create the verified archive only after the change is archive-ready:
+```
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
+
+For cancellation, record a concrete `archive.reason` in `manifest.yaml` and archive the current workspace rather than deleting it.
 
 ## Escalation conditions (summary)
 
@@ -132,4 +144,4 @@ Do not be heroic about keeping something in triage. A legitimate escalation is n
 - `references/context-schema.md` — for reading CONTEXT.md
 - `references/seam-and-test-taxonomy.md`
 - `references/firm-change-protocol.md` — if a firm seam is involved
-- `references/idioms/<lang>.md` — if language is set
+- `idioms` skill — if language is set

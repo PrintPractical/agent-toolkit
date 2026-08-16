@@ -6,13 +6,11 @@
 
 ## Confirmation Ledger
 
-Every material decision must have an explicit user response. `unresolved` rows block the specify gate; missing responses are never inferred as acceptance.
+Every user-owned material decision must have an explicit response: public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Local/private/reversible conventional choices are agent-owned and do not get ledger rows. `unresolved` rows block the specify approval.
 
 | ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
 |---|---|---|---|---|---|---|
-| D-001 | {{question}} | {{recommended decision and why}} | {{meaningful alternatives}} | {{accept | selected alternative | supplied decision}} | confirmed | {{selected decision}} |
-
-<!-- Repeat for each material decision. Use `unresolved` until explicitly confirmed. If none, write one row with D-000 and status confirmed. -->
+<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, leave the table empty and state that no user-owned material decision was needed. -->
 
 ## Interface Changes
 
@@ -28,6 +26,22 @@ Every material decision must have an explicit user response. `unresolved` rows b
 **Notes:** {{Any non-obvious semantics, error conditions, or migration notes.}}
 
 <!-- Repeat for each interface change. If none, state "None." -->
+
+## Error and Failure Contracts
+
+{{Exact externally meaningful errors, propagation, recovery, cancellation, retries, partial results, and cleanup obligations. Omit local control-flow prescriptions.}}
+
+## Security Contracts
+
+{{Exact validation, authorization, trust-boundary, sensitive-data, and abuse-handling behavior where applicable.}}
+
+## State, Ordering, and Observability Contracts
+
+{{Exact legal state transitions, ordering/idempotency/consistency guarantees, and operationally consumed logs, metrics, traces, or diagnostics where applicable.}}
+
+## Agent-Selected Defaults
+
+{{Optional concise record of consequential conventional choices selected without user confirmation. Omit incidental local choices.}}
 
 ## Decision Log
 
@@ -46,19 +60,31 @@ Every material decision must have an explicit user response. `unresolved` rows b
 
 ## Dry-Run Findings
 
-{{Results from the "implement-as-if" dry-run subagent. Only unresolved blockers require a new confirmation batch.}}
+**Policy:** `references/adversarial-review.md`
+**Finding prefix:** `SV-`
+
+{{Results from exactly one broad implement-as-if discovery pass and its bounded closure. Review deeply where applicable without mandatory N/A boilerplate.}}
 
 **Dry-run status:** clean | blockers-resolved
 
-{{#if ambiguities}}
-### Finding {{n}}: {{description}}
+| ID | Severity | Category | Evidence | Concrete impact | Alternative | Linked decision | Disposition | Remediation | Verification |
+|---|---|---|---|---|---|---|---|---|---|
 
-**Found by:** dry-run subagent
-**Iteration:** {{which dry-run pass: 1, 2, …}}
-**Classification:** blocker | assumption | implementation-detail
-**Disposition:** resolved | accepted-assumption | follow-repository-convention
-**Linked decision:** D-{{n}} | n/a
-{{/if}}
+<!-- Add a row only for each issued SV finding. Use Disposition: resolved | unresolved. -->
+
+**Discovery pass:** pending | complete
+**Consolidated batch issued:** {{timestamp or none-clean}}
+**Remediation:** pending | complete | not-needed
+**Focused verification:** pending | passed | targeted-correction-required
+**Targeted correction/reverification used:** no | yes - {{original SV IDs and any remediation-caused blocker regression}}
+**Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
+
+## Review Cycle Reference
+
+**Cycle:** `specify-N`
+
+Use the current manifest review epoch.
+**Review log:** `reviews.json`, phase `specify`
 
 ## Architecture Reconciliation
 
@@ -69,10 +95,10 @@ Every material decision must have an explicit user response. `unresolved` rows b
 
 ## Acceptance Criteria Confirmed
 
-{{Confirmation that every seam in architecture.md with firmness: firm has at least one AC entry in CONTEXT.md or architecture.md, and that each AC will be covered by a test task in plan.md.}}
+{{Confirm before the specify approval that every firm seam has an acceptance criterion and a required test obligation. Plan will map these IDs to concrete tasks.}}
 
-| Seam ID | AC ID | Covered in plan | Test type |
-|---|---|---|---|
-| SEAM-{{id}}-01 | AC-{{id}}-01 | yes | firm-seam / behavioral |
+| Seam ID | AC ID | Required test type |
+|---|---|---|
+| SEAM-{{id}}-01 | AC-{{id}}-01 | firm-seam / behavioral |
 
-<!-- Fill after plan is complete. -->
+<!-- Fill before the specify approval is approved. -->

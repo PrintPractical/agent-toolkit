@@ -1,119 +1,51 @@
 #!/usr/bin/env node
-/**
- * kickback-log.mjs — Log a kickback entry to a change manifest.
- *
- * Usage:
- *   node kickback-log.mjs --id <id> --type defect|amendment --stage specify|plan|implement \
- *     --impact specify|plan|implementation --missed "What the spec should have caught"
- *
- * Output (stdout): JSON { id, kickback, total_defects, frequency }
- * Progress (stderr): human-readable
- */
+/** Log or resolve a legal feature-spine kickback. */
 
 import { parseArgs } from 'util';
-import {
-  readManifest,
-  writeManifest,
-  listActiveChanges,
-  kickbackImpact,
-} from './lib/index.mjs';
+import { readManifest, writeManifest, listActiveChanges, kickbackImpact } from './lib/index.mjs';
 
-const { values } = parseArgs({
-  options: {
-    help:       { type: 'boolean', short: 'h', default: false },
-    id:         { type: 'string' },
-    type:       { type: 'string' },   // defect | amendment
-    stage:      { type: 'string' },   // specify | plan | implement
-    missed:     { type: 'string' },
-    resolution: { type: 'string', default: '' },
-    impact:     { type: 'string', default: 'specify' },
-  },
-  strict: true,
-});
-
-if (values.help) {
-  console.log('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
-  process.exit(0);
-}
-
-if (!values.id || !values.type || !values.stage || !values.missed) {
-  console.error('Usage: kickback-log.mjs --id <id> --type defect|amendment --stage <stage> --impact specify|plan|implementation --missed "<text>" [--resolution "<text>"]');
-  process.exit(1);
-}
-
-if (!['defect', 'amendment'].includes(values.type)) {
-  console.error('--type must be defect or amendment');
-  process.exit(1);
-}
-
-if (!['specify', 'plan', 'implement'].includes(values.stage)) {
-  console.error('--stage must be specify, plan, or implement');
-  process.exit(1);
-}
-
+const { values } = parseArgs({ options: {
+  help: { type: 'boolean', short: 'h', default: false }, id: { type: 'string' }, type: { type: 'string' },
+  phase: { type: 'string' }, missed: { type: 'string' }, resolution: { type: 'string', default: '' },
+  impact: { type: 'string', default: 'specify' }, resolve: { type: 'string' },
+}, strict: true });
+const usage = 'Usage: kickback-log.mjs --id <id> --type defect|amendment --phase specify|plan|implement --impact specify|plan|implementation --missed "<text>"\n       kickback-log.mjs --id <id> --resolve <1-based-entry> --resolution "<text>"';
+if (values.help) { console.log(usage); process.exit(0); }
+if (!values.id) { console.error(usage); process.exit(1); }
 const repoRoot = process.cwd();
 let manifest;
-
-try {
-  manifest = readManifest(values.id, repoRoot);
-} catch (e) {
-  console.error(`Error: ${e.message}`);
-  process.exit(1);
+try { manifest = readManifest(values.id, repoRoot); } catch (error) { console.error(`Error: ${error.message}`); process.exit(1); }
+if (values.resolve) {
+  const index = Number(values.resolve);
+  if (!Number.isInteger(index) || index < 1 || index > (manifest.kickbacks || []).length || !values.resolution.trim()) {
+    console.error('Resolve requires a valid --resolve entry number and non-empty --resolution.'); process.exit(1);
+  }
+  manifest.kickbacks[index - 1].resolution = values.resolution.trim();
+  writeManifest(values.id, manifest, repoRoot);
+  process.stdout.write(JSON.stringify({ id: values.id, resolved: index }) + '\n');
+  process.exit(0);
 }
-
+if (!values.type || !values.phase || !values.missed) { console.error(usage); process.exit(1); }
+if (!['defect', 'amendment'].includes(values.type)) { console.error('--type must be defect or amendment'); process.exit(1); }
+if (!['specify', 'plan', 'implement'].includes(values.phase)) { console.error('--phase must be specify, plan, or implement'); process.exit(1); }
+if (manifest.class !== 'feature' || !['specify', 'plan', 'implement'].includes(manifest.phase)) {
+  console.error(`Kickbacks apply only to an active feature spine; '${manifest.class}' is at '${manifest.phase}'.`); process.exit(1);
+}
 let impact;
-try {
-  impact = kickbackImpact(values.impact);
-} catch (error) {
-  console.error(error.message);
-  process.exit(1);
+try { impact = kickbackImpact(values.impact); } catch (error) { console.error(error.message); process.exit(1); }
+if (['specify', 'plan', 'implement'].indexOf(impact.restartPhase) > ['specify', 'plan', 'implement'].indexOf(manifest.phase)) {
+  console.error(`Kickback impact '${impact.impact}' cannot advance phase '${manifest.phase}'.`); process.exit(1);
 }
-
 const entry = {
-  type:       values.type,
-  stage:      values.stage,
-  at:         new Date().toISOString(),
-  missed:     values.missed,
-  resolution: values.resolution || '',
-  impact: impact.impact,
-  invalidated_gates: impact.invalidatedGates.join(','),
-  restart_stage: impact.restartStage,
+  type: values.type, phase: values.phase, at: new Date().toISOString(), missed: values.missed,
+  resolution: values.resolution, impact: impact.impact, invalidated_approvals: impact.invalidatedApprovals.join(','), restart_phase: impact.restartPhase,
 };
-
 manifest.kickbacks = manifest.kickbacks || [];
 manifest.kickbacks.push(entry);
-manifest.gates = manifest.gates || {};
-for (const gate of impact.invalidatedGates) manifest.gates[gate] = 'pending';
-manifest.stage = impact.restartStage;
-
+for (const approval of impact.invalidatedApprovals) manifest.approvals[approval] = 'pending';
+manifest.review_epochs = manifest.review_epochs || {};
+for (const phase of impact.reviewPhases) manifest.review_epochs[phase] = (manifest.review_epochs[phase] || 1) + 1;
+manifest.phase = impact.restartPhase;
 writeManifest(values.id, manifest, repoRoot);
-
-const defectCount = manifest.kickbacks.filter(k => k.type === 'defect').length;
-const totalChanges = listActiveChanges(repoRoot).length + 1; // +1 approximate; accurate tracking requires completed changes count
-const frequency = defectCount; // raw count; ratio requires total completed changes
-
-console.error(`Kickback logged for change '${values.id}':`);
-console.error(`  Type:       ${values.type}`);
-console.error(`  Stage:      ${values.stage}`);
-console.error(`  Missed:     ${values.missed}`);
-if (values.resolution) console.error(`  Resolution: ${values.resolution}`);
-console.error(`  Total defect kickbacks this change: ${defectCount}`);
-console.error(`  Impact:     ${impact.impact}`);
-console.error(`  Stage:      ${impact.restartStage} (${impact.invalidatedGates.length ? `${impact.invalidatedGates.join(', ')} gate(s) reset` : 'no upstream gates reset'})`);
-
-if (values.type === 'defect') {
-  console.error(`\nThis is a DEFECT kickback — the spec process should have caught this.`);
-  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
-} else {
-  console.error(`\nThis is an AMENDMENT kickback — legitimate requirement evolution.`);
-  console.error(`Resume at '${impact.restartStage}' and re-approve only the invalidated gates.`);
-}
-
-process.stdout.write(JSON.stringify({
-  id: values.id,
-  kickback: entry,
-  total_defects: defectCount,
-  frequency,
-  stage: manifest.stage,
-  reset_gates: impact.invalidatedGates,
-}) + '\n');
+const defectCount = manifest.kickbacks.filter(kickback => kickback.type === 'defect').length;
+process.stdout.write(JSON.stringify({ id: values.id, kickback: entry, total_defects: defectCount, active_changes: listActiveChanges(repoRoot).length, phase: manifest.phase, reset_approvals: impact.invalidatedApprovals }) + '\n');
