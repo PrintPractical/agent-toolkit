@@ -8,9 +8,16 @@
 
 Every user-owned material decision must have an explicit response: public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Local/private/reversible conventional choices are agent-owned and do not get ledger rows. `unresolved` rows block the specify approval.
 
-| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
-|---|---|---|---|---|---|---|
-<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, leave the table empty and state that no user-owned material decision was needed. -->
+<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, state that no user-owned material decision was needed. -->
+
+### D-001
+
+- Question: {{material question}}
+- Recommendation: {{recommendation and rationale}}
+- Alternatives: {{alternatives}}
+- User response: {{explicit response}}
+- Status: unresolved | confirmed
+- Final decision: {{decision}}
 
 ## Interface Changes
 
@@ -67,10 +74,18 @@ Every user-owned material decision must have an explicit response: public contra
 
 **Dry-run status:** clean | blockers-resolved
 
-| ID | Severity | Category | Evidence | Concrete impact | Alternative | Linked decision | Disposition | Remediation | Verification |
-|---|---|---|---|---|---|---|---|---|---|
+<!-- Add one record only for each issued SV finding. Use Disposition: resolved | unresolved. -->
 
-<!-- Add a row only for each issued SV finding. Use Disposition: resolved | unresolved. -->
+### SV-{{seq}} [severity: blocker | major]
+
+- Category: correctness | security | simplicity | maintainability | idioms
+- Evidence: {{path, line, or concrete observation}}
+- Concrete impact: {{impact}}
+- Alternative: {{concrete alternative}}
+- Linked decision: {{D-NNN or none}}
+- Disposition: resolved | unresolved
+- Remediation: {{what changed}}
+- Verification: {{focused verifier evidence}}
 
 **Discovery pass:** pending | complete
 **Consolidated batch issued:** {{timestamp or none-clean}}
@@ -97,8 +112,9 @@ Use the current manifest review epoch.
 
 {{Confirm before the specify approval that every firm seam has an acceptance criterion and a required test obligation. Plan will map these IDs to concrete tasks.}}
 
-| Seam ID | AC ID | Required test type |
-|---|---|---|
-| SEAM-{{id}}-01 | AC-{{id}}-01 | firm-seam / behavioral |
+### AC-{{id}}-01
+
+- Seam: SEAM-{{id}}-01
+- Required test: firm-seam / behavioral
 
 <!-- Fill before the specify approval is approved. -->

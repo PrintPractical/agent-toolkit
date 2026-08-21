@@ -21,24 +21,20 @@ function writeApprovedArtifacts(id, cwd) {
   const specifyCycle = `specify-${readManifest(id, cwd).review_epochs?.specify || 1}`;
   fs.writeFileSync(path.join(dir, 'architecture.md'), [
     '## Summary', 'x', '## Architecture Confirmation Ledger',
-    '| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
-    '|---|---|---|---|---|---|---|',
-    '| A-001 | q | recommendation | none | accept | confirmed | yes |',
+    '### A-001', '- Topic: q', '- User response: accept', '- Status: confirmed',
     '## Architectural Decisions', 'x', '## Seams', 'x',
     '## Validity Check Results', '**Status:** passed',
     '## Review Cycle Reference', 'Cycle: architect-1',
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'decisions.md'), [
     '## Confirmation Ledger',
-    '| ID | Material question | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |',
-    '|---|---|---|---|---|---|---|',
-    '| D-001 | q | recommendation | none | accept | confirmed | yes |',
+    '### D-001', '- Question: q', '- User response: accept', '- Status: confirmed',
     '## Interface Changes', 'None.', '## Decision Log', 'None.', '## Dry-Run Findings', '**Dry-run status:** clean',
     '## Review Cycle Reference', `Cycle: ${specifyCycle}`,
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'plan.md'), [
-    '## Traceability check', '| AC ID | Task(s) | Firm-seam test task |',
-    '|---|---|---|', '| none | n/a | n/a |',
+    '## Traceability check', '<!-- traceability:start -->',
+    '- No acceptance criteria declared.', '<!-- traceability:end -->',
   ].join('\n'));
 }
 
@@ -69,6 +65,7 @@ describe('CLI help', () => {
     'kickback-log.mjs',
     'epic-split.mjs',
     'review-log.mjs',
+    'traceability-sync.mjs',
     'sync-shared.mjs',
   ];
 
@@ -103,7 +100,6 @@ describe('kickback flow', () => {
         specify: 'approved',
         plan: 'approved',
         implement: 'pending',
-        docs: 'pending',
       },
       artifacts: {
         architecture: 'architecture.md',
@@ -141,7 +137,7 @@ describe('kickback flow', () => {
     assert.equal(manifest.review_epochs.implement, 2);
     assert.equal(manifest.kickbacks[0].phase, 'implement');
     assert.equal(manifest.kickbacks[0].resolution, '');
-    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'specify,plan,implement,docs');
+    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'specify,plan,implement');
 
     writeApprovedArtifacts(id, cwd);
     recordEmptyCycle(id, 'specify', 'specify-2', cwd);
@@ -181,7 +177,7 @@ describe('kickback flow', () => {
     assert.equal(manifest.phase, 'plan');
     assert.equal(manifest.approvals.specify, 'approved');
     assert.equal(manifest.approvals.plan, 'pending');
-    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'plan,implement,docs');
+    assert.equal(manifest.kickbacks[0].invalidated_approvals, 'plan,implement');
   });
 
   it('refuses specify approval when the confirmation ledger is absent', () => {
@@ -213,8 +209,8 @@ describe('implement approval review enforcement', () => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-reviewgate-'));
     writeManifest(id, {
       id, title: 'Review approval', class: 'feature', phase: 'implement',
-      approvals: { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending', docs: 'pending' },
-      context_targets: ['CONTEXT.md'], kickbacks: [],
+      approvals: { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending' },
+      context_targets: [], kickbacks: [],
     }, cwd);
   });
 
@@ -239,10 +235,10 @@ describe('implement approval review enforcement', () => {
     assert.equal(readManifest(id, cwd).approvals.implement, 'approved');
   });
 
-  it('blocks docs before implement', () => {
+  it('rejects the epic-only docs approval for a feature', () => {
     const res = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'docs', '--approve'], cwd);
     assert.equal(res.status, 1);
-    assert.match(res.stderr, /before implement is approved/);
+    assert.match(res.stderr, /does not apply to a 'feature'/);
   });
 });
 
@@ -254,7 +250,7 @@ describe('architect and specify approval review enforcement', () => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-spine-review-'));
     writeManifest(id, {
       id, title: 'Spine review', class: 'feature', phase: 'architect',
-      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
+      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending' },
       artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
       context_targets: [], kickbacks: [],
     }, cwd);
@@ -292,7 +288,7 @@ describe('architect and specify approval review enforcement', () => {
     manifest = readManifest(id, cwd);
     manifest.class = 'bug';
     manifest.phase = 'implement';
-    manifest.approvals = { implement: 'pending', docs: 'pending' };
+    manifest.approvals = { implement: 'pending' };
     delete manifest.children;
     writeManifest(id, manifest, cwd);
     const bug = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd);
@@ -312,7 +308,7 @@ describe('change-new refactor class', () => {
     const m = readManifest(id, cwd);
     assert.equal(m.class, 'refactor');
     assert.equal(m.phase, 'refactor');
-    assert.deepEqual(Object.keys(m.approvals).sort(), ['docs', 'implement', 'refactor']);
+    assert.deepEqual(Object.keys(m.approvals).sort(), ['implement', 'refactor']);
     assert.equal(m.refactor_mode, 'execute');
     assert.equal(m.artifacts.refactor, 'refactor.md');
   });
@@ -334,8 +330,8 @@ describe('refactor class approvals', () => {
     cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-refactorclass-'));
     writeManifest(id, {
       id, title: 'Refactor class', class: 'refactor', phase: 'refactor',
-      approvals: { refactor: 'pending', implement: 'pending', docs: 'pending' },
-      context_targets: ['CONTEXT.md'], kickbacks: [],
+      approvals: { refactor: 'pending', implement: 'pending' },
+      context_targets: [], kickbacks: [],
     }, cwd);
   });
 

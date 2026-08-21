@@ -169,7 +169,7 @@ describe('readManifest / writeManifest', () => {
       class: 'feature',
       phase: 'architect',
       language: 'rust',
-      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
+      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending' },
       artifacts: { architecture: 'architecture.md', decisions: 'decisions.md', plan: 'plan.md' },
       context_targets: ['CONTEXT.md'],
       kickbacks: [],
@@ -252,11 +252,10 @@ describe('nextSkill', () => {
     assert.equal(nextSkill(m), 'change-archive');
   });
 
-  it('routes a refactor class through audit → execute → docs', () => {
+  it('routes a refactor class through audit → execute → archive', () => {
     assert.match(nextSkill({ class: 'refactor', phase: 'refactor', approvals: { refactor: 'pending' } }), /refactor \(audit/);
     assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'pending' } }), /execute/);
-    assert.match(nextSkill({ class: 'refactor', phase: 'implement', approvals: { refactor: 'approved', implement: 'approved', docs: 'pending' } }), /docs/);
-    assert.equal(nextSkill({ class: 'refactor', phase: 'archive-ready', approvals: { refactor: 'approved', implement: 'approved', docs: 'approved' } }), 'change-archive');
+    assert.equal(nextSkill({ class: 'refactor', phase: 'archive-ready', approvals: { refactor: 'approved', implement: 'approved' } }), 'change-archive');
   });
 });
 

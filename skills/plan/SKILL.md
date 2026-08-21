@@ -61,7 +61,7 @@ For each section, from `references/templates/plan.md.tmpl`:
 - Include the target file path.
 - Include enough context to identify the required outcome: target path, confirmed contract when any, observable behavior, relevant state transition, validation/error semantics, invariants, and acceptance evidence.
 - Leave private helpers, local representations, control flow, and equivalent idiomatic mechanisms to `implement`.
-- Reference the decision or acceptance criterion being implemented: `(implements [SEAM-<id>])` or `(per decisions.md Q<n>)`.
+- Give every task a stable `[T-NNN]` ID. Reference each acceptance criterion with `[AC-...]`; firm test tasks must also use `[seam: <id>] [firmness: firm]`.
 
 For example, a persistence task states the validated input, atomicity or ordering guarantee, approved error contract, and observable result. It does not dictate private helpers, a seven-step control-flow recipe, or a function body. `implement` decides the idiomatic source expression.
 
@@ -81,7 +81,10 @@ Before finalizing, verify:
 2. Every firm seam has at least one firm-seam test task.
 3. Every approved refactor in `architecture.md` has explicit tasks.
 
-Fill the traceability table in `plan.md`. If any criterion is uncovered, add the missing task.
+Regenerate the traceability summary in `plan.md`. If any criterion is uncovered, add the missing task, then run:
+```
+node "$SKILL_DIR/scripts/traceability-sync.mjs" --id <id> --write
+```
 
 ## Phase 4: Kickback check
 

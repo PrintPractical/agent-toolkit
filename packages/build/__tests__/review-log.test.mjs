@@ -36,7 +36,7 @@ function seedChange(cwd) {
     title: 'Review log',
     class: 'feature',
     phase: 'implement',
-    approvals: { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending', docs: 'pending' },
+    approvals: { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending' },
     context_targets: ['CONTEXT.md'],
     kickbacks: [],
   }, cwd);

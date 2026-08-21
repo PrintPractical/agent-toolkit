@@ -17,9 +17,16 @@
 
 Every user-owned material architectural topic must have an explicit response. User-owned means public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, or meaningful architectural/operational tradeoffs. Local/private/reversible conventional choices are agent-owned and do not get ledger rows. `unresolved` rows block approval.
 
-| ID | Material topic | Recommendation and rationale | Alternatives | Explicit user response | Status | Final decision |
-|---|---|---|---|---|---|---|
-<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, leave the table empty and state that no user-owned material decision was needed. -->
+<!-- Repeat only for user-owned material decisions. Use `unresolved` until explicitly confirmed. If none, state that no user-owned material decision was needed. -->
+
+### A-001
+
+- Topic: {{material topic}}
+- Recommendation: {{recommendation and rationale}}
+- Alternatives: {{alternatives}}
+- User response: {{explicit response}}
+- Status: unresolved | confirmed
+- Final decision: {{decision}}
 
 ## Architectural Decisions
 
@@ -38,14 +45,14 @@ Every user-owned material architectural topic must have an explicit response. Us
 
 {{Seams created or modified by this change. Each carries firmness and, if firm, initial acceptance criteria.}}
 
-### Seam: {{seam-name}}  [firmness: soft | firm]
+### Seam: {{seam-name}} [id: SEAM-{{id}}-{{seq}}] [firmness: soft | firm]
 
 **What crosses this boundary:** {{description}}
 **Testability approach:** {{How this seam will be tested.}}
 
 {{#if firm}}
 **Criteria:**
-- [SEAM-{{id}}-{{seq}}] {{behavioral assertion}} → enforced-by: {{repository-root-relative planned test path}}
+- [AC-{{id}}-{{seq}}] {{behavioral assertion}} → enforced-by: {{repository-root-relative planned test path}}
 {{/if}}
 
 <!-- Repeat for each seam -->
@@ -115,10 +122,17 @@ Use the current manifest review epoch.
 **Findings:** {{0 | list of findings}}
 **Status:** pending | passed | passed-after-resolution
 
-| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Verification |
-|---|---|---|---|---|---|---|---|---|
+<!-- Add one record only for each issued AV finding. Use Disposition: resolved | unresolved. -->
 
-<!-- Add a row only for each issued AV finding. Use Disposition: resolved | unresolved. -->
+### AV-{{seq}} [severity: blocker | major]
+
+- Category: correctness | security | simplicity | maintainability | idioms
+- Evidence: {{path, line, or concrete observation}}
+- Concrete impact: {{impact}}
+- Alternative: {{concrete alternative}}
+- Disposition: resolved | unresolved
+- Remediation: {{what changed}}
+- Verification: {{focused verifier evidence}}
 
 **Discovery pass:** pending | complete
 **Consolidated batch issued:** {{timestamp or none-clean}}

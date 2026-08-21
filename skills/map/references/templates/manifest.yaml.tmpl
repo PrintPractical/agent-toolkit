@@ -10,14 +10,14 @@ language: ""  # idiom-pack filename stem, e.g. rust, go, typescript; leave empty
 # Refactor class only (use change-new.mjs --class refactor to scaffold):
 # refactor_mode: execute        # execute | audit-only
 # refactor_selected_ids: []     # user-approved RF-NNN opportunity IDs from refactor.md
-# For a refactor, approvals are { refactor, implement, docs } and artifacts is { refactor: refactor.md }.
+# For a refactor, approvals are { refactor, implement } and artifacts is { refactor: refactor.md }.
 
 approvals:
   architect:  pending
   specify:    pending
   plan:       pending
   implement:  pending
-  docs:       pending
+# `docs` is required only for epics; reconcile and verify docs before non-epic implement approval.
 
 artifacts:
   change_brief:  change-brief.md

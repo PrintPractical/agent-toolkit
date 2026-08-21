@@ -127,8 +127,8 @@ for (const childDef of childDefs) {
     language: lang,
     parent: values.epic,
     approvals: ['bug', 'small'].includes(cls)
-      ? { implement: 'pending', docs: 'pending' }
-      : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' },
+      ? { implement: 'pending' }
+      : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending' },
     artifacts: {
       change_brief: 'change-brief.md',
       architecture: 'architecture.md',

@@ -34,10 +34,6 @@ implement → per section: code + tests green, live checklist updated
     ↓
 implement approval approved
     ↓
-docs reconciliation → CONTEXT hierarchy updated + verified
-    ↓
-docs approval approved (user confirms happy)
-    ↓
 archive-ready
     ↓
 change-archive.mjs verifies and archives → .changes/archive/<id>.zip, active dir removed
@@ -62,7 +58,7 @@ While a change is in progress, all artifacts live at:
 
 ## Archive
 
-When a standard change reaches `archive-ready` (docs approval approved, user confirms happy), `change-archive.mjs` verifies and runs:
+When a standard change reaches `archive-ready` (implement approval approved, including docs reconciliation and user confirmation), `change-archive.mjs` verifies and runs:
 1. Zips `.changes/active/<id>/` to `.changes/archive/<id>.zip`.
 2. Removes `.changes/active/<id>/`.
 3. Commits the zip (or leaves it for the user to commit — configurable).
@@ -92,9 +88,9 @@ When `implement` discovers a gap the spec didn't anticipate:
 
 Record `specify`, `plan`, or `implementation` impact; amend only affected artifacts and re-approve only invalidated approvals.
 
-## Docs reconciliation (docs approval)
+## Docs reconciliation
 
-Reconciliation is not optional. It is a required approval.
+Reconciliation is not optional. For non-epics it is required before the implement approval; an epic retains its parent-level docs approval because it has no implement phase.
 
 The reconciliation process:
 1. Walk `manifest.yaml context_targets`.
@@ -103,9 +99,9 @@ The reconciliation process:
 4. Re-stamp provenance (`validated-at: <current HEAD sha>`).
 5. Adversarial verifier subagent: confirm CONTEXT claims match the implemented code.
 6. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable. Resolve its findings.
-7. Present summary to user. User approves (docs approval → approved) or requests corrections.
+7. Present summary to user. For a non-epic, the user approves the implement approval; for an epic, the user approves docs.
 
-`context-verify.mjs` and reconciliation are required before docs approval. After that approval, the change enters `archive-ready`; only then may `change-archive.mjs` create the verified archive.
+`context-verify.mjs` and reconciliation are required before non-epic implement approval or epic docs approval. That approval enters `archive-ready`; only then may `change-archive.mjs` create the verified archive.
 
 ## Bounded adversarial reviews
 

@@ -8,7 +8,7 @@ description: Use for behavior-preserving refactors, cleanup, technical debt redu
 You are running the **refactor** maintenance workflow. It has one hard constraint: preserve observable behavior. The sequence is:
 
 ```
-read-only audit → refactor approval → verified execution when selected → docs → archive-ready → verified archive
+read-only audit → refactor approval → verified execution and docs reconciliation when selected → archive-ready → verified archive
 ```
 
 An audit may finish with no execution. Never turn a cleanup request into a feature, bug fix, migration, dependency upgrade, or contract redesign.
@@ -135,14 +135,6 @@ After all selected batches are green, run exactly one `RV-*` cycle from `referen
     ```
     A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or broad review is needed, stop and route upstream rather than extending the cycle.
 
-Present selected/completed/deferred/escalated IDs, changed files, invariant evidence, and test results. Ask explicitly for implement approval; never self-approve it:
-
-```bash
-node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
-```
-
-The approval refuses unless an approved verifier review (backed by a distinct auditor review) is recorded for phase `refactor`.
-
 ## Phase 6: Documentation reconciliation
 
 1. Run `context-verify.mjs` for all context targets.
@@ -150,11 +142,13 @@ The approval refuses unless an approved verifier review (backed by a distinct au
 3. Reconcile developer docs describing changed internals, commands, or package layout. Do not churn user-facing behavior docs when behavior did not change.
 4. Re-stamp changed CONTEXT provenance at current HEAD, and have a fresh docs reviewer compare claims with code and `refactor.md`.
 
-Run `context-verify.mjs` after reconciliation and resolve its findings. Ask the user to approve the docs approval, which moves the change to `archive-ready`; then create the verified archive:
+Run `context-verify.mjs` after reconciliation and resolve its findings. Present selected/completed/deferred/escalated IDs, changed files, invariant evidence, test results, and reconciliation. Ask the user to approve the implement approval, which moves the change to `archive-ready`; then create the verified archive:
 ```bash
-node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
+
+The approval refuses unless an approved verifier review (backed by a distinct auditor review) is recorded for phase `refactor` and every context target passes verification.
 
 The archive must contain the ranked audit, selection record, batch evidence, review records, escalations, and docs reconciliation.
 

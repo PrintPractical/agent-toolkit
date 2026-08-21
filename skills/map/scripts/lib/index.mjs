@@ -574,11 +574,11 @@ export const APPROVALS = ['refactor', 'architect', 'specify', 'plan', 'implement
 export const KICKBACK_IMPACTS = ['specify', 'plan', 'implementation'];
 
 const LIFECYCLES = {
-  feature: { approvals: ['architect', 'specify', 'plan', 'implement', 'docs'], phases: ['architect', 'specify', 'plan', 'implement', 'archive-ready'] },
-  bug: { approvals: ['implement', 'docs'], phases: ['implement', 'archive-ready'] },
-  small: { approvals: ['implement', 'docs'], phases: ['implement', 'archive-ready'] },
+  feature: { approvals: ['architect', 'specify', 'plan', 'implement'], phases: ['architect', 'specify', 'plan', 'implement', 'archive-ready'] },
+  bug: { approvals: ['implement'], phases: ['implement', 'archive-ready'] },
+  small: { approvals: ['implement'], phases: ['implement', 'archive-ready'] },
   epic: { approvals: ['architect', 'specify', 'docs'], phases: ['architect', 'specify', 'decomposed', 'archive-ready'] },
-  refactor: { approvals: ['refactor', 'implement', 'docs'], phases: ['refactor', 'implement', 'archive-ready'] },
+  refactor: { approvals: ['refactor', 'implement'], phases: ['refactor', 'implement', 'archive-ready'] },
 };
 
 export function allowedApprovalsFor(manifest) {
@@ -599,6 +599,7 @@ export function nextPhaseForApproval(manifest, approval) {
   if (approval === 'architect') return 'specify';
   if (approval === 'specify') return manifest.class === 'epic' ? 'specify' : 'plan';
   if (approval === 'plan') return 'implement';
+  if (approval === 'implement') return 'archive-ready';
   return manifest.phase;
 }
 
@@ -637,7 +638,7 @@ export function isArchiveReady(manifest, repoRoot = process.cwd()) {
     const status = epicStatus(manifest, repoRoot);
     return manifest.approvals?.architect === 'approved' && manifest.approvals?.specify === 'approved' && manifest.approvals?.docs === 'approved' && status.total > 0 && status.ready === status.total;
   }
-  return manifest.approvals?.implement === 'approved' && manifest.approvals?.docs === 'approved';
+  return manifest.approvals?.implement === 'approved';
 }
 
 export function phaseIndex(phase) {
@@ -654,12 +655,12 @@ export function kickbackImpact(impact) {
     throw new Error(`impact must be one of: ${KICKBACK_IMPACTS.join(', ')}`);
   }
   if (impact === 'specify') {
-    return { impact, invalidatedApprovals: ['specify', 'plan', 'implement', 'docs'], restartPhase: 'specify', reviewPhases: ['specify', 'implement'] };
+    return { impact, invalidatedApprovals: ['specify', 'plan', 'implement'], restartPhase: 'specify', reviewPhases: ['specify', 'implement'] };
   }
   if (impact === 'plan') {
-    return { impact, invalidatedApprovals: ['plan', 'implement', 'docs'], restartPhase: 'plan', reviewPhases: ['implement'] };
+    return { impact, invalidatedApprovals: ['plan', 'implement'], restartPhase: 'plan', reviewPhases: ['implement'] };
   }
-  return { impact, invalidatedApprovals: ['implement', 'docs'], restartPhase: 'implement', reviewPhases: ['implement'] };
+  return { impact, invalidatedApprovals: ['implement'], restartPhase: 'implement', reviewPhases: ['implement'] };
 }
 
 function readArtifact(manifest, artifact, repoRoot, errors) {
@@ -673,20 +674,7 @@ function readArtifact(manifest, artifact, repoRoot, errors) {
 
 function unresolvedBlockers(content) {
   if (/\*\*Classification:\*\* blocker[\s\S]{0,240}\*\*Disposition:\*\* unresolved/i.test(content)) return true;
-
-  const lines = content.split('\n');
-  for (let index = 0; index < lines.length - 2; index++) {
-    if (!/^\|/.test(lines[index]) || !/^\|[\s|:-]+\|\s*$/.test(lines[index + 1])) continue;
-    const headers = lines[index].split('|').slice(1, -1).map(cell => cell.trim().toLowerCase());
-    const severity = headers.indexOf('severity');
-    const disposition = headers.indexOf('disposition');
-    if (severity === -1 || disposition === -1) continue;
-    for (let row = index + 2; row < lines.length && /^\|/.test(lines[row]); row++) {
-      const cells = lines[row].split('|').slice(1, -1).map(cell => cell.trim().toLowerCase());
-      if (cells[severity] === 'blocker' && cells[disposition] === 'unresolved') return true;
-    }
-  }
-  return false;
+  return /^###\s+(?:AV|SV|RV)-\d+\s+\[severity:\s*blocker\][\s\S]{0,720}?^-\s+Disposition:\s*unresolved\s*$/im.test(content);
 }
 
 function hasFencedSourceCode(content) {
@@ -703,8 +691,90 @@ function reviewCycleReference(content) {
 
 function reviewFindingIds(content, prefix) {
   return new Set(content.split('\n')
-    .map(line => line.match(new RegExp(`^\\|\\s*(${prefix}-[0-9]{3})\\s*\\|`, 'i'))?.[1]?.toUpperCase())
+    .map(line => line.match(new RegExp(`^###\\s+(${prefix}-[0-9]{3})(?:\\s|$)`, 'i'))?.[1]?.toUpperCase())
     .filter(Boolean));
+}
+
+function sectionBody(content, heading) {
+  return content.match(new RegExp(`^##\\s+${heading}\\s*\\n([\\s\\S]*?)(?=^##\\s+|$(?![\\s\\S]))`, 'im'))?.[1] || '';
+}
+
+function recordBlocks(content, heading, prefix) {
+  const body = sectionBody(content, heading);
+  const matches = [...body.matchAll(new RegExp(`^###\\s+(${prefix}-[0-9]{3})(?=\\s|$)[^\\n]*(?:\\n|$)`, 'gim'))];
+  return matches.map((match, index) => ({
+    id: match[1].toUpperCase(),
+    content: body.slice(match.index, matches[index + 1]?.index),
+  })).filter(record => !record.content.includes('{{'));
+}
+
+function recordField(record, label) {
+  return record.content.match(new RegExp(`^-\\s+${label}:[ \\t]*([^\\r\\n]*)$`, 'im'))?.[1]?.trim() || '';
+}
+
+export function artifactContent(manifest, artifact, repoRoot = process.cwd()) {
+  const file = artifactPath(manifest, artifact, repoRoot);
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+}
+
+export function acceptanceCriteria(manifest, repoRoot = process.cwd()) {
+  const criteria = new Set();
+  for (const artifact of ['architecture', 'decisions']) {
+    const content = artifactContent(manifest, artifact, repoRoot);
+    for (const match of content.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/g)) criteria.add(match[1]);
+    for (const match of content.matchAll(/^###\s+(AC-[A-Za-z0-9][A-Za-z0-9-]*)(?=\s|$)/gim)) criteria.add(match[1]);
+  }
+  return [...criteria].sort();
+}
+
+export function firmSeams(manifest, repoRoot = process.cwd()) {
+  const architecture = artifactContent(manifest, 'architecture', repoRoot);
+  const seams = new Set();
+  for (const match of architecture.matchAll(/^###\s+Seam:[^\n]*\[id:\s*(SEAM-[A-Za-z0-9][A-Za-z0-9-]*)\][^\n]*\[firmness:\s*firm\]/gim)) {
+    seams.add(match[1]);
+  }
+  return [...seams].sort();
+}
+
+export function planTasks(content) {
+  const matches = [...content.matchAll(/^-\s+\[[ x]\]\s+\[(T-\d{3})\]\s+(.+?)(?=\n(?=-\s+\[[ x]\]\s+\[T-\d{3}\])|$)/gims)];
+  return matches.map(match => {
+    const body = match[0];
+    const seam = body.match(/\[seam:\s*([^,\]]+?)(?:\s*,\s*firmness:\s*firm)?\]\s*\[firmness:\s*firm\]|\[seam:\s*([^,\]]+),\s*firmness:\s*firm\]/i);
+    return {
+      id: match[1],
+      body,
+      criteria: [...body.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/g)].map(item => item[1]),
+      firmSeam: seam?.[1] || seam?.[2] || null,
+      isTest: /\btest(?:s|ing)?\b/i.test(match[2]),
+    };
+  });
+}
+
+export function traceabilityReport(manifest, repoRoot = process.cwd()) {
+  const plan = artifactContent(manifest, 'plan', repoRoot);
+  const criteria = acceptanceCriteria(manifest, repoRoot);
+  const seams = firmSeams(manifest, repoRoot);
+  const tasks = planTasks(plan);
+  const duplicateTaskIds = tasks.map(task => task.id).filter((id, index, all) => all.indexOf(id) !== index);
+  const entries = criteria.map(id => {
+    const matching = tasks.filter(task => task.criteria.includes(id));
+    return { id, tasks: matching.map(task => task.id), firmTests: matching.filter(task => task.isTest && task.firmSeam).map(task => task.id) };
+  });
+  const missingCriteria = entries.filter(entry => entry.tasks.length === 0).map(entry => entry.id);
+  const uncoveredFirmSeams = seams.filter(seam => !tasks.some(task => task.isTest && task.firmSeam === seam));
+  return { criteria, seams, tasks, entries, duplicateTaskIds, missingCriteria, uncoveredFirmSeams };
+}
+
+export function renderTraceabilitySummary(report) {
+  const lines = report.entries.length === 0
+    ? ['- No acceptance criteria declared.']
+    : report.entries.map(entry => `- \`${entry.id}\` -> tasks: ${entry.tasks.map(id => `\`${id}\``).join(', ') || 'none'}; firm-seam tests: ${entry.firmTests.map(id => `\`${id}\``).join(', ') || 'none'}`);
+  return ['<!-- traceability:start -->', ...lines, '<!-- traceability:end -->'].join('\n');
+}
+
+function traceabilitySummary(content) {
+  return content.match(/<!-- traceability:start -->\n([\s\S]*?)\n<!-- traceability:end -->/m)?.[0] || '';
 }
 
 function validateArtifactReviewIds(manifest, phase, content, repoRoot, errors) {
@@ -744,12 +814,9 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (architecture && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(architecture) !== expectedCycle) {
       errors.push(`architecture.md review cycle reference must be ${expectedCycle}`);
     }
-    const ledger = architecture.match(/## Architecture Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
-    const rows = ledger.split('\n').filter(line => /^\|\s*A-\d+/i.test(line));
-    for (const row of rows) {
-      const cells = row.split('|').map(cell => cell.trim());
-      if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`architecture confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
-      if (!cells[5]) errors.push(`architecture confirmation ledger row has no explicit user response: ${cells[1] || row}`);
+    for (const record of recordBlocks(architecture, 'Architecture Confirmation Ledger', 'A')) {
+      if (recordField(record, 'Status').toLowerCase() !== 'confirmed') errors.push(`architecture confirmation record is not explicitly confirmed: ${record.id}`);
+      if (!recordField(record, 'User response')) errors.push(`architecture confirmation record has no explicit user response: ${record.id}`);
     }
     if (architecture && !/\*\*Status:\*\* passed(?:-after-resolution)?\b/i.test(architecture)) {
       errors.push('architecture.md validity status must be passed or passed-after-resolution');
@@ -773,12 +840,9 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (decisions && ['feature', 'epic'].includes(manifest.class) && reviewCycleReference(decisions) !== expectedCycle) {
       errors.push(`decisions.md review cycle reference must be ${expectedCycle}`);
     }
-    const ledger = decisions.match(/## Confirmation Ledger\s*\n([\s\S]*?)(?:\n## |$)/i)?.[1] || '';
-    const rows = ledger.split('\n').filter(line => /^\|\s*D-\d+/i.test(line));
-    for (const row of rows) {
-      const cells = row.split('|').map(cell => cell.trim());
-      if (cells[6]?.toLowerCase() !== 'confirmed') errors.push(`confirmation ledger row is not explicitly confirmed: ${cells[1] || row}`);
-      if (!cells[5]) errors.push(`confirmation ledger row has no explicit user response: ${cells[1] || row}`);
+    for (const record of recordBlocks(decisions, 'Confirmation Ledger', 'D')) {
+      if (recordField(record, 'Status').toLowerCase() !== 'confirmed') errors.push(`confirmation record is not explicitly confirmed: ${record.id}`);
+      if (!recordField(record, 'User response')) errors.push(`confirmation record has no explicit user response: ${record.id}`);
     }
     if (decisions && unresolvedBlockers(decisions)) errors.push('decisions.md has an unresolved dry-run blocker');
     if (decisions && ['feature', 'epic'].includes(manifest.class)) {
@@ -789,12 +853,14 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
   if (approval === 'plan') {
     const plan = readArtifact(manifest, 'plan', repoRoot, errors);
     if (plan && !plan.includes('## Traceability check')) errors.push('plan.md missing required section: ## Traceability check');
-    if (plan && !/^\|\s*AC ID\s*\|\s*Task\(s\)\s*\|\s*Firm-seam test task\s*\|/mi.test(plan)) {
-      errors.push('plan.md missing traceability table');
+    if (plan && !/<!-- traceability:start -->[\s\S]*<!-- traceability:end -->/m.test(plan)) errors.push('plan.md missing generated traceability summary');
+    if (plan) {
+      const report = traceabilityReport(manifest, repoRoot);
+      if (report.duplicateTaskIds.length > 0) errors.push(`plan.md has duplicate task IDs: ${[...new Set(report.duplicateTaskIds)].join(', ')}`);
+      if (report.missingCriteria.length > 0) errors.push(`plan.md has acceptance criteria without tasks: ${report.missingCriteria.join(', ')}`);
+      if (report.uncoveredFirmSeams.length > 0) errors.push(`plan.md has firm seams without firm-seam test tasks: ${report.uncoveredFirmSeams.join(', ')}`);
+      if (traceabilitySummary(plan) !== renderTraceabilitySummary(report)) errors.push('plan.md generated traceability summary is stale; run traceability-sync.mjs --write');
     }
-    const firmSeams = [...plan.matchAll(/\[firmness:\s*firm\]|\[seam:[^\]]+\bfirmness:\s*firm\]/gi)].length;
-    const firmTasks = [...plan.matchAll(/\[seam:[^\]]+\]\s*\[firmness:\s*firm\]|\[seam:[^\]]+\bfirmness:\s*firm\]/gi)].length;
-    if (firmSeams > firmTasks) errors.push('plan.md has firm seams without matching firm-seam test tasks');
     if (plan && hasFencedSourceCode(plan)) {
       errors.push('plan.md contains a fenced source-code block; replace it with a concise functional specification');
     }
@@ -815,19 +881,16 @@ export function nextSkill(manifest) {
     return epicNextAction(manifest);
   }
 
-  // Refactor changes audit, obtain selection approval, execute the selected
-  // cleanup with independent review, and reconcile docs without entering the
-  // spec spine.
+  // Refactor changes audit, obtain selection approval, then execute the selected
+  // cleanup, reconcile docs, and complete independent review without the spec spine.
   if (manifest.class === 'refactor') {
     if (phase === 'refactor' && approvals.refactor !== 'approved') return 'refactor (audit and selection)';
     if (phase === 'implement' && approvals.implement !== 'approved') return 'refactor (execute selected batches)';
-    if (phase === 'implement' && approvals.implement === 'approved' && approvals.docs !== 'approved') return 'refactor (docs reconciliation)';
     return null;
   }
 
   if (['bug', 'small'].includes(manifest.class)) {
     if (phase === 'implement' && approvals.implement !== 'approved') return 'triage (implement and self-check)';
-    if (phase === 'implement') return 'triage (docs reconciliation)';
     return null;
   }
   if (phase === 'architect' && approvals.architect !== 'approved') return 'architect';
@@ -837,7 +900,6 @@ export function nextSkill(manifest) {
   if (phase === 'plan'      && approvals.plan !== 'approved')     return 'plan';
   if (phase === 'plan'      && approvals.plan === 'approved')     return 'implement';
   if (phase === 'implement' && approvals.implement !== 'approved') return 'implement';
-  if (phase === 'implement' && approvals.implement === 'approved' && approvals.docs !== 'approved') return 'implement (docs reconciliation)';
   return null;
 }
 

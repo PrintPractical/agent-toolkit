@@ -44,8 +44,7 @@ Use this decision tree:
 | `plan` | plan pending | "Run `plan` to continue or restart the planning session." |
 | `plan` | plan approved | "Run `implement` to execute the task checklist." |
 | `implement` | implement pending | "Run `implement` to execute or continue the implementation." |
-| `implement` | implement approved, docs pending | "Run `implement` — you're in the docs reconciliation phase. Update CONTEXT.md files and approve the docs approval." |
-| `archive-ready` | docs approved | "Create the verified archive; this is the last active state." |
+| `archive-ready` | implement approved | "Create the verified archive; this is the last active state." |
 
 **If there are kickbacks logged:**
 - Read the kickback entries from the manifest.
@@ -56,8 +55,7 @@ Use this decision tree:
 | Phase | Approval state | What to tell the user |
 |---|---|---|
 | `implement` | implement pending | "Run `triage` to execute or continue the direct fix." |
-| `implement` | implement approved, docs pending | "Run `triage` to reconcile and verify CONTEXT.md, then approve docs." |
-| `archive-ready` | docs approved | "Create the verified archive." |
+| `archive-ready` | implement approved | "Create the verified archive." |
 
 ### Refactor change (class: refactor)
 
@@ -65,7 +63,6 @@ Use this decision tree:
 |---|---|---|
 | `refactor` | refactor pending | "Run `refactor` to complete the audit and obtain refactor approval." |
 | `implement` | implement pending | "Run `refactor` to execute the selected cleanup." |
-| `implement` | implement approved, docs pending | "Run `refactor` to reconcile and verify docs, then approve docs." |
 | `archive-ready` | — | "Create the verified archive. For audit-only, it contains the approved audit report." |
 
 ### Epic change (class: epic)

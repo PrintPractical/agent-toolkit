@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Runs the direct implement→archive-ready lifecycle with implement and docs approvals, and escalates to architect if scope is larger than expected.
+description: Use for bugs, small isolated fixes, or tiny changes that don't warrant the full architect→specify→plan→implement pipeline. Runs the direct implement→archive-ready lifecycle with documentation reconciliation before the implement approval, and escalates to architect if scope is larger than expected.
 ---
 
 # Triage
@@ -103,7 +103,7 @@ If the fix grows beyond a small isolated change, stop and route it to the full `
 
 ## Phase 6: Docs reconciliation
 
-Reconciliation and verification are required before docs approval. For every relevant `CONTEXT.md` target:
+Reconciliation and verification are required before implement approval. For every relevant `CONTEXT.md` target:
 - Update the relevant CONTEXT.md section.
 - Re-stamp provenance.
 - Run verification and resolve any finding:
@@ -113,10 +113,9 @@ Reconciliation and verification are required before docs approval. For every rel
 
 ## Phase 7: Archive-ready and verified archive
 
-After the lightweight self-check and docs reconciliation, approve implement then docs. This moves the direct triage lifecycle to `archive-ready`:
+After the lightweight self-check and docs reconciliation, approve implement. This moves the direct triage lifecycle to `archive-ready`:
 ```
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
-node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
 ```
 
 Create the verified archive only after the change is archive-ready:

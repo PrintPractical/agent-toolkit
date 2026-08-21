@@ -27,7 +27,7 @@ approvals:
   specify:    pending | approved
   plan:       pending | approved
   implement:  pending | approved
-  docs:       pending | approved
+  docs:       pending | approved    # epic class only
 
 # Formal-review cycle epoch. Omit until a kickback advances an affected phase;
 # the implicit starting epoch is 1. Keep prior reviews.json cycles as history.
@@ -105,16 +105,16 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 | `architect` | User, after bounded `AV-*` review and deterministic artifact validation | Material topics confirmed; original review IDs closed; no unresolved blockers |
 | `specify` | User, after explicit confirmation ledger, bounded `SV-*` implement-as-if review, and deterministic artifact validation | Every material decision explicitly confirmed; original review IDs closed; no unresolved blockers |
 | `plan` | User, after traceability and deterministic artifact validation | Every acceptance criterion traces to >=1 task |
-| `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation complete and tests pass; when formal review applies, original findings are closed by a distinct fresh verifier |
-| `docs` | User, after reconciliation, `context-verify`, and verifier subagent | CONTEXT hierarchy updated and verified |
+| `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation complete and tests pass; CONTEXT hierarchy reconciled and verified; when formal review applies, original findings are closed by a distinct fresh verifier |
+| `docs` | User, after reconciliation, `context-verify`, and verifier subagent | Epic-only parent context hierarchy updated and verified |
 
 ## Change classes
 
-- **`small`** — Used by `triage`. Single component, no new seams or interface changes. It runs directly from `implement` to `archive-ready` with implement and docs approvals, a lightweight self-check, and no formal adversarial review.
-- **`bug`** — Used by `triage`. Existing behavior being restored. It uses the same direct `implement → archive-ready` path and approvals; no architect/specify or formal review is required unless scope expands.
+- **`small`** — Used by `triage`. Single component, no new seams or interface changes. It runs directly from `implement` to `archive-ready` with one implement approval after a lightweight self-check and docs reconciliation; no formal adversarial review is required.
+- **`bug`** — Used by `triage`. Existing behavior being restored. It uses the same direct `implement → archive-ready` path; no architect/specify or formal review is required unless scope expands.
 - **`feature`** — Standard full pipeline, including bounded `AV-*`, `SV-*`, and `RV-*` review cycles.
 - **`epic`** — Runs `architect` with one `AV-*` cycle, then `specify` with one `SV-*` cycle over cross-cutting contracts, then enters `decomposed` via `epic-split`. The epic never runs plan or implement. Each child runs its own applicable spine depth-first, remains `archive-ready` when complete, and archives with the parent in one coordinated operation.
-- **`refactor`** — Used by the `refactor` skill for behavior-preserving cleanup. Execute mode skips the spec spine: `refactor` (audit, rank opportunities, record the user's explicit `RF-NNN` selection) → `implement` (apply selected cleanup, keep tests green, obtain a distinct fresh independent review) → `archive-ready` after docs approval. Audit-only approves the completed `refactor` audit, moves directly to `archive-ready`, and archives the report without execution. Never changes observable behavior; anything that would is escalated to `architect`.
+- **`refactor`** — Used by the `refactor` skill for behavior-preserving cleanup. Execute mode skips the spec spine: `refactor` (audit, rank opportunities, record the user's explicit `RF-NNN` selection) → `implement` (apply selected cleanup, reconcile docs, keep tests green, obtain a distinct fresh independent review) → `archive-ready`. Audit-only approves the completed `refactor` audit, moves directly to `archive-ready`, and archives the report without execution. Never changes observable behavior; anything that would is escalated to `architect`.
 
 ## Epic parent/child model
 

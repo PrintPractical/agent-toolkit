@@ -11,13 +11,11 @@
 
 ## Traceability check
 
-Every firm acceptance criterion must trace to at least one task. Every firm seam must have at least one firm-seam test task.
+Every acceptance criterion must trace to at least one task. Every firm seam must have at least one firm-seam test task. `traceability-sync.mjs --write` regenerates this block; do not edit it manually.
 
-| AC ID | Task(s) | Firm-seam test task |
-|---|---|---|
-| AC-{{id}}-01 | Section N, Task M | Section N, Task K |
-
-<!-- Fill before plan approval is approved. -->
+<!-- traceability:start -->
+- No acceptance criteria declared.
+<!-- traceability:end -->
 
 ---
 
@@ -29,24 +27,24 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}] [firmness: firm]
+- [ ] [T-001] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}] [firmness: firm]
   - Target: `{{test file path}}`
   - Assert: `{{behavioral assertion from AC}}`
-  - Traces to: `[SEAM-{{id}}-01]`
+  - Traces to: `[AC-{{id}}-01]`
 
-- [ ] Write unit tests for {{component}} [seam: internal] [firmness: soft]
+- [ ] [T-002] Write unit tests for {{component}} [seam: internal] [firmness: soft]
   - Target: `{{test file path}}`
 
 ### Implementation
 
-- [ ] {{specific task}} — `{{target file}}`
+- [ ] [T-003] {{specific task}} — `{{target file}}`
   - Confirmed contract/symbol: `{{optional public one-line signature or symbol; no body}}`
   - Required outcome: {{observable behavior and state transition}}
   - Errors and invariants: {{confirmed validation, error semantics, ordering guarantees, and constraints}}
   - Acceptance evidence: {{test/assertion or criterion proving completion}}
   - Implementation freedom: {{private helpers, local representation, and control flow remain implementer-owned}}
 
-- [ ] {{specific task}} — `{{target file}}`
+- [ ] [T-004] {{specific task}} — `{{target file}}`
 
 ### Verify
 
@@ -60,11 +58,11 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ### Tests
 
-- [ ] {{test task}} [seam: {{seam-id}}] [firmness: {{firm|soft}}]
+- [ ] [T-005] {{test task}} [seam: {{seam-id}}] [firmness: {{firm|soft}}]
 
 ### Implementation
 
-- [ ] {{task}}
+- [ ] [T-006] {{task}}
 
 ### Verify
 
@@ -92,10 +90,17 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Record structured auditor and verifier attestations under the current `implement-N` epoch; verifier resolutions reference every original RV ID.
 - [ ] User approves → implement approval → approved (blocked until the verifier approval is recorded)
 
-| ID | Severity | Category | Evidence | Concrete impact | Alternative | Disposition | Remediation | Focused verification |
-|---|---|---|---|---|---|---|---|---|
+<!-- Add one record only for each issued RV finding. Use Disposition: resolved | unresolved. -->
 
-<!-- Add a row only for each issued RV finding. Use Disposition: resolved | unresolved. -->
+### RV-{{seq}} [severity: blocker | major]
+
+- Category: correctness | security | simplicity | maintainability | idioms
+- Evidence: {{path, line, or concrete observation}}
+- Concrete impact: {{impact}}
+- Alternative: {{concrete alternative}}
+- Disposition: resolved | unresolved
+- Remediation: {{what changed}}
+- Focused verification: {{verifier evidence}}
 
 **Targeted correction/reverification used:** no | yes - {{original RV IDs and any remediation-caused blocker regression}}
 **Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
@@ -104,7 +109,7 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 
 ## Final section: Documentation reconciliation
 
-> **Triggered by:** `implement` approval approved, user confirms happy.
+> **Triggered by:** implementation and bounded review completion, before the implement approval.
 > **Goal:** Update all CONTEXT.md files in `manifest.context_targets` to reflect this change.
 
 - [ ] Run `context-verify.mjs` — baseline drift report
@@ -113,5 +118,5 @@ Every firm acceptance criterion must trace to at least one task. Every firm seam
 - [ ] Re-stamp provenance on all updated CONTEXT.md files (`validated-at: <HEAD sha>`)
 - [ ] Verifier subagent: confirm CONTEXT claims match implemented code
 - [ ] Present reconciliation summary to user
-- [ ] User approves → docs approval → approved
+- [ ] User approves → implement approval → approved
 - [ ] Run `change-archive.mjs` → zip to `.changes/archive/{{id}}.zip`

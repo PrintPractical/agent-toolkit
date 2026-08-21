@@ -71,18 +71,6 @@ node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cy
    ```
    A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.
 
-### Implement approval
-
-When all sections are green, the bounded review/remediation is done, and an approved verifier review is recorded:
-
-> "All implementation sections are complete, tests pass, and the independent review is approved. Do you approve the implement approval?"
-
-```
-node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
-```
-
-The approval refuses unless an approved verifier review (backed by a distinct auditor review) exists for this change.
-
 ## Kickback protocol
 
 When you encounter:
@@ -104,7 +92,7 @@ When you encounter:
 4. Tell the user to resume at the recorded phase and re-approve only invalidated approvals.
 5. Do not continue this session until the kickback is resolved.
 
-### Docs reconciliation (docs approval)
+### Docs reconciliation and implement approval
 
 Load `manifest.context_targets` from `manifest.yaml`. For each target CONTEXT.md:
 1. Run `context-verify.mjs` for baseline:
@@ -125,13 +113,15 @@ node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
 5. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable, and address its findings.
 6. Present the reconciliation summary. Address any verifier findings.
 
-Ask the user:
-> "CONTEXT.md files have been reconciled and verified. Are you happy with this change? (Approving the docs approval will move the change to `archive-ready`.)"
+When all sections are green, the bounded review/remediation is done, and documentation is reconciled and verified, ask the user:
+> "All implementation sections are complete, tests pass, the independent review is approved, and CONTEXT.md is reconciled. Do you approve the implement approval?"
 
 On approval:
 ```
-node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --approve
+node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
 ```
+
+The approval refuses unless an approved verifier review (backed by a distinct auditor review) exists and `context-verify.mjs` passes for every context target.
 
 ### Archive-ready and verified archive
 
@@ -139,7 +129,7 @@ node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval docs --appr
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>
 ```
 
-Run this only after the docs approval has moved the change to `archive-ready`. The change is terminal only once archive verification succeeds and the zip is in `.changes/archive/<id>.zip`.
+Run this only after the implement approval has moved the change to `archive-ready`. The change is terminal only once archive verification succeeds and the zip is in `.changes/archive/<id>.zip`.
 
 To cancel instead, record a concrete `archive.reason` in `manifest.yaml` and archive the current artifacts rather than deleting them.
 

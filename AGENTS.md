@@ -57,14 +57,14 @@ Canonical source ownership is strict: shared guidance belongs in `_shared/`, tem
 
 ```
 active phases: architect → specify → plan → implement → refactor → decomposed → archive-ready
-approvals: architect | specify | plan | implement | docs
+approvals: refactor | architect | specify | plan | implement | docs (epics only)
 
 feature:        architect → specify → plan → implement → archive-ready → verified archive
 bug/small:      implement → archive-ready → verified archive
 refactor:       refactor → implement → archive-ready → verified archive
 refactor audit: refactor → archive-ready → verified archive
 epic:           architect → specify → decomposed → coordinated verified archive
-refactor approvals: refactor | implement | docs
+refactor approvals: refactor | implement
 ```
 
 - No skill advances past an approval without `approved` status.
@@ -72,7 +72,7 @@ refactor approvals: refactor | implement | docs
 - Standard `implement` and the `refactor` class require an approved independent review (fresh auditor + distinct fresh verifier, recorded via `review-log.mjs --phase`) before approval. No per-file snapshot tracking.
 - `change-status.mjs` prints the current phase and recommended next skill.
 - `archive-ready` is active; only a verified archive is terminal. Cancellation records a concrete reason and archives the current artifacts rather than deleting them.
-- Docs approval requires reconciliation plus `context-verify.mjs`; include its script in a skill's distribution mapping whenever that skill documents the command.
+- Non-epic implement approval requires documentation reconciliation plus `context-verify.mjs`; epic docs approval does the same. Include `context-verify.mjs` in a skill's distribution mapping whenever that skill documents the command.
 
 ## Kickback types
 

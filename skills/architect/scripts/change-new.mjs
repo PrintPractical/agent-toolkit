@@ -89,17 +89,17 @@ const dir = changeDir(id, repoRoot);
 console.error(`Creating change: ${id}`);
 fs.mkdirSync(dir, { recursive: true });
 
-// Epics only use architect + specify + coordinated docs approvals.
-// Refactors skip the spec spine: refactor (audit + selection) → implement → docs.
+// Epics use architect + specify + coordinated docs approvals.
+// Refactors skip the spec spine: refactor (audit + selection) → implement.
 const approvals = values.class === 'epic'
   ? { architect: 'pending', specify: 'pending', docs: 'pending' }
   : values.class === 'refactor'
   ? values.mode === 'audit-only'
     ? { refactor: 'pending' }
-    : { refactor: 'pending', implement: 'pending', docs: 'pending' }
+    : { refactor: 'pending', implement: 'pending' }
   : ['bug', 'small'].includes(values.class)
-  ? { implement: 'pending', docs: 'pending' }
-  : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending', docs: 'pending' };
+  ? { implement: 'pending' }
+  : { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending' };
 
 const isRefactor = values.class === 'refactor';
 
@@ -139,7 +139,7 @@ if (values.parent) {
   console.error(`  Epic flow: architect → specify → (auto-decompose into children)`);
 } else if (isRefactor) {
   console.error(`Phase: refactor — run the 'refactor' skill next`);
-  console.error(`  Refactor flow: refactor (audit + selection) → implement (execute + review) → docs`);
+    console.error(`  Refactor flow: refactor (audit + selection) → implement (execute + docs reconciliation + review) → archive-ready`);
 } else {
   console.error(`Phase: ${manifest.phase} — run the '${manifest.phase === 'implement' ? 'triage' : 'architect'}' skill next`);
 }

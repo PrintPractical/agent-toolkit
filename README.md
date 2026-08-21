@@ -122,7 +122,7 @@ implement
  └─ independent review recorded via review-log.mjs (no per-file snapshot tracking)
  └─ live checklist: checks off tasks as they complete
   └─ on completion: reconcile CONTEXT.md files, re-stamp provenance, run context-verify.mjs
-   └─ approves: implement approval → docs approval → archive-ready → verified archive
+    └─ reconciles docs before the implement approval → archive-ready → verified archive
 ```
 
 `brainstorm` is useful when an idea is not yet ready for architecture. It creates no manifest or approval; its optional `architect-seed.md` records facts, hypotheses, preferences, alternatives, and open questions for `architect` to challenge.
@@ -186,7 +186,7 @@ triage
   └─ writes failing test first (red), then fix (green)
   └─ quick refactor pass
   └─ reconciles CONTEXT.md and runs context-verify.mjs
-  └─ implement approval → docs approval → archive-ready → verified archive
+  └─ docs reconciliation → implement approval → archive-ready → verified archive
 ```
 
 **Triage escalates to `architect` when:**
@@ -212,7 +212,7 @@ refactor
  └─ fresh auditor records findings, then a distinct fresh verifier confirms (review-log.mjs)
   └─ execute mode reconciles and verifies CONTEXT.md, then reaches archive-ready
   └─ audit-only: refactor approval → archive-ready → verified audit archive
-  └─ execute mode: refactor approval → implement approval → docs approval → archive-ready → verified archive
+  └─ execute mode: refactor approval → documentation reconciliation → implement approval → archive-ready → verified archive
 ```
 
 `refactor` preserves observable behavior. Bug fixes, product changes, public or firm contract changes, migrations, dependency upgrades, and cross-scope redesign are recorded as architect candidates and must follow the `architect` flow. Firm-seam tests remain immutable; a firm-seam failure during cleanup is a kickback, not a test edit. The independent review is recorded via `review-log.mjs` — no per-file snapshot tracking.

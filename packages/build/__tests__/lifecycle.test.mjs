@@ -34,8 +34,6 @@ describe('end-to-end closure', () => {
     const { id } = JSON.parse(created.stdout);
     assert.equal(readManifest(id, cwd).phase, 'implement');
     assert.equal(run('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd).status, 0);
-    const docs = run('manifest-approval.mjs', ['--id', id, '--approval', 'docs', '--approve'], cwd);
-    assert.equal(docs.status, 0, docs.stderr);
     assert.equal(readManifest(id, cwd).phase, 'archive-ready');
     const archive = run('change-archive.mjs', ['--id', id], cwd);
     assert.equal(archive.status, 0, archive.stderr);

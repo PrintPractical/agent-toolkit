@@ -69,7 +69,7 @@ if (values.approve) {
     process.exit(1);
   }
   const earlier = allowed.slice(0, allowed.indexOf(values.approval)).filter(approval => approval !== 'docs');
-  if (values.approval === 'docs' && manifest.approvals.implement !== 'approved') {
+  if (values.approval === 'docs' && manifest.class !== 'epic' && manifest.approvals.implement !== 'approved') {
     console.error(`Cannot approve docs before implement is approved for '${values.id}'.`);
     process.exit(1);
   }
@@ -100,8 +100,10 @@ if (values.approve) {
         process.exit(1);
       }
     }
+  }
+  if (values.approval === 'implement' || values.approval === 'docs') {
     const contextError = verifyContexts();
-    if (contextError) { console.error(`Cannot approve docs: ${contextError}`); process.exit(1); }
+    if (contextError) { console.error(`Cannot approve ${values.approval}: ${contextError}`); process.exit(1); }
   }
   manifest.approvals[values.approval] = 'approved';
   manifest.phase = nextPhaseForApproval(manifest, values.approval);

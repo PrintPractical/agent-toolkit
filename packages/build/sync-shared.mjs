@@ -164,7 +164,7 @@ export const SCRIPT_MAP = {
   brainstorm: [],
   architect: ['change-new.mjs', 'context-discover.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
   specify: ['epic-split.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
-  plan: ['kickback-log.mjs', 'manifest-approval.mjs'],
+  plan: ['kickback-log.mjs', 'manifest-approval.mjs', 'traceability-sync.mjs'],
   implement: ['change-archive.mjs', 'change-recover.mjs', 'context-verify.mjs', 'kickback-log.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
   refactor: ['change-archive.mjs', 'change-recover.mjs', 'change-new.mjs', 'context-discover.mjs', 'context-verify.mjs', 'manifest-approval.mjs', 'review-log.mjs'],
   triage: ['change-archive.mjs', 'change-recover.mjs', 'change-new.mjs', 'change-status.mjs', 'context-verify.mjs', 'manifest-approval.mjs'],
