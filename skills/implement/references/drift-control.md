@@ -30,11 +30,14 @@ The firmness model partitions the drift problem:
 - On demand via the `verify` skill (conversational)
 
 What it does for each CONTEXT.md:
-1. Read `Provenance: validated-at: <sha>`.
-2. Run `git diff --name-only <sha>..HEAD -- <component-dir>` → list of changed files since stamp.
-3. If changed files exist: mark CONTEXT as stale.
-4. For each firm seam with `enforced-by` test citations: run those tests.
-5. Emit a drift report: `{ path, stale, firmSeamResults: [{seamId, testPath, passed}] }`.
+1. Require exactly one final `Provenance: validated-at: <full-sha>` footer, or `<not-in-git-repo>` only outside Git.
+2. In Git, compare the stamped commit to HEAD and inspect unstaged, staged, and untracked paths in the context scope.
+3. If any scoped path changed: mark CONTEXT as stale.
+4. Parse only `### Seam: ... [firmness: firm]` blocks. Each must have an AC-linked criterion citing a root-relative test path, an exact command, and a matching seam marker in that test.
+5. With `--run-tests` (or `--ci`), execute each cited command separately.
+6. Emit a drift report: `{ path, isStale, firmSeamResults: [{seamId, testPath, command, exists, marker, passed}] }`.
+
+Run `node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file> --run-tests` during reconciliation. Approval scripts run the same check for every declared target.
 
 ## CI asymmetry
 
@@ -43,6 +46,7 @@ The CI response mirrors the firmness model:
 ```
 firm-seam test failing  → hard block (must fix before merge)
 firm-seam test missing  → hard block (firm seam must have a test)
+firm citation malformed → hard block (path, marker, AC, and command are required)
 soft prose stale        → warning + required PR trailer ack
                           (Reviewer adds: Context-Reviewed: src/gateway/CONTEXT.md)
 ```
@@ -66,7 +70,7 @@ Every firm seam carries a stable ID (`[SEAM-<component>-<name>-<seq>]`). This ID
 - `CONTEXT.md`: seam definition
 - `decisions.md`: any decision that changes the seam
 - Tests: `// [SEAM-gw-rl-01]` comment
-- `manifest.yaml` context_targets (implicit)
+- the marker in its cited enforcing test
 
 When `context-verify.mjs` or `verify` detects firm drift, it reports by seam ID — making blast-radius analysis and the firm-change protocol easier to execute precisely.
 

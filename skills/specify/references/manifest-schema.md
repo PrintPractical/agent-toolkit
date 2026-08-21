@@ -41,6 +41,8 @@ artifacts:
   decisions:    decisions.md
   plan:         plan.md
   refactor:     refactor.md          # refactor class only (replaces architecture/decisions/plan)
+  implementation: implementation.md  # non-refactor, non-epic completion evidence
+  epic_docs: epic-docs.md            # epic class only
 
 # Required only for a cancellation archive
 archive:
@@ -57,12 +59,12 @@ context_targets:                    # CONTEXT.md files this change should reconc
 
 kickbacks:
   - type:       defect | amendment
-    phase:      specify | plan | implement
+    phase:      specify | plan | implement | refactor
     at:         2026-07-01T14:32:00Z
     missed:     "What the upstream spec should have caught"
     resolution: "What was decided to resolve it"
-    impact: specify | plan | implementation
-    invalidated_approvals: "specify,plan"
+    impact: specify | plan | implementation | epic-specify | architect
+    invalidated_approvals: "specify,plan,implement"
     restart_phase: specify
 ```
 
@@ -77,7 +79,7 @@ Feature:              architect → specify → plan → implement → archive-r
 
 Bug/small (triage):   implement → archive-ready → verified archive
 
-Epic:                 architect → specify → decomposed
+Epic:                 architect → specify → decomposed → docs → archive-ready
                                             ↓
                          child ... → archive-ready (held by epic)
                                             ↓
@@ -93,7 +95,8 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 - `change-status.mjs` prints the current phase and the recommended next skill.
 - `archive-ready` is active, not terminal. The only terminal state is a verified archive; the active workspace is removed only after archive verification succeeds.
 - Cancellation may occur from any active phase. Record `archive.outcome: cancelled` and a specific `archive.reason`, then create a verified cancellation archive. It bypasses unfinished approvals but never silently discards the workspace.
-- A kickback records its impact. `specify` impact resets specify and plan; `plan` impact resets only plan; `implementation` impact resets no upstream approval. It advances the affected formal review epochs, so resumed reviews use the current `phase-N` epoch while prior cycles remain history. Re-approve only invalidated approvals without losing unaffected checklist work.
+- A kickback records its impact. `specify` resets specify, plan, and implement; `plan` resets plan and implement; `implementation` resets implement. It advances affected formal review epochs, so resumed reviews use the current `phase-N` epoch while prior cycles remain history. Re-approve only invalidated approvals without losing unaffected checklist work.
+- A child may use `epic-specify` to return a cross-cutting contract to its direct epic parent. The parent and active children are reset for revalidation. A refactor uses `architect` to record an escalation handoff, then creates an architect-class change rather than continuing as a refactor.
 
 **Epics never run plan or implement.** Their `specify` covers cross-cutting contracts only. After `specify` is approved, run `epic-split.mjs`; the epic enters `decomposed`, and its `architecture.md` + `decisions.md` become parent context for each child's `architect` session. Keep completed children at `archive-ready` until the epic is ready to archive them together.
 
@@ -105,8 +108,8 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 | `architect` | User, after bounded `AV-*` review and deterministic artifact validation | Material topics confirmed; original review IDs closed; no unresolved blockers |
 | `specify` | User, after explicit confirmation ledger, bounded `SV-*` implement-as-if review, and deterministic artifact validation | Every material decision explicitly confirmed; original review IDs closed; no unresolved blockers |
 | `plan` | User, after traceability and deterministic artifact validation | Every acceptance criterion traces to >=1 task |
-| `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation complete and tests pass; CONTEXT hierarchy reconciled and verified; when formal review applies, original findings are closed by a distinct fresh verifier |
-| `docs` | User, after reconciliation, `context-verify`, and verifier subagent | Epic-only parent context hierarchy updated and verified |
+| `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation evidence records passing tests and completed context verification; CONTEXT hierarchy is reconciled and verified; when formal review applies, original findings are closed by a distinct fresh verifier |
+| `docs` | User, after reconciliation, `context-verify`, and verifier subagent | Epic-only `epic-docs.md` records reconciliation, passing verification, independent docs review, and explicit approval evidence |
 
 ## Change classes
 
@@ -120,9 +123,9 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 
 An epic is a container for multiple related feature/bug/small changes that are too large to implement as one change but share a common architectural context.
 
-**Epic manifest:** Contains `class: epic` and a `children` list of child change IDs. The epic runs `architect` then `specify`; `epic-split` populates the `children` list after the specify approval is approved and moves the epic to `decomposed`. When every child is `archive-ready`, reconcile the epic context, approve docs, move the epic to `archive-ready`, and archive the parent plus children together.
+**Epic manifest:** Contains `class: epic` and a `children` list of child change IDs. The epic runs `architect` then `specify`; `epic-split` populates the `children` list after the specify approval is approved and moves the epic to `decomposed`. When every child is `archive-ready`, use the `epic` skill to reconcile parent context, approve docs, move the epic to `archive-ready`, and archive the parent plus children together.
 
-**Child manifests:** Contain `parent: <epic-id>` linking back to the epic. Each child has its own full pipeline.
+**Child manifests:** Contain `parent: <epic-id>` linking back to the epic. Each child has its own full pipeline and cannot be archived or cancelled independently. Cancel the epic parent to create one coordinated cancellation archive for it and all children.
 
 **Execution order — depth-first.** Take each child through its applicable spine to `archive-ready` before starting the next, in dependency order. Do not architect/specify all children up front: the epic's `specify` already locked the cross-cutting contracts between children, so each child is insulated from the others. Independent children may run in parallel, but each runs its full spine start-to-finish — never batched by phase. Do not archive an `archive-ready` child independently. If a child implementation reveals a cross-cutting contract is wrong, kick back to the epic's `specify` (firm-change protocol) and propagate to any already-completed children.
 

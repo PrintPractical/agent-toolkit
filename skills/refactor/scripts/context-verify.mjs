@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Verify CONTEXT provenance, drift, and cited firm seams. */
+/** Verify strict CONTEXT provenance, drift, and executable firm-seam citations. */
 
 import fs from 'fs';
 import path from 'path';
@@ -9,9 +9,9 @@ import { parseArgs } from 'util';
 const { values } = parseArgs({ options: {
   help: { type: 'boolean', short: 'h', default: false }, root: { type: 'string', default: process.cwd() },
   path: { type: 'string' }, all: { type: 'boolean', default: false }, 'run-tests': { type: 'boolean', default: false },
-  ci: { type: 'boolean', default: false }, 'test-command': { type: 'string' },
+  ci: { type: 'boolean', default: false },
 }, strict: true });
-const usage = 'Usage: context-verify.mjs [--root <directory>] [--path <context-file>] [--all] [--run-tests] [--ci] [--test-command <command>]';
+const usage = 'Usage: context-verify.mjs [--root <directory>] [--path <context-file>] [--all] [--run-tests] [--ci]';
 if (values.help) { console.log(usage); process.exit(0); }
 const repoRoot = path.resolve(values.root);
 
@@ -39,14 +39,54 @@ function discover() {
   return result;
 }
 
-let contextFiles;
-if (values.path) contextFiles = [path.resolve(repoRoot, values.path)];
-else if (values.all) contextFiles = discover();
-else contextFiles = [path.join(repoRoot, 'CONTEXT.md')];
+function runGit(args) {
+  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+}
+
+function inScope(file, contextPath) {
+  const scope = path.dirname(path.relative(repoRoot, contextPath));
+  return scope === '' || scope === '.' || file === scope || file.startsWith(`${scope}/`);
+}
+
+function footerOnlyUpdate(contextPath, relPath, content, stamp) {
+  if (!gitRepository || stamp !== runGit(['rev-parse', 'HEAD'])) return false;
+  try {
+    const committed = runGit(['show', `HEAD:${relPath}`]);
+    const withoutFooter = value => value.replace(/^Provenance:\s*validated-at:\s*.+\s*$/im, '').trimEnd();
+    return withoutFooter(committed) === withoutFooter(content);
+  } catch {
+    return false;
+  }
+}
+
+function parseFirmSeams(content) {
+  const seams = [];
+  const authored = content.replace(/<!--[\s\S]*?-->/g, '');
+  const blocks = [...authored.matchAll(/^###\s+Seam:[^\n]*\[firmness:\s*firm\][\s\S]*?(?=^###\s+Seam:|^##\s+|$(?![\s\S]))/gim)];
+  for (const match of blocks) {
+    const block = match[0];
+    const id = block.match(/\[SEAM-([^\]]+)\]/i)?.[1];
+    if (!id) continue;
+    const seamId = `SEAM-${id}`;
+    const citations = [...block.matchAll(new RegExp(`\\[${seamId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\][^→\\n]*(?:→|->)\\s*enforced-by:\\s*([^;\\n]+?)\\s*;\\s*command:\\s*(.+)$`, 'gim'))]
+      .map(citation => ({ testPath: citation[1].trim(), command: citation[2].trim() }));
+    seams.push({ seamId, criteria: [...block.matchAll(/\[AC-[A-Za-z0-9][A-Za-z0-9-]*\]/g)].length, citations });
+  }
+  return seams;
+}
+
+function validRootPath(candidate) {
+  return Boolean(candidate) && !path.isAbsolute(candidate) && !candidate.split('/').includes('..') && !candidate.split('\\').includes('..');
+}
+
+const contextFiles = values.path
+  ? [path.resolve(repoRoot, values.path)]
+  : values.all ? discover() : [path.join(repoRoot, 'CONTEXT.md')];
 const results = [];
 let invalid = false;
 let stale = false;
 let firmFailure = false;
+
 for (const contextPath of contextFiles) {
   const relPath = path.relative(repoRoot, contextPath);
   if (!fs.existsSync(contextPath)) {
@@ -54,49 +94,79 @@ for (const contextPath of contextFiles) {
     invalid = true;
     continue;
   }
+
   const content = fs.readFileSync(contextPath, 'utf8');
-  const provenance = content.match(/Provenance:\s*validated-at:\s*(?:([a-f0-9]{7,40})|(<not-in-git-repo>))/i);
-  const sha = provenance?.[1] || null;
-  const untracked = Boolean(provenance?.[2]);
-  let provenanceValid = Boolean(sha || untracked);
+  const footers = [...content.matchAll(/^Provenance:\s*validated-at:\s*(.+)\s*$/gim)];
+  const finalFooter = footers.length === 1 && content.trimEnd().endsWith(footers[0]?.[0].trim());
+  const stamp = footers[0]?.[1]?.trim() || null;
+  const sha = /^[a-f0-9]{40}$/i.test(stamp || '') ? stamp : null;
+  const untracked = stamp === '<not-in-git-repo>' && !gitRepository;
+  let provenanceValid = finalFooter && Boolean(sha || untracked);
   let changedFiles = [];
-  if (sha) {
+
+  if (sha && gitRepository) {
     try {
-      execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: repoRoot, stdio: 'pipe' });
-      const output = execFileSync('git', ['diff', '--name-only', `${sha}..HEAD`, '--', path.dirname(relPath) || '.'], { cwd: repoRoot, encoding: 'utf8' }).trim();
-      changedFiles = output ? output.split('\n') : [];
+      runGit(['cat-file', '-e', `${sha}^{commit}`]);
+      const committed = runGit(['diff', '--name-only', `${sha}..HEAD`, '--', path.dirname(relPath) || '.']);
+      const dirty = [
+        runGit(['diff', '--name-only', '--', path.dirname(relPath) || '.']),
+        runGit(['diff', '--cached', '--name-only', '--', path.dirname(relPath) || '.']),
+        runGit(['ls-files', '--others', '--exclude-standard', '--', path.dirname(relPath) || '.']),
+      ].flatMap(output => output ? output.split('\n') : []);
+      changedFiles = [...new Set([...(committed ? committed.split('\n') : []), ...dirty])]
+        .filter(file => inScope(file, contextPath) && file !== '.changes' && !file.startsWith('.changes/'))
+        // A full HEAD stamp necessarily changes after the reconciliation commit.
+        // Permit that footer-only unstaged update, but no other context drift.
+        .filter(file => file !== relPath || !footerOnlyUpdate(contextPath, relPath, content, sha));
     } catch {
       provenanceValid = false;
     }
+  } else if (sha || (stamp === '<not-in-git-repo>' && gitRepository)) {
+    provenanceValid = false;
   }
-  const isStale = !provenanceValid || changedFiles.length > 0 || (untracked && gitRepository);
-  if (!provenanceValid) invalid = true;
-  if (isStale) stale = true;
-  const authoredContent = content.replace(/<!--[\s\S]*?-->/g, '');
-  const firmSeams = [...authoredContent.matchAll(/\[SEAM-([^\]]+)\][^→\n]*(?:→|->)\s*enforced-by:\s*([^\n]+)/gi)]
-    .map(match => ({ id: `SEAM-${match[1]}`, testPath: match[2].trim() }));
-  const firmSeamResults = firmSeams.map(seam => ({
-    seamId: seam.id,
-    testPath: seam.testPath,
-    exists: fs.existsSync(path.resolve(repoRoot, seam.testPath)) || fs.existsSync(path.resolve(path.dirname(contextPath), seam.testPath)),
-    passed: null,
-  }));
-  if (firmSeamResults.some(result => !result.exists)) {
-    firmFailure = true;
-    firmSeamResults.filter(result => !result.exists).forEach(result => { result.passed = false; result.note = 'test file not found'; });
-  }
-  if ((values['run-tests'] || values.ci) && firmSeams.length > 0 && !firmFailure) {
-    const command = values['test-command'] || process.env.AGENT_TOOLKIT_FIRM_TEST_COMMAND || 'npm test';
-    try {
-      execSync(command, { cwd: repoRoot, stdio: 'pipe' });
-      firmSeamResults.forEach(result => { result.passed = true; result.command = command; });
-    } catch (error) {
-      firmFailure = true;
-      firmSeamResults.forEach(result => { result.passed = false; result.command = command; result.note = String(error.message); });
+
+  const parsedSeams = parseFirmSeams(content);
+  const structureErrors = [];
+  const firmSeamResults = [];
+  for (const seam of parsedSeams) {
+    if (seam.criteria === 0) structureErrors.push(`${seam.seamId} has no acceptance criterion`);
+    if (seam.citations.length === 0) structureErrors.push(`${seam.seamId} has no executable enforcing test`);
+    for (const citation of seam.citations) {
+      const testPath = citation.testPath;
+      const absolutePath = validRootPath(testPath) ? path.resolve(repoRoot, testPath) : null;
+      const exists = Boolean(absolutePath && fs.existsSync(absolutePath));
+      const marker = exists && fs.readFileSync(absolutePath, 'utf8').includes(`[${seam.seamId}]`);
+      const result = { seamId: seam.seamId, testPath, command: citation.command, exists, marker, passed: null };
+      if (!exists) result.note = 'test file not found at repository-root-relative path';
+      else if (!marker) result.note = 'test file does not contain the cited seam marker';
+      firmSeamResults.push(result);
     }
   }
-  results.push({ path: relPath, sha, provenance: untracked ? 'untracked' : sha ? 'git' : null, provenanceValid, isStale, changedFiles, firmSeams: firmSeams.length, firmSeamResults });
+  if (structureErrors.length > 0 || firmSeamResults.some(result => !result.exists || !result.marker)) {
+    invalid = true;
+    firmFailure = true;
+    firmSeamResults.filter(result => !result.exists || !result.marker).forEach(result => { result.passed = false; });
+  }
+  if ((values['run-tests'] || values.ci) && firmSeamResults.length > 0 && !firmFailure) {
+    for (const result of firmSeamResults) {
+      try {
+        execSync(result.command, { cwd: repoRoot, stdio: 'pipe' });
+        result.passed = true;
+      } catch (error) {
+        result.passed = false;
+        result.note = String(error.message);
+        firmFailure = true;
+      }
+    }
+  }
+  const isStale = !provenanceValid || changedFiles.length > 0;
+  // A non-Git marker becomes stale after Git initialization, but remains a
+  // migration warning rather than malformed provenance.
+  if (!provenanceValid && !(stamp === '<not-in-git-repo>' && gitRepository)) invalid = true;
+  if (isStale) stale = true;
+  results.push({ path: relPath, sha, provenance: untracked ? 'untracked' : sha ? 'git' : null, provenanceValid, isStale, changedFiles, firmSeams: parsedSeams.length, firmSeamResults, structureErrors });
 }
+
 process.stdout.write(JSON.stringify(results) + '\n');
 if (firmFailure || invalid) process.exit(1);
 if (stale) process.exit(2);

@@ -72,6 +72,7 @@ jobs:
 
       - name: Require authorization for firm-seam test changes
         env:
+          CONTEXT_REPORT: ${{ runner.temp }}/context-report.json
           EVENT_PATH: ${{ github.event_path }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -84,18 +85,10 @@ jobs:
           const messages = [event.pull_request.body || '', execFileSync('git', ['log', '--format=%B', `${process.env.BASE_SHA}..${process.env.HEAD_SHA}`], { encoding: 'utf8' })].join('\n');
           const files = execFileSync('git', ['diff', '--name-only', `${process.env.BASE_SHA}..${process.env.HEAD_SHA}`], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
           const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const seamIds = new Set();
-
-          for (const file of files) {
-            for (const revision of [process.env.BASE_SHA, process.env.HEAD_SHA]) {
-              try {
-                const content = execFileSync('git', ['show', `${revision}:${file}`], { encoding: 'utf8' });
-                for (const match of content.matchAll(/\[SEAM-([^\]]+)\]/g)) seamIds.add(`SEAM-${match[1]}`);
-              } catch {
-                // The file may exist on only one side of the pull-request diff.
-              }
-            }
-          }
+          const report = JSON.parse(fs.readFileSync(process.env.CONTEXT_REPORT, 'utf8'));
+          const seamIds = new Set(report.flatMap(context => context.firmSeamResults || [])
+            .filter(result => files.includes(result.testPath))
+            .map(result => result.seamId));
 
           const missing = [...seamIds].filter(seamId => !new RegExp(`^Firm-Change:\\s*${escapeRegExp(seamId)}\\s*$`, 'm').test(messages));
           if (missing.length > 0) {

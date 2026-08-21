@@ -38,6 +38,18 @@ function writeApprovedArtifacts(id, cwd) {
   ].join('\n'));
 }
 
+function writeContext(cwd) {
+  fs.writeFileSync(path.join(cwd, 'CONTEXT.md'), '# Context\n\nProvenance: validated-at: <not-in-git-repo>\n');
+}
+
+function writeImplementationEvidence(id, cwd) {
+  fs.writeFileSync(path.join(cwd, '.changes', 'active', id, 'implementation.md'), [
+    '## Completed work', '- completed', '## Verification',
+    '| Kind | Command | Result | Evidence |', '|---|---|---|---|', '| tests | `true` | pass | green |',
+    '**Context verification:** pass - reconciled', '## Approval evidence', '**User response (verbatim):** approve',
+  ].join('\n'));
+}
+
 function recordEmptyCycle(id, phase, cycle, cwd) {
   const audit = runScript('review-log.mjs', [
     'record', '--id', id, '--phase', phase, '--cycle', cycle, '--role', 'auditor',
@@ -184,6 +196,8 @@ describe('kickback flow', () => {
     const manifest = readManifest(id, cwd);
     manifest.phase = 'specify';
     manifest.approvals.specify = 'pending';
+    manifest.approvals.plan = 'pending';
+    manifest.approvals.implement = 'pending';
     writeManifest(id, manifest, cwd);
     const res = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'specify', '--approve'], cwd);
     assert.equal(res.status, 1);
@@ -194,6 +208,9 @@ describe('kickback flow', () => {
     const manifest = readManifest(id, cwd);
     manifest.phase = 'architect';
     manifest.approvals.architect = 'pending';
+    manifest.approvals.specify = 'pending';
+    manifest.approvals.plan = 'pending';
+    manifest.approvals.implement = 'pending';
     writeManifest(id, manifest, cwd);
     const res = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'architect', '--approve'], cwd);
     assert.equal(res.status, 1);
@@ -210,8 +227,10 @@ describe('implement approval review enforcement', () => {
     writeManifest(id, {
       id, title: 'Review approval', class: 'feature', phase: 'implement',
       approvals: { architect: 'approved', specify: 'approved', plan: 'approved', implement: 'pending' },
-      context_targets: [], kickbacks: [],
+      context_targets: ['CONTEXT.md'], kickbacks: [],
     }, cwd);
+    writeContext(cwd);
+    writeImplementationEvidence(id, cwd);
   });
 
   afterEach(() => { fs.rmSync(cwd, { recursive: true, force: true }); });
@@ -239,6 +258,13 @@ describe('implement approval review enforcement', () => {
     const res = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'docs', '--approve'], cwd);
     assert.equal(res.status, 1);
     assert.match(res.stderr, /does not apply to a 'feature'/);
+  });
+
+  it('requires implementation evidence before independent review can approve', () => {
+    fs.rmSync(path.join(cwd, '.changes', 'active', id, 'implementation.md'));
+    const res = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /missing implementation artifact/);
   });
 });
 
@@ -289,8 +315,11 @@ describe('architect and specify approval review enforcement', () => {
     manifest.class = 'bug';
     manifest.phase = 'implement';
     manifest.approvals = { implement: 'pending' };
+    manifest.context_targets = ['CONTEXT.md'];
     delete manifest.children;
     writeManifest(id, manifest, cwd);
+    writeContext(cwd);
+    writeImplementationEvidence(id, cwd);
     const bug = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd);
     assert.equal(bug.status, 0, bug.stderr);
   });
@@ -331,8 +360,20 @@ describe('refactor class approvals', () => {
     writeManifest(id, {
       id, title: 'Refactor class', class: 'refactor', phase: 'refactor',
       approvals: { refactor: 'pending', implement: 'pending' },
-      context_targets: [], kickbacks: [],
+      context_targets: ['CONTEXT.md'], kickbacks: [],
     }, cwd);
+    writeContext(cwd);
+    fs.writeFileSync(path.join(cwd, '.changes', 'active', id, 'refactor.md'), [
+      '## Ranked opportunities', '**Audit conclusion:** opportunities-ranked',
+      '### RF-001 Parser cleanup', '**Status:** selected',
+      '## Execution batches', '### Batch 1', '**Opportunity IDs:** RF-001',
+      '**User response (verbatim):** RF-001',
+      '## Full verification', '| Kind | Command | Result |', '|---|---|---|', '| tests | `true` | pass |',
+      '**Context verification:** pass - reconciled',
+    ].join('\n'));
+    const manifest = readManifest(id, cwd);
+    manifest.refactor_selected_ids = ['RF-001'];
+    writeManifest(id, manifest, cwd);
   });
 
   afterEach(() => { fs.rmSync(cwd, { recursive: true, force: true }); });
@@ -363,5 +404,70 @@ describe('refactor class approvals', () => {
 
     const ok = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'implement', '--approve'], cwd);
     assert.equal(ok.status, 0, ok.stderr);
+  });
+
+  it('requires a completed refactor report and exact selected opportunities', () => {
+    fs.rmSync(path.join(cwd, '.changes', 'active', id, 'refactor.md'));
+    let result = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'refactor', '--approve'], cwd);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /missing refactor artifact/);
+
+    fs.writeFileSync(path.join(cwd, '.changes', 'active', id, 'refactor.md'), [
+      '## Ranked opportunities', '**Audit conclusion:** opportunities-ranked',
+      '### RF-001 Parser cleanup', '**Status:** proposed',
+      '## Execution batches', '### Batch 1', '**Opportunity IDs:** RF-001',
+      '**User response (verbatim):** RF-001',
+    ].join('\n'));
+    result = runScript('manifest-approval.mjs', ['--id', id, '--approval', 'refactor', '--approve'], cwd);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /must be selected and appear/);
+  });
+});
+
+describe('change-status validation', () => {
+  let cwd;
+  beforeEach(() => { cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-status-')); });
+  afterEach(() => { fs.rmSync(cwd, { recursive: true, force: true }); });
+
+  it('fails for a requested missing change and withholds recommendations for invalid state', () => {
+    const missing = runScript('change-status.mjs', ['--id', 'missing-change'], cwd);
+    assert.equal(missing.status, 1);
+
+    const id = '2026-08-15-invalid';
+    writeManifest(id, {
+      id, title: 'Invalid', class: 'feature', phase: 'implement',
+      approvals: { architect: 'pending', specify: 'pending', plan: 'pending', implement: 'pending' },
+      context_targets: ['CONTEXT.md'], kickbacks: [],
+    }, cwd);
+    const result = runScript('change-status.mjs', ['--id', id], cwd);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout)[0].next_skill, null);
+    assert.match(JSON.parse(result.stdout)[0].state_errors.join('\n'), /inconsistent/);
+  });
+});
+
+describe('refactor escalation kickback', () => {
+  let cwd;
+  const id = '2026-08-16-refactor-escalation';
+
+  beforeEach(() => {
+    cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-toolkit-refactor-escalation-'));
+    writeManifest(id, {
+      id, title: 'Refactor escalation', class: 'refactor', phase: 'implement', refactor_mode: 'execute',
+      approvals: { refactor: 'approved', implement: 'pending' }, context_targets: ['CONTEXT.md'], kickbacks: [],
+    }, cwd);
+  });
+  afterEach(() => { fs.rmSync(cwd, { recursive: true, force: true }); });
+
+  it('records a blocking architect handoff rather than allowing a behavior-changing refactor', () => {
+    const result = runScript('kickback-log.mjs', [
+      '--id', id, '--type', 'defect', '--phase', 'implement', '--impact', 'architect', '--missed', 'Firm contract would change',
+    ], cwd);
+    assert.equal(result.status, 0, result.stderr);
+    const manifest = readManifest(id, cwd);
+    assert.equal(manifest.phase, 'implement');
+    assert.equal(manifest.kickbacks[0].restart_phase, 'architect');
+    assert.equal(manifest.kickbacks[0].escalation, true);
+    assert.equal(manifest.kickbacks[0].resolution, '');
   });
 });

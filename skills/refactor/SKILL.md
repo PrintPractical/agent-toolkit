@@ -137,12 +137,12 @@ After all selected batches are green, run exactly one `RV-*` cycle from `referen
 
 ## Phase 6: Documentation reconciliation
 
-1. Run `context-verify.mjs` for all context targets.
+1. Run `context-verify.mjs --run-tests` for all context targets.
 2. Update relevant `CONTEXT.md` Known Soft Spots, dependency descriptions, and soft structural descriptions to match code. A behavior-preserving refactor must not rewrite firm criteria or contracts.
 3. Reconcile developer docs describing changed internals, commands, or package layout. Do not churn user-facing behavior docs when behavior did not change.
-4. Re-stamp changed CONTEXT provenance at current HEAD, and have a fresh docs reviewer compare claims with code and `refactor.md`.
+4. In Git, commit the reconciled scope, then update only each final provenance footer with the resulting full HEAD SHA. Outside Git, retain `<not-in-git-repo>`. Have a fresh docs reviewer compare claims with code and `refactor.md`.
 
-Run `context-verify.mjs` after reconciliation and resolve its findings. Present selected/completed/deferred/escalated IDs, changed files, invariant evidence, test results, and reconciliation. Ask the user to approve the implement approval, which moves the change to `archive-ready`; then create the verified archive:
+Run `context-verify.mjs --run-tests` after reconciliation and record passing test and context-verification rows in `refactor.md`. Present selected/completed/deferred/escalated IDs, changed files, invariant evidence, test results, and reconciliation. Ask the user to approve the implement approval, which moves the change to `archive-ready`; then create the verified archive:
 ```bash
 node "$SKILL_DIR/scripts/manifest-approval.mjs" --id <id> --approval implement --approve
 node "$SKILL_DIR/scripts/change-archive.mjs" --id <id>

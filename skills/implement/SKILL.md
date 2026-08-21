@@ -30,6 +30,8 @@ Load `manifest.yaml`. Verify:
 - `approvals.implement` is `pending`.
 - `plan.md` exists.
 
+For feature changes, create `implementation.md` from `references/templates/implementation.md.tmpl` now. Keep its verification and context-reconciliation evidence current; implement approval validates it.
+
 Read `change-brief.md` first, then `references/engineering-fundamentals.md`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for implementation and review. If no matching pack is installed, state that and use repository conventions and tooling.
 
 ## The loop: per section (implement → tests green)
@@ -85,10 +87,10 @@ When you encounter:
 2. Classify: is this a `defect` (spec should have caught it) or `amendment` (legitimate new info)?
 3. Log the kickback:
 ```
-  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --phase implement --impact specify|plan|implementation \
+  node "$SKILL_DIR/scripts/kickback-log.mjs" --id <id> --type defect|amendment --phase implement --impact specify|plan|implementation|epic-specify \
   --missed "<what the spec didn't cover>"
 ```
-   Choose `specify` when a material decision changes, `plan` when only the checklist is stale, and `implementation` when no upstream artifact is invalidated. The script records the precise `restart_phase` and `invalidated_approvals`.
+    Choose `specify` when a material decision changes, `plan` when only the checklist is stale, and `implementation` when no upstream artifact is invalidated. A child uses `epic-specify` only when an epic cross-cutting contract is wrong. The script records the precise `restart_phase` and `invalidated_approvals`.
 4. Tell the user to resume at the recorded phase and re-approve only invalidated approvals.
 5. Do not continue this session until the kickback is resolved.
 
@@ -97,7 +99,7 @@ When you encounter:
 Load `manifest.context_targets` from `manifest.yaml`. For each target CONTEXT.md:
 1. Run `context-verify.mjs` for baseline:
 ```
-node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
+node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file> --run-tests
 ```
 2. Diff `architecture.md` + `decisions.md` against the CONTEXT.md. What changed?
 3. Update the CONTEXT.md to reflect this change:
@@ -110,7 +112,7 @@ node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
 4. Run a verifier subagent:
 > "Compare these CONTEXT.md files against the implementation. Do the claims match the code? List any discrepancy."
 
-5. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable, and address its findings.
+5. In Git, commit the reconciled scope, then update only each final provenance footer with the resulting full HEAD SHA. Outside Git, retain `<not-in-git-repo>`. Run `context-verify.mjs --run-tests` after reconciliation and address its findings.
 6. Present the reconciliation summary. Address any verifier findings.
 
 When all sections are green, the bounded review/remediation is done, and documentation is reconciled and verified, ask the user:
@@ -136,7 +138,7 @@ To cancel instead, record a concrete `archive.reason` in `manifest.yaml` and arc
 ## Firm-seam tripwire (summary)
 
 **Never edit a firm-seam test to make a refactor pass.** That is the tripwire. It means:
-- The refactor is not a pure refactor (behavior changed) → kickback with `--impact specify`.
+- The refactor is not a pure refactor (behavior changed) → record an escalation with `--impact architect`, then hand off to a new architect-class change.
 - Or the firm seam itself needs to change → this requires the full firm-change protocol (see `references/firm-change-protocol.md`), a `Firm-Change:` kickback, and scoped re-approval of affected approvals.
 
 ## Reference files

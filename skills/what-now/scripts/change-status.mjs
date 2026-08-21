@@ -51,13 +51,14 @@ for (const id of ids) {
   try {
     manifest = readManifest(id, repoRoot);
   } catch (e) {
-    console.error(`Warning: could not read manifest for ${id}: ${e.message}`);
+    console.error(`Error: could not read manifest for ${id}: ${e.message}`);
+    if (values.id) process.exit(1);
     continue;
   }
 
   const stateErrors = validateManifestState(manifest);
 
-  const skill = nextSkill(manifest);
+  const skill = stateErrors.length === 0 ? nextSkill(manifest, repoRoot) : null;
   const defectKickbacks = (manifest.kickbacks || []).filter(k => k.type === 'defect').length;
   const totalKickbacks = (manifest.kickbacks || []).length;
   const unresolvedKickback = [...(manifest.kickbacks || [])].reverse().find(k => !k.resolution);

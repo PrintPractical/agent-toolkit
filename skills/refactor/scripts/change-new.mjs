@@ -115,11 +115,19 @@ const manifest = {
   approvals,
   artifacts: isRefactor
     ? { change_brief: 'change-brief.md', refactor: 'refactor.md' }
+    : values.class === 'epic'
+    ? {
+        change_brief: 'change-brief.md',
+        architecture: 'architecture.md',
+        decisions: 'decisions.md',
+        epic_docs: 'epic-docs.md',
+      }
     : {
         change_brief: 'change-brief.md',
         architecture: 'architecture.md',
         decisions:    'decisions.md',
         plan:         'plan.md',
+        implementation: 'implementation.md',
       },
   context_targets: ['CONTEXT.md'],
   kickbacks: [],

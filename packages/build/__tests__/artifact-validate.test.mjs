@@ -107,6 +107,18 @@ describe('validateApprovalArtifacts', () => {
     assert.equal(result.valid, true, result.errors.join('\n'));
   });
 
+  it('requires every firm seam to link an acceptance criterion', () => {
+    fs.writeFileSync(path.join(dir, 'architecture.md'), architecture({ seam: '### Seam: API [id: SEAM-API] [firmness: firm]\n- Contract is stable.' }));
+    fs.writeFileSync(path.join(dir, 'plan.md'), [
+      '## Traceability check', '<!-- traceability:start -->', '- No acceptance criteria declared.', '<!-- traceability:end -->',
+      '- [ ] [T-001] Test API contract [seam: SEAM-API] [firmness: firm]',
+    ].join('\n'));
+
+    const result = validateApprovalArtifacts(manifest, 'plan', cwd);
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join('\n'), /firm seams without acceptance criteria: SEAM-API/);
+  });
+
   it('rejects duplicate task IDs and fenced source code', () => {
     const plan = [
       '## Traceability check', '<!-- traceability:start -->', '- No acceptance criteria declared.', '<!-- traceability:end -->',

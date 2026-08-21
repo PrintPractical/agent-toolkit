@@ -21,9 +21,9 @@ They are **not** exhaustive documentation. Exhaustive docs rot. CONTEXT.md is a 
 ### Seam: <name>  [firmness: soft|firm]
 Description: what crosses this boundary and what doesn't.
 Criteria:
-  - [SEAM-<id>] <behavioral assertion> → enforced-by: <repository-root-relative test path> (if firm)
+  - [SEAM-<id>] [AC-<id>] <behavioral assertion> → enforced-by: <repository-root-relative test path>; command: <exact test command>
 ```
-Firm seams have at least one enforcing test. Soft seams do not require one.
+Every firm seam has at least one criterion with an acceptance-criterion ID, repository-root-relative enforcing test path, exact executable command, and matching `[SEAM-<id>]` marker in that test. Soft seams do not require enforcement.
 
 **Interfaces/Contracts** — Public API, message formats, file layouts, or protocol surface. Firm interfaces carry a seam ID. Soft interfaces are described with the expectation they will evolve.
 
@@ -74,6 +74,8 @@ Outside a Git repository, `context-scaffold.mjs` writes `Provenance: validated-a
 
 ## Staleness and provenance
 
-CONTEXT.md is stamped with a git SHA at the moment it is validated. Tools and CI use `git diff --name-only <sha>..HEAD -- <component-dir>` to detect whether relevant code has changed since the stamp. Staleness by itself is a warning, not a block. A failing firm-seam test is a hard block.
+CONTEXT.md is stamped with the full HEAD SHA at the moment it is validated. In a Git repository, commit the reconciled context first, then update only its final provenance footer to that commit's full HEAD SHA. `context-verify.mjs` accepts this footer-only unstaged update and rejects every other unstaged, staged, or untracked scoped change, as well as committed changes since the stamp. Outside Git, `<not-in-git-repo>` is valid while Git is unavailable; it becomes invalid after Git initialization.
+
+Staleness remains a CI warning, but malformed provenance or a missing, unmarked, or failing firm-seam test is a hard block.
 
 See `_shared/drift-control.md` for the full drift model.

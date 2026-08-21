@@ -9,7 +9,7 @@ const { values } = parseArgs({ options: {
   phase: { type: 'string' }, missed: { type: 'string' }, resolution: { type: 'string', default: '' },
   impact: { type: 'string', default: 'specify' }, resolve: { type: 'string' },
 }, strict: true });
-const usage = 'Usage: kickback-log.mjs --id <id> --type defect|amendment --phase specify|plan|implement --impact specify|plan|implementation --missed "<text>"\n       kickback-log.mjs --id <id> --resolve <1-based-entry> --resolution "<text>"';
+const usage = 'Usage: kickback-log.mjs --id <id> --type defect|amendment --phase specify|plan|implement --impact specify|plan|implementation|epic-specify|architect --missed "<text>"\n       kickback-log.mjs --id <id> --resolve <1-based-entry> --resolution "<text>"';
 if (values.help) { console.log(usage); process.exit(0); }
 if (!values.id) { console.error(usage); process.exit(1); }
 const repoRoot = process.cwd();
@@ -28,6 +28,44 @@ if (values.resolve) {
 if (!values.type || !values.phase || !values.missed) { console.error(usage); process.exit(1); }
 if (!['defect', 'amendment'].includes(values.type)) { console.error('--type must be defect or amendment'); process.exit(1); }
 if (!['specify', 'plan', 'implement'].includes(values.phase)) { console.error('--phase must be specify, plan, or implement'); process.exit(1); }
+if (manifest.class === 'refactor') {
+  if (values.impact !== 'architect') {
+    console.error("Refactor kickbacks must use --impact architect to create a blocking architect handoff."); process.exit(1);
+  }
+  const entry = {
+    type: values.type, phase: values.phase, at: new Date().toISOString(), missed: values.missed,
+    resolution: '', impact: 'architect', restart_phase: 'architect', invalidated_approvals: 'refactor,implement', escalation: true,
+  };
+  manifest.kickbacks = manifest.kickbacks || [];
+  manifest.kickbacks.push(entry);
+  writeManifest(values.id, manifest, repoRoot);
+  process.stdout.write(JSON.stringify({ id: values.id, kickback: entry, action: 'create an architect-class change, then cancel this refactor with the handoff recorded' }) + '\n');
+  process.exit(0);
+}
+if (values.impact === 'epic-specify') {
+  if (!manifest.parent) { console.error('An epic-specify kickback must originate from an epic child.'); process.exit(1); }
+  let parent;
+  try { parent = readManifest(manifest.parent, repoRoot); } catch (error) { console.error(`Unable to read epic parent: ${error.message}`); process.exit(1); }
+  if (parent.class !== 'epic' || parent.phase !== 'decomposed') { console.error(`Epic parent '${manifest.parent}' must be decomposed before its contracts can be reopened.`); process.exit(1); }
+  const at = new Date().toISOString();
+  const entry = { type: values.type, phase: values.phase, at, missed: values.missed, resolution: '', impact: 'epic-specify', restart_phase: 'specify', invalidated_approvals: 'specify,docs', propagated_children: parent.children || [] };
+  parent.kickbacks = parent.kickbacks || [];
+  parent.kickbacks.push(entry);
+  parent.approvals.specify = 'pending';
+  parent.approvals.docs = 'pending';
+  parent.phase = 'specify';
+  writeManifest(parent.id, parent, repoRoot);
+  for (const childId of parent.children || []) {
+    const child = readManifest(childId, repoRoot);
+    for (const approval of Object.keys(child.approvals || {})) child.approvals[approval] = 'pending';
+    child.phase = ['bug', 'small'].includes(child.class) ? 'implement' : 'architect';
+    child.kickbacks = child.kickbacks || [];
+    child.kickbacks.push({ ...entry, resolution: 'Revalidation required after epic contract kickback', parent: parent.id });
+    writeManifest(childId, child, repoRoot);
+  }
+  process.stdout.write(JSON.stringify({ id: values.id, kickback: entry, parent: parent.id, phase: parent.phase }) + '\n');
+  process.exit(0);
+}
 if (manifest.class !== 'feature' || !['specify', 'plan', 'implement'].includes(manifest.phase)) {
   console.error(`Kickbacks apply only to an active feature spine; '${manifest.class}' is at '${manifest.phase}'.`); process.exit(1);
 }

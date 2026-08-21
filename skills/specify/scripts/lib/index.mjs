@@ -597,7 +597,7 @@ export function nextPhaseForApproval(manifest, approval) {
     return manifest.refactor_mode === 'audit-only' ? 'archive-ready' : 'implement';
   }
   if (approval === 'architect') return 'specify';
-  if (approval === 'specify') return manifest.class === 'epic' ? 'specify' : 'plan';
+  if (approval === 'specify') return manifest.class === 'epic' ? (manifest.children?.length ? 'decomposed' : 'specify') : 'plan';
   if (approval === 'plan') return 'implement';
   if (approval === 'implement') return 'archive-ready';
   return manifest.phase;
@@ -627,8 +627,40 @@ export function validateManifestState(manifest) {
   }
   if (manifest.class === 'epic' && !Array.isArray(manifest.children)) errors.push('epic children must be an array');
   if (manifest.class !== 'epic' && Array.isArray(manifest.children)) errors.push('only epics may have children');
+  if (manifest.context_targets !== undefined && (!Array.isArray(manifest.context_targets) || manifest.context_targets.some(target => typeof target !== 'string' || !target.trim() || path.isAbsolute(target) || target.split(path.sep).includes('..')))) {
+    errors.push('context_targets must be repository-relative, non-empty paths');
+  }
+  if (!manifest.archive?.outcome && !phaseMatchesApprovals(manifest)) {
+    errors.push(`phase '${manifest.phase}' is inconsistent with its approval statuses`);
+  }
   if (manifest.phase === 'archive-ready' && !isArchiveReady(manifest)) errors.push('archive-ready change does not satisfy archive preconditions');
   return errors;
+}
+
+function phaseMatchesApprovals(manifest) {
+  const approvals = manifest.approvals || {};
+  const is = (name, status) => approvals[name] === status;
+  if (manifest.class === 'feature') {
+    return (manifest.phase === 'architect' && is('architect', 'pending') && is('specify', 'pending') && is('plan', 'pending') && is('implement', 'pending'))
+      || (manifest.phase === 'specify' && is('architect', 'approved') && is('specify', 'pending') && is('plan', 'pending') && is('implement', 'pending'))
+      || (manifest.phase === 'plan' && is('architect', 'approved') && is('specify', 'approved') && is('plan', 'pending') && is('implement', 'pending'))
+      || (manifest.phase === 'implement' && is('architect', 'approved') && is('specify', 'approved') && is('plan', 'approved') && is('implement', 'pending'))
+      || (manifest.phase === 'archive-ready' && is('architect', 'approved') && is('specify', 'approved') && is('plan', 'approved') && is('implement', 'approved'));
+  }
+  if (['bug', 'small'].includes(manifest.class)) return (manifest.phase === 'implement' && is('implement', 'pending')) || (manifest.phase === 'archive-ready' && is('implement', 'approved'));
+  if (manifest.class === 'refactor') {
+    if (manifest.refactor_mode === 'audit-only') return (manifest.phase === 'refactor' && is('refactor', 'pending')) || (manifest.phase === 'archive-ready' && is('refactor', 'approved'));
+    return (manifest.phase === 'refactor' && is('refactor', 'pending') && is('implement', 'pending'))
+      || (manifest.phase === 'implement' && is('refactor', 'approved') && is('implement', 'pending'))
+      || (manifest.phase === 'archive-ready' && is('refactor', 'approved') && is('implement', 'approved'));
+  }
+  if (manifest.class === 'epic') {
+    return (manifest.phase === 'architect' && is('architect', 'pending') && is('specify', 'pending') && is('docs', 'pending'))
+      || (manifest.phase === 'specify' && is('architect', 'approved') && is('docs', 'pending'))
+      || (manifest.phase === 'decomposed' && is('architect', 'approved') && is('specify', 'approved') && is('docs', 'pending'))
+      || (manifest.phase === 'archive-ready' && is('architect', 'approved') && is('specify', 'approved') && is('docs', 'approved'));
+  }
+  return false;
 }
 
 export function isArchiveReady(manifest, repoRoot = process.cwd()) {
@@ -761,9 +793,20 @@ export function traceabilityReport(manifest, repoRoot = process.cwd()) {
     const matching = tasks.filter(task => task.criteria.includes(id));
     return { id, tasks: matching.map(task => task.id), firmTests: matching.filter(task => task.isTest && task.firmSeam).map(task => task.id) };
   });
+  const firmCriteria = new Map(seams.map(seam => [seam, []]));
+  const architecture = artifactContent(manifest, 'architecture', repoRoot);
+  for (const seam of seams) {
+    const block = architecture.match(new RegExp(`^###\\s+Seam:[^\\n]*\\[id:\\s*${seam}\\][\\s\\S]*?(?=^###\\s+Seam:|^##\\s+|$(?![\\s\\S]))`, 'im'))?.[0] || '';
+    for (const match of block.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/g)) firmCriteria.get(seam).push(match[1]);
+  }
+  const decisions = artifactContent(manifest, 'decisions', repoRoot);
+  for (const match of decisions.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\][^\n]*traces-to:\s*\[\s*(SEAM-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/gi)) {
+    if (firmCriteria.has(match[2])) firmCriteria.get(match[2]).push(match[1]);
+  }
   const missingCriteria = entries.filter(entry => entry.tasks.length === 0).map(entry => entry.id);
   const uncoveredFirmSeams = seams.filter(seam => !tasks.some(task => task.isTest && task.firmSeam === seam));
-  return { criteria, seams, tasks, entries, duplicateTaskIds, missingCriteria, uncoveredFirmSeams };
+  const firmSeamsWithoutCriteria = [...firmCriteria].filter(([, ids]) => ids.length === 0).map(([seam]) => seam);
+  return { criteria, seams, tasks, entries, duplicateTaskIds, missingCriteria, uncoveredFirmSeams, firmSeamsWithoutCriteria };
 }
 
 export function renderTraceabilitySummary(report) {
@@ -799,7 +842,7 @@ function validateArtifactReviewIds(manifest, phase, content, repoRoot, errors) {
  */
 export function validateApprovalArtifacts(manifest, approval, repoRoot = process.cwd()) {
   const errors = [];
-  if (!['architect', 'specify', 'plan'].includes(approval)) return { valid: true, errors };
+  if (!['architect', 'specify', 'plan', 'refactor', 'implement', 'docs'].includes(approval)) return { valid: true, errors };
 
   if (approval === 'architect') {
     const architecture = readArtifact(manifest, 'architecture', repoRoot, errors);
@@ -858,6 +901,7 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
       const report = traceabilityReport(manifest, repoRoot);
       if (report.duplicateTaskIds.length > 0) errors.push(`plan.md has duplicate task IDs: ${[...new Set(report.duplicateTaskIds)].join(', ')}`);
       if (report.missingCriteria.length > 0) errors.push(`plan.md has acceptance criteria without tasks: ${report.missingCriteria.join(', ')}`);
+      if (report.firmSeamsWithoutCriteria.length > 0) errors.push(`plan.md has firm seams without acceptance criteria: ${report.firmSeamsWithoutCriteria.join(', ')}`);
       if (report.uncoveredFirmSeams.length > 0) errors.push(`plan.md has firm seams without firm-seam test tasks: ${report.uncoveredFirmSeams.join(', ')}`);
       if (traceabilitySummary(plan) !== renderTraceabilitySummary(report)) errors.push('plan.md generated traceability summary is stale; run traceability-sync.mjs --write');
     }
@@ -867,10 +911,52 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (plan && unresolvedBlockers(plan)) errors.push('plan.md has an unresolved blocker');
   }
 
+  if (approval === 'refactor') {
+    const report = readArtifact(manifest, 'refactor', repoRoot, errors);
+    if (report && (!/^##\s+Ranked opportunities\s*$/im.test(report) || !/^\*\*Audit conclusion:\*\*\s+(?:opportunities-ranked|no-actionable-opportunities)\b/im.test(report))) {
+      errors.push('refactor.md must contain a completed audit conclusion and ranked opportunities section');
+    }
+    const response = report.match(/^\*\*User response \(verbatim\):\*\*\s*(.+)$/im)?.[1]?.trim() || '';
+    if (!response || response.includes('{{')) errors.push('refactor.md must record the exact user selection response');
+    const selected = Array.isArray(manifest.refactor_selected_ids) ? manifest.refactor_selected_ids : [];
+    if (manifest.refactor_mode === 'audit-only') {
+      if (!/\baudit-only\b/i.test(response)) errors.push('audit-only refactor approval requires an explicit audit-only user selection');
+    } else {
+      if (selected.length === 0) errors.push('execute-mode refactor approval requires selected RF IDs');
+      const unique = new Set(selected);
+      if (unique.size !== selected.length || [...unique].some(id => !/^RF-\d{3}$/.test(id))) errors.push('refactor_selected_ids must contain unique RF-NNN IDs');
+      for (const id of unique) {
+        const block = report.match(new RegExp(`^###\\s+${id}\\b[\\s\\S]*?(?=^###\\s+RF-\\d{3}\\b|^##\\s+|$(?![\\s\\S]))`, 'im'))?.[0] || '';
+        if (!new RegExp(`\\b${id}\\b`).test(response) || !/^\*\*Status:\*\*\s+selected\b/im.test(block)) errors.push(`selected refactor opportunity '${id}' must be selected and appear in the verbatim response`);
+        const batches = report.match(/^\*\*Opportunity IDs:\*\*\s*(.+)$/gim) || [];
+        const assignments = batches.filter(line => new RegExp(`\\b${id}\\b`).test(line)).length;
+        if (assignments !== 1) errors.push(`selected refactor opportunity '${id}' must appear in exactly one execution batch`);
+      }
+    }
+  }
+
+  if (approval === 'implement') {
+    const artifact = manifest.class === 'refactor' ? 'refactor' : 'implementation';
+    const evidence = readArtifact(manifest, artifact, repoRoot, errors);
+    if (evidence && (!/\|\s*tests\s*\|[^\n]*\|\s*pass\s*\|/i.test(evidence) || !/context (?:verification|reconciliation)[^\n]*(?:pass|complete)/i.test(evidence))) {
+      errors.push(`${artifact}.md must record passing tests and completed CONTEXT verification`);
+    }
+  }
+
+  if (approval === 'docs') {
+    const evidence = readArtifact(manifest, 'epic_docs', repoRoot, errors);
+    for (const section of ['## Context reconciliation', '## Independent docs review', '## Approval evidence']) {
+      if (evidence && !evidence.includes(section)) errors.push(`epic-docs.md missing required section: ${section}`);
+    }
+    if (evidence && (!/\|[^\n]*\|\s*pass\s*\|/i.test(evidence) || !/\*\*Docs reviewer verdict:\*\*\s+approved\b/i.test(evidence) || !/\*\*User response \(verbatim\):\*\*\s*[^\n{]+/i.test(evidence))) {
+      errors.push('epic-docs.md must record passing context verification, an approved independent docs review, and user response');
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
-export function nextSkill(manifest) {
+export function nextSkill(manifest, repoRoot = process.cwd()) {
   const phase = manifest.phase;
   const approvals = manifest.approvals || {};
 
@@ -878,7 +964,7 @@ export function nextSkill(manifest) {
 
   // Epics: architect → specify → decompose → done (no plan/implement)
   if (manifest.class === 'epic') {
-    return epicNextAction(manifest);
+    return epicNextAction(manifest, repoRoot);
   }
 
   // Refactor changes audit, obtain selection approval, then execute the selected
@@ -911,7 +997,7 @@ export function nextSkill(manifest) {
  *
  * Epics never run plan or implement. They plan; their children implement.
  */
-export function epicNextAction(manifest) {
+export function epicNextAction(manifest, repoRoot = process.cwd()) {
   const approvals  = manifest.approvals  || {};
   const phase  = manifest.phase  || 'architect';
   const children = manifest.children || [];
@@ -933,8 +1019,9 @@ export function epicNextAction(manifest) {
 
   // Children exist — track their progress and complete the parent once delivered.
   if (children.length > 0 && approvals.specify === 'approved') {
-    const status = epicStatus(manifest);
-    if (status.ready === children.length) return 'implement (epic docs reconciliation)';
+    const status = epicStatus(manifest, repoRoot);
+    if (status.ready === children.length) return 'epic (docs reconciliation)';
+    if ((manifest.kickbacks || []).some(kickback => kickback.impact === 'epic-specify')) return 'architect (revalidate children after epic contract kickback)';
     return null; // children drive completion; use change-status to track
   }
 

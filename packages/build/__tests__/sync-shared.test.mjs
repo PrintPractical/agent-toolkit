@@ -98,7 +98,8 @@ describe('sync-shared.mjs', () => {
     assert.ok(SYNC_MAP.architect.length < 12, 'architect must not receive the complete shared bundle');
     assert.ok(SYNC_MAP.plan.length < 8, 'plan must not receive the complete shared bundle');
     assert.equal(SYNC_MAP.reforge.some(({ src }) => src === '_shared/adversarial-review.md'), false);
-    assert.equal(SYNC_MAP.implement.some(({ src }) => src.startsWith('_templates/')), false);
+    assert.ok(SYNC_MAP.implement.some(({ src }) => src === '_templates/implementation.md.tmpl'));
+    assert.ok(SYNC_MAP.epic.some(({ src }) => src === '_templates/epic-docs.md.tmpl'));
   });
 
   it('syncs the brainstorm architect seed template', () => {
@@ -136,6 +137,11 @@ describe('sync-shared.mjs', () => {
       const refDir = path.join(REPO_ROOT, 'skills', skill, 'references');
       assert.ok(fs.existsSync(refDir), `Expected references/ dir for skill: ${skill}`);
     }
+  });
+
+  it('registers the dedicated epic docs skill', () => {
+    assert.ok(fs.existsSync(path.join(REPO_ROOT, 'skills/epic/SKILL.md')));
+    assert.deepEqual(SCRIPT_MAP.epic, ['change-archive.mjs', 'context-verify.mjs', 'manifest-approval.mjs']);
   });
 
   it('bundles only each skill capability scripts plus the shared lib', () => {

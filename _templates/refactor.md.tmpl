@@ -31,7 +31,7 @@
 
 | Language | Evidence in scope | Idiom pack | Status |
 |---|---|---|---|
-| {{language}} | `{{paths/extensions}}` | `references/idioms/{{language}}.md` | loaded / missing |
+| {{language}} | `{{paths/extensions}}` | `idioms` skill | loaded / missing |
 
 ## Audit roles
 
@@ -91,7 +91,7 @@ Read-only. Each role loads the relevant idiom pack and reports evidence-backed f
 **Selection approval:** pending | audit-only | approved-for-exact-IDs
 **Selection approval command:** `node "$SKILL_DIR/scripts/manifest-approval.mjs" --id {{id}} --approval refactor --approve`
 
-<!-- Use --approve only after each selected RF ID has a complete ranked record with Status: selected and appears explicitly in the verbatim response, assigned once to a batch below. For audit-only, stop after recording the ranked inventory (or no-actionable-opportunities) and the verbatim audit-only selection; leave the refactor approval pending. -->
+<!-- Use --approve only after each selected RF ID has a complete ranked record with Status: selected and appears explicitly in the verbatim response, assigned once to a batch below. For audit-only, stop after recording the ranked inventory (or no-actionable-opportunities) and the verbatim audit-only selection, then approve and archive the report. -->
 
 ## Existing baseline
 
@@ -189,8 +189,6 @@ Use the current manifest review epoch.
 **CONTEXT files changed:** {{paths and exact sections, or none}}
 **Firm contracts/criteria changed:** none (otherwise this workflow must stop and route to architect)
 **Provenance stamps:** {{paths and SHA}}
-**Docs-approval user response:** {{verbatim}}
-**Docs approval:** pending | approved
 
 ## Outcome and archive
 

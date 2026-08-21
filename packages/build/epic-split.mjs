@@ -134,6 +134,7 @@ for (const childDef of childDefs) {
       architecture: 'architecture.md',
       decisions:    'decisions.md',
       plan:         'plan.md',
+      implementation: 'implementation.md',
     },
     context_targets: epicManifest.context_targets || ['CONTEXT.md'],
     kickbacks: [],

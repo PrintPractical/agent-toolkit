@@ -37,6 +37,8 @@ node "$SKILL_DIR/scripts/change-new.mjs" --title "<title>" --class small|bug [--
 
 Load the active `manifest.yaml`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for the challenge and refactor passes. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 
+Create `implementation.md` from `references/templates/implementation.md.tmpl` and use it to record completed work, passing tests, context verification, and the user's approval evidence.
+
 ## Phase 1: Classify
 
 Answer these questions before doing anything else:
@@ -108,7 +110,7 @@ Reconciliation and verification are required before implement approval. For ever
 - Re-stamp provenance.
 - Run verification and resolve any finding:
   ```
-  node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file>
+  node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file> --run-tests
   ```
 
 ## Phase 7: Archive-ready and verified archive

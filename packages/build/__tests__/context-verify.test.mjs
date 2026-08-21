@@ -21,6 +21,14 @@ function verify(cwd, args = []) {
 function scaffold(cwd, args = []) {
   return spawnSync(process.execPath, [scaffoldScript, ...args], { cwd, encoding: 'utf8' });
 }
+function writeCommittedContext(cwd, body = '# Context') {
+  fs.writeFileSync(path.join(cwd, 'CONTEXT.md'), `${body}\n\nProvenance: validated-at: ${head(cwd)}\n`);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-m', 'reconcile context']);
+  const stamp = head(cwd);
+  const contextPath = path.join(cwd, 'CONTEXT.md');
+  fs.writeFileSync(contextPath, fs.readFileSync(contextPath, 'utf8').replace(/Provenance: validated-at: .+/, `Provenance: validated-at: ${stamp}`));
+}
 
 describe('context-verify.mjs', () => {
   let cwd;
@@ -46,8 +54,7 @@ describe('context-verify.mjs', () => {
   });
 
   it('reports staleness after relevant files change', () => {
-    const head = git(cwd, ['rev-parse', 'HEAD']);
-    fs.writeFileSync(path.join(cwd, 'CONTEXT.md'), `# Context\n\nProvenance: validated-at: ${head}\n`);
+    writeCommittedContext(cwd);
     fs.writeFileSync(path.join(cwd, 'tracked.txt'), 'changed\n');
     git(cwd, ['add', '.']);
     git(cwd, ['commit', '-m', 'change tracked file']);
@@ -57,45 +64,66 @@ describe('context-verify.mjs', () => {
     assert.deepEqual(JSON.parse(result.stdout)[0].changedFiles, ['CONTEXT.md', 'tracked.txt']);
   });
 
-  it('runs the configured test command for cited firm seams', () => {
-    const head = git(cwd, ['rev-parse', 'HEAD']);
-    fs.writeFileSync(path.join(cwd, 'firm.test'), 'test\n');
-    fs.writeFileSync(path.join(cwd, 'CONTEXT.md'), [
-      '# Context',
-      '',
-      '[SEAM-example-01] -> enforced-by: firm.test',
-      '',
-      `Provenance: validated-at: ${head}`,
-      '',
+  it('runs each cited firm-seam command and accepts a footer-only HEAD stamp update', () => {
+    fs.writeFileSync(path.join(cwd, 'firm.test'), [
+      'import test from \'node:test\';',
+      'import assert from \'node:assert/strict\';',
+      '// [SEAM-example-01]',
+      "test('firm seam', () => assert.equal(1, 1));",
+    ].join('\n'));
+    writeCommittedContext(cwd, [
+      '# Context', '', '## Architecture & Seams', '',
+      '### Seam: Example [firmness: firm]', 'Criteria:',
+      '- [SEAM-example-01] [AC-example-01] Preserves the example contract. -> enforced-by: firm.test; command: node --test firm.test',
     ].join('\n'));
 
-    const result = verify(cwd, ['--run-tests', '--test-command', 'false']);
-    assert.equal(result.status, 1);
-    assert.equal(JSON.parse(result.stdout)[0].firmSeamResults[0].passed, false);
+    const result = verify(cwd, ['--run-tests']);
+    assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+    assert.equal(JSON.parse(result.stdout)[0].firmSeamResults[0].passed, true);
   });
 
-  it('resolves firm test paths from the repository root, with component-relative fallback', () => {
-    const component = path.join(cwd, 'src', 'component');
-    fs.mkdirSync(path.join(cwd, 'tests'), { recursive: true });
-    fs.mkdirSync(component, { recursive: true });
-    fs.writeFileSync(path.join(cwd, 'tests', 'component.test'), 'test\n');
-    fs.writeFileSync(path.join(component, 'firm.test'), 'test\n');
-    fs.writeFileSync(path.join(component, 'CONTEXT.md'), [
-      '[SEAM-root-01] -> enforced-by: tests/component.test',
-      '[SEAM-legacy-01] -> enforced-by: firm.test',
-      `Provenance: validated-at: ${head(cwd)}`,
-    ].join('\n'));
-    git(cwd, ['add', '.']);
-    git(cwd, ['commit', '-m', 'add component context']);
-    fs.writeFileSync(path.join(component, 'CONTEXT.md'), [
-      '[SEAM-root-01] -> enforced-by: tests/component.test',
-      '[SEAM-legacy-01] -> enforced-by: firm.test',
-      `Provenance: validated-at: ${head(cwd)}`,
+  it('rejects a firm seam whose cited test lacks its marker', () => {
+    fs.writeFileSync(path.join(cwd, 'firm.test'), 'export default null;\n');
+    writeCommittedContext(cwd, [
+      '# Context', '### Seam: Example [firmness: firm]', 'Criteria:',
+      '- [SEAM-example-01] [AC-example-01] Preserves the contract. -> enforced-by: firm.test; command: node --test firm.test',
     ].join('\n'));
 
-    const result = verify(cwd, ['--path', 'src/component/CONTEXT.md']);
+    const result = verify(cwd, ['--run-tests']);
+    assert.equal(result.status, 1);
+    assert.equal(JSON.parse(result.stdout)[0].firmSeamResults[0].marker, false);
+  });
+
+  it('rejects firm seams without an acceptance criterion and executable citation', () => {
+    writeCommittedContext(cwd, [
+      '# Context', '### Seam: Example [firmness: firm]', 'Criteria:',
+      '- [SEAM-example-01] Preserves the contract.',
+    ].join('\n'));
+
+    const result = verify(cwd, ['--run-tests']);
+    assert.equal(result.status, 1);
+    assert.match(JSON.parse(result.stdout)[0].structureErrors.join('\n'), /has no acceptance criterion/);
+    assert.match(JSON.parse(result.stdout)[0].structureErrors.join('\n'), /has no executable enforcing test/);
+  });
+
+  it('ignores enforcing citations on soft seams', () => {
+    writeCommittedContext(cwd, [
+      '# Context', '### Seam: Example [firmness: soft]', 'Criteria:',
+      '- [SEAM-example-01] Optional behavior. -> enforced-by: missing.test; command: false',
+    ].join('\n'));
+
+    const result = verify(cwd, ['--run-tests']);
     assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
-    assert.deepEqual(JSON.parse(result.stdout)[0].firmSeamResults.map(item => item.exists), [true, true]);
+    assert.deepEqual(JSON.parse(result.stdout)[0].firmSeamResults, []);
+  });
+
+  it('marks non-footer worktree changes in a context scope stale', () => {
+    writeCommittedContext(cwd);
+    fs.writeFileSync(path.join(cwd, 'tracked.txt'), 'dirty\n');
+
+    const result = verify(cwd);
+    assert.equal(result.status, 2);
+    assert.deepEqual(JSON.parse(result.stdout)[0].changedFiles, ['tracked.txt']);
   });
 });
 

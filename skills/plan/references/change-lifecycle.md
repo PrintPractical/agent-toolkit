@@ -50,6 +50,8 @@ While a change is in progress, all artifacts live at:
   architecture.md    (created by architect)
   decisions.md       (created by specify)
   plan.md            (created by plan, updated live by implement)
+  implementation.md  (non-refactor completion evidence)
+  epic-docs.md       (epic docs-approval evidence)
 ```
 
 `<id>` format: `YYYY-MM-DD-<kebab-slug>`.
@@ -71,7 +73,7 @@ Humans can unzip any archive to understand historical context.
 
 ## Cancellation
 
-Cancellation is an explicit, reasoned archive, not deletion. From any active phase, record `archive.outcome: cancelled` and a concrete `archive.reason` in `manifest.yaml`, preserve the current artifacts, and create a verified cancellation archive. Unfinished approvals do not block cancellation; an absent reason does.
+Cancellation is an explicit, reasoned archive, not deletion. From any active phase, record `archive.outcome: cancelled` and a concrete `archive.reason` in `manifest.yaml`, preserve the current artifacts, and create a verified cancellation archive. Unfinished approvals do not block cancellation; an absent reason does. Epic children cannot be cancelled independently: cancel the epic parent, which coordinates a cancellation archive for the parent and every child.
 
 ## Epic coordination
 
@@ -81,12 +83,12 @@ After an epic's specify approval, `epic-split` puts the parent in `decomposed`. 
 
 When `implement` discovers a gap the spec didn't anticipate:
 1. Stop immediately. Do not improvise.
-2. Run `kickback-log.mjs` with an impact: `specify` for a material decision, `plan` for a stale checklist, or `implementation` when no upstream artifact is stale.
+2. Run `kickback-log.mjs` with an impact: `specify` for a material decision, `plan` for a stale checklist, or `implementation` when no upstream artifact is stale. A child uses `epic-specify` for an invalid cross-cutting epic contract. A refactor records an `architect` escalation and hands off to a new architect-class change.
 3. Amend only the affected artifact at the recorded restart phase and record the actual resolution in the kickback entry.
 4. Re-approve only invalidated approvals; `plan.md` retains completed unaffected checklist items.
 5. `implement` resumes from the checkpoint.
 
-Record `specify`, `plan`, or `implementation` impact; amend only affected artifacts and re-approve only invalidated approvals.
+Record the relevant impact; amend only affected artifacts and re-approve only invalidated approvals. `specify` invalidates specify, plan, and implement; `plan` invalidates plan and implement; `implementation` invalidates implement.
 
 ## Docs reconciliation
 
@@ -96,9 +98,9 @@ The reconciliation process:
 1. Walk `manifest.yaml context_targets`.
 2. Diff architecture.md + decisions.md against each target CONTEXT.md.
 3. Update each CONTEXT.md to reflect the change: new seams, updated interfaces, graduated firmness, new known-soft-spots.
-4. Re-stamp provenance (`validated-at: <current HEAD sha>`).
+4. In Git, commit reconciled scoped changes, then update only each final provenance footer with that commit's full HEAD SHA. Outside Git, retain `<not-in-git-repo>`.
 5. Adversarial verifier subagent: confirm CONTEXT claims match the implemented code.
-6. Run `context-verify.mjs` after reconciliation, including firm-seam tests where applicable. Resolve its findings.
+6. Run `context-verify.mjs --run-tests` after reconciliation. Resolve its findings.
 7. Present summary to user. For a non-epic, the user approves the implement approval; for an epic, the user approves docs.
 
 `context-verify.mjs` and reconciliation are required before non-epic implement approval or epic docs approval. That approval enters `archive-ready`; only then may `change-archive.mjs` create the verified archive.

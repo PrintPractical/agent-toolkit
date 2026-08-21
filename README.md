@@ -121,7 +121,7 @@ implement
  └─ firm-seam tests must stay green — failure = kickback, not a test edit
  └─ independent review recorded via review-log.mjs (no per-file snapshot tracking)
  └─ live checklist: checks off tasks as they complete
-  └─ on completion: reconcile CONTEXT.md files, re-stamp provenance, run context-verify.mjs
+   └─ on completion: record implementation evidence, reconcile CONTEXT.md files, commit/re-stamp provenance in Git, run context-verify.mjs --run-tests
     └─ reconciles docs before the implement approval → archive-ready → verified archive
 ```
 
@@ -162,14 +162,14 @@ specify (epic)
    specify (child) → plan (child) → implement (child) → archive-ready (child held by epic)
    [standard pipeline per child]
 
-   When all children are archive-ready: reconcile and verify epic context → docs approval → epic archive-ready → coordinated verified archive.
+    When all children are archive-ready: run epic → reconcile and verify epic context → docs approval → epic archive-ready → coordinated verified archive.
 ```
 
 **Key rule:** epics never run plan or implement directly. Epics plan; children implement.
 
 **Execution order — depth-first, one child at a time.** Take each child to `archive-ready` (architect → specify → plan → implement → archive-ready) before starting the next, in dependency order. Do **not** archive an archive-ready child independently: the epic holds it for the coordinated verified archive. Do **not** architect/specify all children up front. This is safe because the epic's `specify` already locked the cross-cutting contracts *between* children. Independent children may run in parallel, but each still goes through its full spine start-to-finish — never batched by phase.
 
-If implementing a child reveals that a cross-cutting contract was wrong, that is a kickback to the **epic's** `specify` (firm-change protocol), which then propagates to any already-completed children. This should be rare — its frequency is a quality signal for the epic-level specify.
+If implementing a child reveals that a cross-cutting contract was wrong, log an `epic-specify` kickback to the **epic's** `specify` (firm-change protocol). It propagates revalidation to active children, including completed children. This should be rare — its frequency is a quality signal for the epic-level specify.
 
 **Checking epic progress:** ask the agent **"what now"** — the `what-now` skill reads the epic manifest and reports child progress and the next step.
 
@@ -185,7 +185,7 @@ triage
  └─ root cause analysis
   └─ writes failing test first (red), then fix (green)
   └─ quick refactor pass
-  └─ reconciles CONTEXT.md and runs context-verify.mjs
+   └─ records implementation evidence, reconciles CONTEXT.md, and runs context-verify.mjs --run-tests
   └─ docs reconciliation → implement approval → archive-ready → verified archive
 ```
 
@@ -210,7 +210,7 @@ refactor
  └─ adds minimal characterization tests when current behavior lacks coverage
  └─ executes selected work in small batches: baseline green → apply → tests stay green
  └─ fresh auditor records findings, then a distinct fresh verifier confirms (review-log.mjs)
-  └─ execute mode reconciles and verifies CONTEXT.md, then reaches archive-ready
+   └─ execute mode records verification evidence, reconciles and verifies CONTEXT.md, then reaches archive-ready
   └─ audit-only: refactor approval → archive-ready → verified audit archive
   └─ execute mode: refactor approval → documentation reconciliation → implement approval → archive-ready → verified archive
 ```
@@ -304,6 +304,8 @@ If kickback frequency trends to zero, `architect` and `specify` are working. Eve
     decisions.md        # specify output
     plan.md             # plan output (live checklist, updated by implement)
     refactor.md         # ranked audit, selection, batches, and evidence (refactor class)
+    implementation.md   # completed work, test, context, and approval evidence (non-refactor)
+    epic-docs.md        # epic reconciliation and docs approval evidence
     reviews.json        # independent review records (auditor + verifier verdicts)
   archive/<id>.zip      # zipped on completion — agent won't read; humans can
 ```

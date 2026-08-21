@@ -18,6 +18,9 @@ if (values.cancel && !values.reason?.trim()) { console.error('Cancellation requi
 const repoRoot = process.cwd();
 let manifest;
 try { manifest = readManifest(values.id, repoRoot); } catch (error) { console.error(`Error: ${error.message}`); process.exit(1); }
+if (manifest.parent) {
+  console.error(`Error: child '${values.id}' is held by epic '${manifest.parent}' and must be archived or cancelled through its parent.`); process.exit(1);
+}
 if (values.cancel) {
   manifest.archive = { outcome: 'cancelled', reason: values.reason.trim(), at: new Date().toISOString() };
   manifest.phase = 'archive-ready';
@@ -30,7 +33,12 @@ const ids = manifest.class === 'epic' ? [values.id, ...(manifest.children || [])
 if (manifest.class === 'epic') for (const childId of manifest.children || []) {
   let child;
   try { child = readManifest(childId, repoRoot); } catch (error) { console.error(`Error: child '${childId}' is unavailable: ${error.message}`); process.exit(1); }
-  if (child.phase !== 'archive-ready' || !isArchiveReady(child, repoRoot)) { console.error(`Error: child '${childId}' is not archive-ready.`); process.exit(1); }
+  if (!values.cancel && (child.phase !== 'archive-ready' || !isArchiveReady(child, repoRoot))) { console.error(`Error: child '${childId}' is not archive-ready.`); process.exit(1); }
+  if (values.cancel) {
+    child.archive = { outcome: 'cancelled', reason: `Cancelled with epic '${values.id}': ${values.reason.trim()}`, at: manifest.archive.at };
+    child.phase = 'archive-ready';
+    writeManifest(childId, child, repoRoot);
+  }
 }
 const destination = archiveDir(repoRoot);
 fs.mkdirSync(destination, { recursive: true });

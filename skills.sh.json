@@ -10,7 +10,7 @@
     {
       "title": "Spec Spine",
       "description": "The core pipeline: architect feeds specify, which feeds plan, which feeds implement.",
-      "skills": ["specify", "plan", "implement"]
+      "skills": ["specify", "plan", "implement", "epic"]
     },
     {
       "title": "Maintenance",

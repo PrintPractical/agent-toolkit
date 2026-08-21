@@ -54,7 +54,9 @@ function reviewPhaseForApproval() {
 
 function verifyContexts() {
   const script = path.join(path.dirname(new URL(import.meta.url).pathname), 'context-verify.mjs');
-  for (const target of manifest.context_targets || []) {
+  const targets = manifest.context_targets;
+  if (!Array.isArray(targets) || targets.length === 0) return 'manifest must declare at least one CONTEXT.md target';
+  for (const target of targets) {
     const result = spawnSync(process.execPath, [script, '--path', target, '--run-tests'], { cwd: repoRoot, encoding: 'utf8' });
     if (result.status !== 0) return result.stderr.trim() || result.stdout.trim() || `verification failed for '${target}'`;
   }
@@ -109,7 +111,7 @@ if (values.approve) {
   manifest.phase = nextPhaseForApproval(manifest, values.approval);
   writeManifest(values.id, manifest, repoRoot);
   console.error(`Approval '${values.approval}' approved for change '${values.id}'`);
-  const skill = nextSkill(manifest);
+  const skill = nextSkill(manifest, repoRoot);
   if (skill) console.error(`Next skill: ${skill}`);
   process.stdout.write(JSON.stringify({ id: values.id, approval: values.approval, status: 'approved', phase: manifest.phase }) + '\n');
 } else if (values.reset) {
