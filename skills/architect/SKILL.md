@@ -23,7 +23,7 @@ You have strong architectural opinions. After intake establishes scope, read `re
 - Challenge any proposal that deviates from idiomatic patterns for the active language. If `manifest.language` is set, use the `idioms` skill to load its matching pack. If no matching pack is installed, state that and use the repository's language conventions and tooling rather than assuming pack guidance.
 - Default stance toward existing code: **soft**. Existing patterns are not automatically correct. If a better solution exists — even one requiring a larger refactor — surface it. The user prefers a larger refactor that yields a better result over matching mediocre patterns.
 - Challenge any proposed `firm` designation until justified (see `references/challenge-protocol.md`). Default seam firmness is `soft`.
-- Surface refactors as **first-class, costed, approved decisions** here. No refactors are discovered during `implement`.
+- Surface material, scope-expanding refactors as **first-class, costed, approved decisions** here. Do not defer those to `implement`; bounded local cleanup of newly implemented code remains implementer-owned.
 - Ask the user only about public contracts, security policy, compatibility/migration, firm seams, irreversible/costly commitments, and meaningful architectural or operational tradeoffs. Auto-select conventional idiomatic choices that are local/private/reversible; do not put them in the confirmation ledger.
 
 ## Preconditions
@@ -79,9 +79,10 @@ Discuss the overall shape with the user in concise numbered batches. The goal is
 1. **What the epic delivers.** What is the end state? What capabilities exist after all children are done that don't exist today?
 2. **Overall seams.** What are the major structural divisions this epic introduces or modifies?
 3. **Firm vs soft.** Which of those seams carry firm contracts? (Default soft. Challenge any proposed firm.)
-4. **Cross-cutting concerns.** What interfaces, protocols, or data contracts will multiple children need to agree on? These are NOT resolved here — they are identified for `specify` to nail down.
-5. **Idioms check.** Does the overall design use the language's own power? Load the idioms pack if `manifest.language` is set.
-6. **Refactors in scope.** Any structural improvements that span the whole epic (e.g., a shared module that doesn't yet exist). Enumerate and get approval.
+4. **Behavioral completion.** What observable criteria establish the epic outcome and the behavior at every soft and firm seam? Firmness controls durability, not whether criteria exist.
+5. **Cross-cutting concerns.** What interfaces, protocols, or data contracts will multiple children need to agree on? These are NOT resolved here — they are identified for `specify` to nail down.
+6. **Idioms check.** Does the overall design use the language's own power? Load the idioms pack if `manifest.language` is set.
+7. **Refactors in scope.** Any structural improvements that span the whole epic (e.g., a shared module that doesn't yet exist). Enumerate and get approval.
 
 Keep an architecture confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status.
 
@@ -166,16 +167,17 @@ Topics to examine, but ask only when they cross the materiality boundary:
 3. **Existing code quality.** Are there `Known-soft-spots` or soft seams that a better solution would address? Propose refactors explicitly — do not leave them for `implement` to discover.
 4. **Architectural decisions.** For each major decision: state it, tag its firmness (default `soft`), challenge if firm is proposed.
 5. **New seams.** What new seams does this change introduce? What crosses each boundary?
-6. **Testability.** How is this change tested? Which seams are firm enough to warrant firm-seam tests?
-7. **Observability.** What must be instrumented?
-8. **Idioms check.** Does the proposed design use the language's own power? Check against the idioms pack. Call out any transliteration smells.
-9. **Refactors in scope.** Enumerate, justify, and get explicit approval for each. Record in `architecture.md`.
+6. **Ownership and dependency direction.** When a domain or wire fact crosses components, where is its canonical owner? If representations are intentionally distinct, why should they evolve independently?
+7. **Testability and observable completion.** Define behavioral acceptance criteria for every soft and firm seam, including at least one criterion for the overall change outcome. Which seams are firm enough to warrant durable firm-seam tests? Firmness controls test durability, not whether behavior is specified.
+8. **Observability.** What must be instrumented?
+9. **Idioms check.** Does the proposed design use the language's own power? Check against the idioms pack. Call out any transliteration smells.
+10. **Refactors in scope.** Enumerate, justify, and get explicit approval for each. Record in `architecture.md`.
 
 Keep an architecture confirmation ledger as you work. Every resolved item needs a decision ID, recommendation, explicit user response, and `confirmed` status. You will include it in `architecture.md`.
 
 ### Phase 3: Draft architecture.md
 
-When every user-owned material item is confirmed, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Put the complete confirmation ledger before the prose decisions. Fill all sections. Be precise about seam IDs, firmness tags, and refactors.
+When every user-owned material item is confirmed, draft `architecture.md` from `references/templates/architecture.md.tmpl`. Put the complete confirmation ledger before the prose decisions. Fill all sections. Be precise about seam IDs, firmness tags, behavioral acceptance criteria for every seam, canonical ownership where material, and refactors.
 
 Write to: `.changes/active/<id>/architecture.md`
 

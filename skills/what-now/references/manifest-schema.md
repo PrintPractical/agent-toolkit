@@ -107,7 +107,7 @@ Refactor audit-only:  refactor → archive-ready → verified archive
 | `refactor` | User, after audit; execute mode also requires explicit opportunity selection | Audit report is complete; execute mode records exact selected `RF-NNN` IDs |
 | `architect` | User, after bounded `AV-*` review and deterministic artifact validation | Material topics confirmed; original review IDs closed; no unresolved blockers |
 | `specify` | User, after explicit confirmation ledger, bounded `SV-*` implement-as-if review, and deterministic artifact validation | Every material decision explicitly confirmed; original review IDs closed; no unresolved blockers |
-| `plan` | User, after traceability and deterministic artifact validation | Every acceptance criterion traces to >=1 task |
+| `plan` | User, after source-grounded implementability review, traceability, and deterministic artifact validation | Every seam has behavioral criteria; every criterion traces to >=1 task; prospective review passed |
 | `implement` | User; full-spine features/refactors also require an approved bounded `RV-*` review | Implementation evidence records passing tests and completed context verification; CONTEXT hierarchy is reconciled and verified; when formal review applies, original findings are closed by a distinct fresh verifier |
 | `docs` | User, after reconciliation, `context-verify`, and verifier subagent | Epic-only `epic-docs.md` records reconciliation, passing verification, independent docs review, and explicit approval evidence |
 

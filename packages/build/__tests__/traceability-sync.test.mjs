@@ -29,11 +29,13 @@ describe('traceability-sync.mjs', () => {
     const dir = path.join(cwd, '.changes', 'active', id);
     fs.writeFileSync(path.join(dir, 'architecture.md'), [
       '## Seams', '### Seam: API [id: SEAM-API] [firmness: firm]', '- [AC-API] Returns a validated response.',
+      '### Seam: UI [id: SEAM-UI] [firmness: soft]', '- [AC-UI] Renders the validated response.',
     ].join('\n'));
     fs.writeFileSync(path.join(dir, 'decisions.md'), '## Acceptance Criteria Confirmed\n');
     fs.writeFileSync(path.join(dir, 'plan.md'), [
       '## Traceability check', '<!-- traceability:start -->', '- stale', '<!-- traceability:end -->',
-      '- [ ] [T-001] Write API test [AC-API] [seam: SEAM-API] [firmness: firm]',
+      '- [ ] [T-001] Run API baseline test [AC-API] [test: baseline] [seam: SEAM-API] [firmness: firm]',
+      '- [ ] [T-002] Implement UI outcome [AC-UI]',
     ].join('\n'));
 
     const run = args => spawnSync(process.execPath, [path.join(scriptsDir, 'traceability-sync.mjs'), '--id', id, ...args], { cwd, encoding: 'utf8' });
@@ -44,5 +46,6 @@ describe('traceability-sync.mjs', () => {
     const check = run([]);
     assert.equal(check.status, 0, check.stderr);
     assert.match(fs.readFileSync(path.join(dir, 'plan.md'), 'utf8'), /`AC-API` -> tasks: `T-001`; firm-seam tests: `T-001`/);
+    assert.match(fs.readFileSync(path.join(dir, 'plan.md'), 'utf8'), /`AC-UI` -> tasks: `T-002`; firm-seam tests: none/);
   });
 });

@@ -27,6 +27,18 @@ Use this reference to test material engineering choices during architecture, spe
 - Verify the actual contract: ordering and stability, comparator preconditions, mutation/invalidation, allocation, error and partial-result behavior, and complexity. A library call is not automatically correct merely because it is standard.
 - Write a direct loop or focused local implementation when it makes stateful control flow clearer or when the standard operation cannot meet a demonstrated bound. Document the reason and test the boundary conditions.
 
+## Ownership and representation
+
+- Give each domain fact, contract, or representation one canonical owner at the layer that has authority to change it. Make dependency direction point toward that owner rather than recreating equivalent knowledge in each consumer.
+- Multiple representations are legitimate when boundaries or independent evolution require them. Name the boundary, keep conversion in one visible place, and preserve semantics with tests. Equivalent parallel representations without an evolution reason are accidental duplication.
+- Prefer existing repository types, schemas, mappings, and utilities when they already own the required semantics. Before adding custom machinery, verify that the standard language/library facility and nearby repository mechanism do not fit; record the concrete mismatch when they do not.
+
+## Cohesion and control flow
+
+- Keep behavior with the state or responsibility that owns it. Split responsibilities when they have different reasons to change; do not scatter one invariant across unrelated modules or combine orchestration, policy, conversion, and persistence into one monolithic block.
+- Prefer control flow whose states, exits, and error paths are visible without tracing deeply nested branches. Use early exits, exhaustive dispatch, focused extraction, or data-driven mappings when they clarify the domain; do not transform direct code solely to reduce a metric.
+- Optimize for the next correct change: a maintainer should be able to locate the owner of a fact, understand why representations differ, and modify one responsibility without discovering hidden coordinated edits.
+
 ## Equality, hashing, and ordering
 
 - Define domain identity before implementing equality. Values considered equal must produce equal hashes, and ordering equivalence must agree with equality whenever an ordered collection or algorithm relies on that relationship.

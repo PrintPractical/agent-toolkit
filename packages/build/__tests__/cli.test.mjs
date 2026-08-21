@@ -22,7 +22,10 @@ function writeApprovedArtifacts(id, cwd) {
   fs.writeFileSync(path.join(dir, 'architecture.md'), [
     '## Summary', 'x', '## Architecture Confirmation Ledger',
     '### A-001', '- Topic: q', '- User response: accept', '- Status: confirmed',
-    '## Architectural Decisions', 'x', '## Seams', 'x',
+    '## Architectural Decisions', 'x', '## Seams',
+    '**Overall outcome criterion:** [AC-OUTCOME]',
+    '### Seam: Outcome [id: SEAM-OUTCOME] [firmness: soft]',
+    '- [AC-OUTCOME] The requested outcome is observable.',
     '## Validity Check Results', '**Status:** passed',
     '## Review Cycle Reference', 'Cycle: architect-1',
   ].join('\n'));
@@ -34,7 +37,24 @@ function writeApprovedArtifacts(id, cwd) {
   ].join('\n'));
   fs.writeFileSync(path.join(dir, 'plan.md'), [
     '## Traceability check', '<!-- traceability:start -->',
-    '- No acceptance criteria declared.', '<!-- traceability:end -->',
+    '- `AC-OUTCOME` -> tasks: `T-001`; firm-seam tests: none', '<!-- traceability:end -->',
+    '## Source reconnaissance', '- Existing implementation and tests.',
+    '## Section 1: Outcome', '### Implementation context',
+    '- **Observable outcome and acceptance criteria:** AC-OUTCOME',
+    '- **Ownership and dependency direction:** Existing component owns the behavior.',
+    '- **Existing mechanisms to reuse:** Existing component API.',
+    '- **Domain facts that evolve together:** None.',
+    '- **Responsibilities that remain distinct:** Input and output concerns.',
+    '- **Expected touchpoints (non-binding):** Existing component.',
+    '- **Errors and invariants:** Existing behavior remains valid.',
+    '- **Exact verification:** `true`',
+    '- [ ] [T-001] Implement the observable outcome [AC-OUTCOME]',
+    '## Prospective implementability review',
+    '- **Reviewer:** plan-reviewer', '- **Source walked:** implementation, tests, and metadata',
+    '- **Coverage:** ownership, reuse, representations, facts, boundaries, and idioms',
+    '- **Findings incorporated:** none-clean',
+    '- **Unresolved material findings:** none',
+    '- **Implementability status:** passed',
   ].join('\n'));
 }
 
@@ -44,9 +64,23 @@ function writeContext(cwd) {
 
 function writeImplementationEvidence(id, cwd) {
   fs.writeFileSync(path.join(cwd, '.changes', 'active', id, 'implementation.md'), [
+    '## Section approaches', '### Section 1: Outcome', '- **Recorded before source edits:** yes',
+    '- **Verified mechanisms to reuse:** existing API',
+    '- **Ownership and representation:** existing component owns the behavior',
+    '- **Standard language/library facilities:** standard runtime',
+    '- **Responsibility boundaries:** input and output remain distinct',
+    '- **Custom machinery justification:** none', '- **Evolution or justified deviations:** none',
     '## Completed work', '- completed', '## Verification',
     '| Kind | Command | Result | Evidence |', '|---|---|---|---|', '| tests | `true` | pass | green |',
+    '| format/lint/typecheck | `true` | pass | clean |',
     '**Context verification:** pass - reconciled', '## Approval evidence', '**User response (verbatim):** approve',
+    '## Quality signals',
+    '- **Implementation model/route:** test-model',
+    '- **First-pass lint/typecheck result:** pass', '- **First-pass test result:** pass',
+    '- **Unplanned ownership/representation changes:** none',
+    '- **Final RV blocker/major findings by category:** none', '- **Post-review remediation size:** none',
+    '- **Recurring finding categories:** none observed',
+    '- **Reported implementation/review cost:** unavailable',
   ].join('\n'));
 }
 
@@ -230,6 +264,7 @@ describe('implement approval review enforcement', () => {
       context_targets: ['CONTEXT.md'], kickbacks: [],
     }, cwd);
     writeContext(cwd);
+    writeApprovedArtifacts(id, cwd);
     writeImplementationEvidence(id, cwd);
   });
 

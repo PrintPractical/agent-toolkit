@@ -11,11 +11,17 @@
 
 ## Traceability check
 
-Every acceptance criterion must trace to at least one task. Every firm seam must have at least one firm-seam test task. `traceability-sync.mjs --write` regenerates this block; do not edit it manually.
+Every soft- and firm-seam acceptance criterion must trace to at least one task. Every firm seam must have at least one firm-seam test task. `traceability-sync.mjs --write` regenerates this block; do not edit it manually.
 
 <!-- traceability:start -->
 - No acceptance criteria declared.
 <!-- traceability:end -->
+
+---
+
+## Source reconnaissance
+
+{{Record the relevant implementation, tests, dependency manifests/lockfiles, nearby conventions, and CONTEXT.md files inspected before section design. Use exact paths and symbols where useful. This is orientation evidence, not an allowed-files list.}}
 
 ---
 
@@ -25,30 +31,46 @@ Every acceptance criterion must trace to at least one task. Every firm seam must
 > **Decisions implemented:** {{list of decision references from decisions.md}}
 > **Seams touched:** {{list of seam IDs, with firmness}}
 
+### Implementation context
+
+- **Observable outcome and acceptance criteria:** {{section outcome and AC IDs}}
+- **Ownership and dependency direction:** {{where behavior/domain facts belong and which direction dependencies flow}}
+- **Existing mechanisms to reuse:** {{verified types, utilities, library facilities, and nearby patterns}}
+- **Domain facts that evolve together:** {{constants, mappings, states, wire facts, or none}}
+- **Responsibilities that remain distinct:** {{boundaries that must not be collapsed}}
+- **Expected touchpoints (non-binding):** {{likely paths/symbols for orientation; not an allowlist}}
+- **Errors and invariants:** {{validation, failure semantics, ordering, resource, and state constraints}}
+- **Exact verification:** `{{targeted commands and expected observations}}`
+
 ### Tests
 
-- [ ] [T-001] Write firm-seam test for {{seam-name}} [seam: {{seam-id}}] [firmness: firm]
+- [ ] [T-001] Establish existing firm-seam test baseline for {{seam-name}} [test: baseline] [seam: {{seam-id}}] [firmness: firm]
+  - Target: `{{existing test file path}}`
+  - Assert: `{{existing behavioral assertion from AC}}`
+  - Traces to: `[AC-{{id}}-01]`
+
+- [ ] [T-002] Write new or changed criterion test for {{seam-name}} [test: criterion] [seam: {{seam-id}}] [firmness: firm]
   - Target: `{{test file path}}`
   - Assert: `{{behavioral assertion from AC}}`
   - Traces to: `[AC-{{id}}-01]`
 
-- [ ] [T-002] Write unit tests for {{component}} [seam: internal] [firmness: soft]
+- [ ] [T-003] Write unit tests for {{component}} [test: criterion] [seam: internal] [firmness: soft]
   - Target: `{{test file path}}`
 
 ### Implementation
 
-- [ ] [T-003] {{specific task}} — `{{target file}}`
+- [ ] [T-004] {{specific task}} — `{{target file}}`
   - Confirmed contract/symbol: `{{optional public one-line signature or symbol; no body}}`
   - Required outcome: {{observable behavior and state transition}}
   - Errors and invariants: {{confirmed validation, error semantics, ordering guarantees, and constraints}}
   - Acceptance evidence: {{test/assertion or criterion proving completion}}
   - Implementation freedom: {{private helpers, local representation, and control flow remain implementer-owned}}
 
-- [ ] [T-004] {{specific task}} — `{{target file}}`
+- [ ] [T-005] {{specific task}} — `{{target file}}`
 
 ### Verify
 
-- [ ] Run tests — section reaches a green baseline before the next section
+- [ ] Run exact section verification, including applicable format/lint/typecheck/tests — section reaches a clean green baseline before the next section
 
 ---
 
@@ -56,21 +78,45 @@ Every acceptance criterion must trace to at least one task. Every firm seam must
 
 > **Scope:** {{description}}
 
+### Implementation context
+
+- **Observable outcome and acceptance criteria:** {{section outcome and AC IDs}}
+- **Ownership and dependency direction:** {{canonical ownership and dependency flow}}
+- **Existing mechanisms to reuse:** {{verified mechanisms and conventions}}
+- **Domain facts that evolve together:** {{coordinated facts or none}}
+- **Responsibilities that remain distinct:** {{separate responsibilities}}
+- **Expected touchpoints (non-binding):** {{orientation paths/symbols, not an allowlist}}
+- **Errors and invariants:** {{constraints}}
+- **Exact verification:** `{{commands and expected observations}}`
+
 ### Tests
 
-- [ ] [T-005] {{test task}} [seam: {{seam-id}}] [firmness: {{firm|soft}}]
+- [ ] [T-006] {{test task}} [test: {{baseline|criterion|characterization}}] [seam: {{seam-id}}] [firmness: {{firm|soft}}]
 
 ### Implementation
 
-- [ ] [T-006] {{task}}
+- [ ] [T-007] {{task}}
 
 ### Verify
 
-- [ ] Run tests — section reaches a green baseline
+- [ ] Run exact section verification — section reaches a clean green baseline
 
 ---
 
-<!-- Add sections as needed. Each section ends at a green test baseline. There is NO per-section refactor: the single behavior-preserving review-and-refactor pass runs once, below, after all sections are green. -->
+<!-- Add sections as needed. Each section ends after a bounded local clean/convergence pass and a green verification run. This is not a broad refactor or formal review; the single independent review-and-remediation cycle still runs once, below, after all sections are green. -->
+
+---
+
+## Prospective implementability review
+
+> Run once after all implementation sections are drafted and before plan approval. A fresh read-only reviewer walks the plan against the cited source. This is agent-owned review, not another user approval or a formal review-log cycle.
+
+- **Reviewer:** {{fresh reviewer label}}
+- **Source walked:** {{implementation, tests, dependencies, conventions, and CONTEXT inspected}}
+- **Coverage:** {{ownership clarity; existing machinery; parallel-representation risk; coordinated domain facts; responsibility boundaries; idiomatic implementation sufficiency}}
+- **Findings incorporated:** {{none-clean | concise findings and plan changes}}
+- **Unresolved material findings:** none | {{kick back before approval}}
+- **Implementability status:** pending | passed | passed-after-resolution
 
 ---
 
@@ -82,7 +128,7 @@ Every acceptance criterion must trace to at least one task. Every firm seam must
 > **Cycle:** `implement-N`
 > Use the current manifest review epoch.
 
-- [ ] Launch a **fresh auditor subagent** for one broad applicable discovery pass across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms; no mandatory N/A boilerplate.
+- [ ] Launch a **fresh auditor subagent** for one broad pass. Always cover structure/ownership, applicable language idioms, and tests/behavior preservation; add runtime/security/operational lenses when scope evidence makes them relevant. No mandatory N/A boilerplate.
 - [ ] Consolidate one complete blocker/major batch. Record each original finding below and attest with `review-log.mjs`; do not issue later batches.
 - [ ] Apply one behavior-preserving remediation for the complete batch (or record an evidence-based clean rationale). Firm-seam tests stay green; a firm-seam failure is a kickback, not a test edit.
 - [ ] Run the full test suite — must be green after remediation.
@@ -104,6 +150,8 @@ Every acceptance criterion must trace to at least one task. Every firm seam must
 
 **Targeted correction/reverification used:** no | yes - {{original RV IDs and any remediation-caused blocker regression}}
 **Clean-review rationale (if no findings):** {{brief evidence-based rationale}}
+
+> Major structural rewrites here indicate an upstream implementation-context or pre-code approach failure. Record that signal; this review is a safety net, not the normal place to generate the design.
 
 ---
 

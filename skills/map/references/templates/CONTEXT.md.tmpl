@@ -15,10 +15,11 @@
 
 {{What crosses this boundary and what doesn't. How this seam is defined.}}
 
-<!--
-For firm seams, add:
 Criteria:
-  - [SEAM-{{component}}-{{name}}-01] [AC-{{component}}-01] {{behavioral assertion}} → enforced-by: {{repository-root-relative test path}}; command: {{exact test command}}
+  - [SEAM-{{component}}-{{name}}-01] [AC-{{component}}-01] {{behavioral assertion}}
+
+<!-- For a firm seam, append executable durable enforcement to each criterion:
+  → enforced-by: {{repository-root-relative test path}}; command: {{exact test command}}
 -->
 
 ## Interfaces / Contracts
@@ -47,7 +48,7 @@ Example:
 
 ## Acceptance / Behavioral Criteria
 
-{{The definition of done for this scope. Derived from firm seams. These are the source for firm-seam test generation.}}
+{{The definition of done for this scope. Derived from all seams. Firm criteria are the source for durable firm-seam test enforcement; soft criteria may use disposable evidence.}}
 
 <!--
 Example:

@@ -10,7 +10,7 @@ For `class: refactor`, audit opportunities are proposals, not authorization. No 
 
 ## Lifecycle
 
-- **Standard implementation:** complete every plan section to a green baseline, then run one `RV-*` cycle over the whole change. Do not refactor per section.
+- **Standard implementation:** complete every plan section through inspect, test, implement, bounded local clean/convergence, and verification, then run one `RV-*` cycle over the whole change. Local convergence is not a per-section formal review or broad refactor.
 - **Refactor execution:** execute selected opportunities to green, then run one `RV-*` cycle over the complete diff.
 - **Triage:** excluded. It uses its lightweight self-check and no formal review log.
 
@@ -31,14 +31,13 @@ The auditor and verifier are distinct fresh read-only subagents, neither of whic
 
 ## Discovery coverage
 
-The auditor receives only idiom packs applicable to the effective scope and reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` report is required. The pass must also catch unsafe or panic-prone recoverable paths, swallowed errors, wrong ownership or dependency direction, monolithic responsibilities, duplication, leaky abstractions, dead/debug/placeholder code, and operational risks from persistence, concurrency, resources, networking, or deployment.
+The auditor receives the complete diff, relevant seams/CONTEXT, section approaches and deviations, verification evidence, and only idiom packs applicable to the effective scope. Every implementation review covers structure/ownership, applicable language idioms, and tests/behavior preservation. Runtime, security, and operational lenses are added when scope evidence makes them relevant. No mandatory `N/A` report is required. The pass must catch unsafe or panic-prone recoverable paths, swallowed errors, wrong ownership or dependency direction, accidental parallel representations, duplicated domain facts, monolithic responsibilities, leaky abstractions, dead/debug/placeholder code, and applicable operational risks from persistence, concurrency, resources, networking, or deployment.
 
 Specialized lenses may run in parallel as one coordinated discovery pass:
 
-- Scope, architecture, and contract mapping
-- Structure, dependency, state, and data review
-- Language idioms and error/safety review
-- Tests and preservation coverage
+- Structure, ownership, dependency, representation, state, and data review
+- Language idioms, standard machinery, and error/safety review
+- Tests, acceptance criteria, and behavior-preservation coverage
 - Runtime, security, and operational risk when applicable
 
 They report to one consolidator. They do not produce later batches.
@@ -48,6 +47,8 @@ They report to one consolidator. They do not produce later batches.
 Use the `RV-NNN` finding contract from `adversarial-review.md`: severity `blocker|major`; category `correctness|security|simplicity|maintainability|idioms`; concrete evidence, impact, and alternative. Record all findings in one artifact table. A clean pass records a brief evidence-based rationale.
 
 Resolve the complete batch once. Local/private/reversible idiomatic choices are agent-owned. Escalate decisions at the materiality boundary. Firm-seam tests stay green; a firm-seam failure is a kickback, never a test edit.
+
+Final review is a safety net, not the normal design-generation step. A major structural rewrite indicates the prospective implementation context or pre-code approach was insufficient. Record that signal with remediation size and category so repeated failures can inform future model routing without creating model-specific workflow modes.
 
 After tests are green, the verifier checks only the original `RV-*` IDs and records each as resolved or unresolved. Verification must not repeat discovery, expand scope, or introduce new low/major findings. A remediation-caused blocker regression is the only new-ID exception: record it with `--regression`, correct it within the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or safety requires broad review, stop and kick back.
 

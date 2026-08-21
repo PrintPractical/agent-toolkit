@@ -760,45 +760,108 @@ export function acceptanceCriteria(manifest, repoRoot = process.cwd()) {
 }
 
 export function firmSeams(manifest, repoRoot = process.cwd()) {
+  return architectureSeams(manifest, repoRoot)
+    .filter(seam => seam.firmness === 'firm')
+    .map(seam => seam.id)
+    .sort();
+}
+
+function architectureSeams(manifest, repoRoot = process.cwd()) {
   const architecture = artifactContent(manifest, 'architecture', repoRoot);
-  const seams = new Set();
-  for (const match of architecture.matchAll(/^###\s+Seam:[^\n]*\[id:\s*(SEAM-[A-Za-z0-9][A-Za-z0-9-]*)\][^\n]*\[firmness:\s*firm\]/gim)) {
-    seams.add(match[1]);
-  }
-  return [...seams].sort();
+  const matches = [...architecture.matchAll(/^###\s+Seam:[^\n]*\[id:\s*(SEAM-[A-Za-z0-9][A-Za-z0-9-]*)\][^\n]*\[firmness:\s*(soft|firm)\][^\n]*(?:\n|$)/gim)];
+  return matches.map(match => {
+    const remainder = architecture.slice(match.index + match[0].length);
+    const boundary = remainder.search(/^###\s+Seam:|^##\s+/im);
+    const blockEnd = boundary < 0 ? architecture.length : match.index + match[0].length + boundary;
+    const block = architecture.slice(match.index, blockEnd);
+    const criteria = [...block.matchAll(/^\s*-\s+\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]\s+([^\r\n{][^\r\n]*)$/gim)]
+      .map(item => item[1]);
+    return { id: match[1], firmness: match[2].toLowerCase(), criteria };
+  });
 }
 
 export function planTasks(content) {
-  const matches = [...content.matchAll(/^-\s+\[[ x]\]\s+\[(T-\d{3})\]\s+(.+?)(?=\n(?=-\s+\[[ x]\]\s+\[T-\d{3}\])|$)/gims)];
-  return matches.map(match => {
-    const body = match[0];
-    const seam = body.match(/\[seam:\s*([^,\]]+?)(?:\s*,\s*firmness:\s*firm)?\]\s*\[firmness:\s*firm\]|\[seam:\s*([^,\]]+),\s*firmness:\s*firm\]/i);
+  const matches = [...content.matchAll(/^-\s+\[[ x]\]\s+\[(T-\d{3})\]\s+([^\r\n]*)$/gim)];
+  const headings = [...content.matchAll(/^#{2,3}\s+/gm)].map(match => match.index);
+  return matches.map((match, index) => {
+    const nextTask = matches[index + 1]?.index ?? content.length;
+    const nextHeading = headings.find(position => position > match.index) ?? content.length;
+    const body = content.slice(match.index, Math.min(nextTask, nextHeading));
+    const seam = body.match(/\[seam:\s*([^\]]+)\]/i);
+    const isFirm = /\[firmness:\s*firm\]/i.test(body);
     return {
       id: match[1],
       body,
       criteria: [...body.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/g)].map(item => item[1]),
-      firmSeam: seam?.[1] || seam?.[2] || null,
-      isTest: /\btest(?:s|ing)?\b/i.test(match[2]),
+      firmSeam: isFirm && seam?.[1]?.trim().toLowerCase() !== 'internal' ? seam?.[1]?.trim() : null,
+      isTest: /\[test:\s*(?:baseline|criterion|characterization)\]/i.test(body),
     };
   });
+}
+
+function planImplementationSections(content) {
+  const matches = [...content.matchAll(/^##\s+Section\s+\d+:[^\n]*(?:\n|$)/gim)];
+  return matches.map((match, index) => ({
+    title: match[0].replace(/^##\s+/, '').trim(),
+    content: content.slice(match.index, matches[index + 1]?.index ?? content.length).split(/^##\s+(?!(?:Section\s+\d+:))/m)[0],
+  }));
+}
+
+function labeledValue(content, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return content.match(new RegExp(`^\\s*-\\s+\\*\\*${escaped}:\\*\\*\\s*([^\\r\\n]*)$`, 'im'))?.[1]?.trim() || '';
+}
+
+function isConcrete(value) {
+  return Boolean(value) && !value.includes('{{');
+}
+
+function missingImplementationContext(content) {
+  const required = [
+    'Observable outcome and acceptance criteria',
+    'Ownership and dependency direction',
+    'Existing mechanisms to reuse',
+    'Domain facts that evolve together',
+    'Responsibilities that remain distinct',
+    'Expected touchpoints (non-binding)',
+    'Errors and invariants',
+    'Exact verification',
+  ];
+  const sections = planImplementationSections(content);
+  return {
+    sections,
+    missing: sections.flatMap(section => required
+      .filter(label => !isConcrete(labeledValue(section.content, label)))
+      .map(label => `${section.title}: ${label}`)),
+  };
+}
+
+function overallOutcomeCriterion(manifest, repoRoot = process.cwd()) {
+  return artifactContent(manifest, 'architecture', repoRoot)
+    .match(/^\*\*Overall outcome criterion:\*\*\s*\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]\s*$/im)?.[1] || null;
+}
+
+function implementationApproaches(content) {
+  const body = sectionBody(content, 'Section approaches');
+  const matches = [...body.matchAll(/^###\s+(Section\s+\d+:[^\r\n]+)\s*$/gim)];
+  return matches.map((match, index) => ({
+    title: match[1].trim(),
+    content: body.slice(match.index, matches[index + 1]?.index ?? body.length),
+  }));
 }
 
 export function traceabilityReport(manifest, repoRoot = process.cwd()) {
   const plan = artifactContent(manifest, 'plan', repoRoot);
   const criteria = acceptanceCriteria(manifest, repoRoot);
-  const seams = firmSeams(manifest, repoRoot);
+  const allSeams = architectureSeams(manifest, repoRoot);
+  const seams = allSeams.filter(seam => seam.firmness === 'firm').map(seam => seam.id);
   const tasks = planTasks(plan);
   const duplicateTaskIds = tasks.map(task => task.id).filter((id, index, all) => all.indexOf(id) !== index);
   const entries = criteria.map(id => {
     const matching = tasks.filter(task => task.criteria.includes(id));
     return { id, tasks: matching.map(task => task.id), firmTests: matching.filter(task => task.isTest && task.firmSeam).map(task => task.id) };
   });
-  const firmCriteria = new Map(seams.map(seam => [seam, []]));
-  const architecture = artifactContent(manifest, 'architecture', repoRoot);
-  for (const seam of seams) {
-    const block = architecture.match(new RegExp(`^###\\s+Seam:[^\\n]*\\[id:\\s*${seam}\\][\\s\\S]*?(?=^###\\s+Seam:|^##\\s+|$(?![\\s\\S]))`, 'im'))?.[0] || '';
-    for (const match of block.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/g)) firmCriteria.get(seam).push(match[1]);
-  }
+  const firmCriteria = new Map(allSeams.filter(seam => seam.firmness === 'firm').map(seam => [seam.id, [...seam.criteria]]));
   const decisions = artifactContent(manifest, 'decisions', repoRoot);
   for (const match of decisions.matchAll(/\[\s*(AC-[A-Za-z0-9][A-Za-z0-9-]*)\s*\][^\n]*traces-to:\s*\[\s*(SEAM-[A-Za-z0-9][A-Za-z0-9-]*)\s*\]/gi)) {
     if (firmCriteria.has(match[2])) firmCriteria.get(match[2]).push(match[1]);
@@ -806,7 +869,8 @@ export function traceabilityReport(manifest, repoRoot = process.cwd()) {
   const missingCriteria = entries.filter(entry => entry.tasks.length === 0).map(entry => entry.id);
   const uncoveredFirmSeams = seams.filter(seam => !tasks.some(task => task.isTest && task.firmSeam === seam));
   const firmSeamsWithoutCriteria = [...firmCriteria].filter(([, ids]) => ids.length === 0).map(([seam]) => seam);
-  return { criteria, seams, tasks, entries, duplicateTaskIds, missingCriteria, uncoveredFirmSeams, firmSeamsWithoutCriteria };
+  const seamsWithoutCriteria = allSeams.filter(seam => seam.criteria.length === 0).map(seam => seam.id);
+  return { criteria, seams, allSeams, tasks, entries, duplicateTaskIds, missingCriteria, uncoveredFirmSeams, firmSeamsWithoutCriteria, seamsWithoutCriteria };
 }
 
 export function renderTraceabilitySummary(report) {
@@ -865,6 +929,13 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
       errors.push('architecture.md validity status must be passed or passed-after-resolution');
     }
     if (architecture && unresolvedBlockers(architecture)) errors.push('architecture.md has an unresolved blocker');
+    if (architecture) {
+      const report = traceabilityReport(manifest, repoRoot);
+      const outcome = overallOutcomeCriterion(manifest, repoRoot);
+      const seamCriteria = new Set(report.allSeams.flatMap(seam => seam.criteria));
+      if (!outcome || !seamCriteria.has(outcome)) errors.push('architecture.md must identify one seam criterion as the observable overall change outcome');
+      if (report.seamsWithoutCriteria.length > 0) errors.push(`architecture.md has seams without behavioral acceptance criteria: ${report.seamsWithoutCriteria.join(', ')}`);
+    }
     if (architecture && ['feature', 'epic'].includes(manifest.class)) {
       validateArtifactReviewIds(manifest, 'architect', architecture, repoRoot, errors);
     }
@@ -888,6 +959,13 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
       if (!recordField(record, 'User response')) errors.push(`confirmation record has no explicit user response: ${record.id}`);
     }
     if (decisions && unresolvedBlockers(decisions)) errors.push('decisions.md has an unresolved dry-run blocker');
+    if (decisions) {
+      const report = traceabilityReport(manifest, repoRoot);
+      const outcome = overallOutcomeCriterion(manifest, repoRoot);
+      const seamCriteria = new Set(report.allSeams.flatMap(seam => seam.criteria));
+      if (!outcome || !seamCriteria.has(outcome)) errors.push('specification must retain a seam criterion identified as the observable overall change outcome');
+      if (report.seamsWithoutCriteria.length > 0) errors.push(`specification has seams without behavioral acceptance criteria: ${report.seamsWithoutCriteria.join(', ')}`);
+    }
     if (decisions && ['feature', 'epic'].includes(manifest.class)) {
       validateArtifactReviewIds(manifest, 'specify', decisions, repoRoot, errors);
     }
@@ -899,11 +977,28 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     if (plan && !/<!-- traceability:start -->[\s\S]*<!-- traceability:end -->/m.test(plan)) errors.push('plan.md missing generated traceability summary');
     if (plan) {
       const report = traceabilityReport(manifest, repoRoot);
+      if (report.criteria.length === 0) errors.push('plan.md cannot be approved without observable acceptance criteria');
       if (report.duplicateTaskIds.length > 0) errors.push(`plan.md has duplicate task IDs: ${[...new Set(report.duplicateTaskIds)].join(', ')}`);
       if (report.missingCriteria.length > 0) errors.push(`plan.md has acceptance criteria without tasks: ${report.missingCriteria.join(', ')}`);
-      if (report.firmSeamsWithoutCriteria.length > 0) errors.push(`plan.md has firm seams without acceptance criteria: ${report.firmSeamsWithoutCriteria.join(', ')}`);
+      if (report.seamsWithoutCriteria.length > 0) errors.push(`plan.md has seams without behavioral acceptance criteria: ${report.seamsWithoutCriteria.join(', ')}`);
       if (report.uncoveredFirmSeams.length > 0) errors.push(`plan.md has firm seams without firm-seam test tasks: ${report.uncoveredFirmSeams.join(', ')}`);
       if (traceabilitySummary(plan) !== renderTraceabilitySummary(report)) errors.push('plan.md generated traceability summary is stale; run traceability-sync.mjs --write');
+      const reconnaissance = sectionBody(plan, 'Source reconnaissance')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '')
+        .trim();
+      if (!isConcrete(reconnaissance)) errors.push('plan.md Source reconnaissance must record concrete evidence');
+      const context = missingImplementationContext(plan);
+      if (context.sections.length === 0) errors.push('plan.md must contain at least one implementation section');
+      const sectionTitles = context.sections.map(section => section.title.toLowerCase());
+      if (new Set(sectionTitles).size !== sectionTitles.length) errors.push('plan.md implementation section headings must be unique');
+      if (context.missing.length > 0) errors.push(`plan.md implementation context is incomplete: ${context.missing.join(', ')}`);
+      const prospective = sectionBody(plan, 'Prospective implementability review');
+      for (const label of ['Reviewer', 'Source walked', 'Coverage', 'Findings incorporated']) {
+        if (!isConcrete(labeledValue(prospective, label))) errors.push(`plan.md prospective implementability review missing concrete evidence: ${label}`);
+      }
+      if (labeledValue(prospective, 'Unresolved material findings').toLowerCase() !== 'none') errors.push('plan.md prospective implementability review has unresolved material findings');
+      if (!/^(?:passed|passed-after-resolution)$/i.test(labeledValue(prospective, 'Implementability status'))) errors.push('plan.md prospective implementability review must be passed or passed-after-resolution');
     }
     if (plan && hasFencedSourceCode(plan)) {
       errors.push('plan.md contains a fenced source-code block; replace it with a concise functional specification');
@@ -940,6 +1035,48 @@ export function validateApprovalArtifacts(manifest, approval, repoRoot = process
     const evidence = readArtifact(manifest, artifact, repoRoot, errors);
     if (evidence && (!/\|\s*tests\s*\|[^\n]*\|\s*pass\s*\|/i.test(evidence) || !/context (?:verification|reconciliation)[^\n]*(?:pass|complete)/i.test(evidence))) {
       errors.push(`${artifact}.md must record passing tests and completed CONTEXT verification`);
+    }
+    if (evidence && artifact === 'implementation' && !/\|\s*format\/lint\/typecheck\s*\|[^\n]*\|\s*(?:pass|not-applicable)\s*\|/i.test(evidence)) {
+      errors.push('implementation.md must record applicable format/lint/typecheck results or an evidenced not-applicable result');
+    }
+    if (evidence && manifest.class === 'feature') {
+      const planSections = planImplementationSections(artifactContent(manifest, 'plan', repoRoot));
+      const approaches = implementationApproaches(evidence);
+      const approachFields = [
+        'Verified mechanisms to reuse',
+        'Ownership and representation',
+        'Standard language/library facilities',
+        'Responsibility boundaries',
+        'Custom machinery justification',
+        'Evolution or justified deviations',
+      ];
+      const approachesByTitle = new Map(approaches.map(approach => [approach.title.toLowerCase(), approach]));
+      const uniquePlanSections = new Set(planSections.map(section => section.title.toLowerCase()));
+      const incompleteApproaches = planSections.filter(section => {
+        const approach = approachesByTitle.get(section.title.toLowerCase());
+        return !approach
+          || labeledValue(approach.content, 'Recorded before source edits').toLowerCase() !== 'yes'
+          || approachFields.some(label => !isConcrete(labeledValue(approach.content, label)));
+      });
+      if (planSections.length === 0
+        || uniquePlanSections.size !== planSections.length
+        || approachesByTitle.size !== approaches.length
+        || approaches.length !== planSections.length
+        || incompleteApproaches.length > 0) {
+        errors.push('implementation.md must record a pre-code approach for each implemented section');
+      }
+      const qualitySignals = [
+        'Implementation model/route',
+        'First-pass lint/typecheck result',
+        'First-pass test result',
+        'Unplanned ownership/representation changes',
+        'Final RV blocker/major findings by category',
+        'Post-review remediation size',
+        'Recurring finding categories',
+        'Reported implementation/review cost',
+      ];
+      const missing = qualitySignals.filter(label => !isConcrete(labeledValue(evidence, label)));
+      if (missing.length > 0) errors.push(`implementation.md missing quality signals: ${missing.join(', ')}`);
     }
   }
 

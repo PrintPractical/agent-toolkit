@@ -18,7 +18,7 @@ Tests are not typed independently. The seam decides everything.
 A firm-seam test asserts a contract. It tests *what the system does*, not how it does it. A true refactor does not change observable behavior, so firm-seam tests must survive any refactor unchanged.
 
 **Rules for firm-seam tests:**
-- Written before implementation (red-green discipline).
+- Existing baseline tests start green. Tests for new or changed criteria demonstrate red before implementation. Characterization tests for unchanged behavior start green.
 - Located at the level of the seam they pin (integration, system, or behavioral — not unit internals).
 - Never modified to make a refactor pass. A failing firm-seam test during a refactor is not a test problem — it is evidence that the refactor changed behavior, which means it is not a pure refactor. **This triggers a kickback, not a test edit.**
 - Carry the seam ID in a comment: `// [SEAM-gw-rl-01]`.
@@ -41,9 +41,13 @@ A soft-seam test is coupled to implementation structure. It tests internal units
 `plan` labels every test task with its seam's firmness. The label appears in the checklist:
 
 ```
-- [ ] Write tests for rate-limit enforcement [seam: gateway/rate-limit, firmness: firm]
-- [ ] Write unit tests for token-bucket internals [seam: internal, firmness: soft]
+- [ ] Run existing rate-limit safety net [test: baseline] [seam: gateway/rate-limit] [firmness: firm]
+- [ ] Write changed rate-limit criterion test [test: criterion] [seam: gateway/rate-limit] [firmness: firm]
+- [ ] Characterize accepted legacy input [test: characterization] [seam: gateway/rate-limit] [firmness: firm]
+- [ ] Write unit tests for token-bucket internals [test: criterion] [seam: internal] [firmness: soft]
 ```
+
+Use the three separate labels exactly. `baseline` means existing behavior starts green, `criterion` means new or changed behavior demonstrates red, and `characterization` means unchanged behavior starts green. Never manufacture red by changing an existing firm safety net.
 
 A plan must contain at least one firm-seam test task per firm seam in the acceptance criteria. CI will verify this check.
 
@@ -51,14 +55,14 @@ A plan must contain at least one firm-seam test task per firm seam in the accept
 
 Per section (L2), just reach a green baseline:
 1. Identify which seams are touched. Check `architecture.md` for firmness.
-2. If any touched seam is firm: write the firm-seam test first. Must be green before continuing.
-3. Implement to pass tests. Move to the next section.
+2. Run firm `baseline` tests green; demonstrate firm `criterion` tests red for the intended reason; keep `characterization` tests green.
+3. Implement to pass tests, perform bounded local convergence, and rerun applicable static checks and tests before moving to the next section.
 
 Once every section is green, run the single behavior-preserving review-and-refactor pass over the whole change (L3, see `implementation-review.md`):
 4. A fresh auditor flags cleanup; apply behavior-preserving refactors. Firm-seam tests must remain green throughout.
 5. Rewrite soft-seam tests to match the refactored structure; a distinct fresh verifier confirms behavior is preserved.
 
-If cleanup needs behavior a firm-seam test would not yet catch, add a minimal passing **characterization test** to pin the current behavior before refactoring, then treat it as a firm-seam safety net for that pass.
+If cleanup needs behavior a firm-seam test would not yet catch, add a minimal passing **characterization test** to pin the current behavior before refactoring, then treat it as a firm-seam safety net for that pass. Adding that new test is allowed during bounded remediation; modifying an existing firm-seam test is not.
 
 **The tripwire:** `implement` treats any firm-seam test modification as an automatic kickback signal. The implementer must STOP, explain why the firm contract changed, and kick back to `specify` (as an amendment or defect, as appropriate). The implementer never changes a firm-seam test unilaterally.
 

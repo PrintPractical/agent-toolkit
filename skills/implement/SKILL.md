@@ -1,6 +1,6 @@
 ---
 name: implement
-description: Use after plan approval is approved to execute plan.md. Implements each section to a green baseline, then runs one bounded independent RV review and behavior-preserving remediation over the whole change before the implement approval. Enforces the firm-seam tripwire, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan approval is approved.
+description: Use after plan approval is approved to execute source-grounded plan.md. Records a pre-code approach, runs each section through inspect, test, implement, clean, and verify, then performs one bounded independent RV review before implement approval. Enforces the firm-seam tripwire, logs kickbacks, and reconciles CONTEXT.md. Do not run unless the plan approval is approved.
 ---
 
 # Implement
@@ -21,7 +21,7 @@ All `node "$SKILL_DIR/scripts/..."` commands below depend on this. Never referen
 
 The implementer follows confirmed outcomes and scope. It does not improvise behavior or contracts. Investigate uncertainty first; kick back only when evidence leaves a user-owned material decision unresolved. Private helpers, local data structures, control flow, and equivalent idiomatic mechanisms are implementation choices, not spec defects.
 
-Code quality is still your job, but it is **not** reviewed per section. Each section reaches a green baseline; the single bounded review and behavior-preserving remediation happens once after all sections are green (see `references/implementation-review.md`).
+Code quality is still your job. Each section gets a bounded local convergence pass while its context is fresh, but no per-section formal review or broad refactor. The single independent review and behavior-preserving remediation happens once after all sections are green (see `references/implementation-review.md`).
 
 ## Preconditions
 
@@ -32,23 +32,47 @@ Load `manifest.yaml`. Verify:
 
 For feature changes, create `implementation.md` from `references/templates/implementation.md.tmpl` now. Keep its verification and context-reconciliation evidence current; implement approval validates it.
 
-Read `change-brief.md` first, then `references/engineering-fundamentals.md`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for implementation and review. If no matching pack is installed, state that and use repository conventions and tooling.
+Read `change-brief.md` first, then `plan.md`, the plan's cited `CONTEXT.md` and source anchors, and `references/engineering-fundamentals.md`. If `manifest.language` is set, use the `idioms` skill to load its matching pack for implementation and review. If no matching pack is installed, state that and use repository conventions and tooling.
 
-## The loop: per section (implement → tests green)
+## The loop: per section (inspect -> test -> implement -> clean -> verify)
 
 Work through `plan.md` one section at a time. For each section:
 
-### Step 1: Write firm-seam tests first
+### Step 1: Inspect and record the approach
 
-Find all test tasks labeled `[seam: <id>] [firmness: firm]` in this section. Write those tests first. They must be **red** (failing) before any implementation code is written. This is non-negotiable.
+Inspect the section's cited implementation, tests, dependencies, conventions, and CONTEXT before editing source. Resolve its non-binding expected touchpoints against repository reality.
 
-### Step 2: Implement to green
+Before source edits, add the section's concise approach to `implementation.md`: verified mechanisms to reuse; ownership, dependency, and representation choices; applicable standard language/library facilities; intended responsibility boundaries; and a concrete justification for custom machinery, if any. This is agent-owned and needs no user approval. Update it when evidence changes a local choice and record why; kick back if the change crosses the materiality boundary.
 
-Write the implementation tasks from the plan. Work the checklist top to bottom. Check off each task in `plan.md` as you complete it (update the file with `[x]`). Goal: get firm-seam tests green.
+### Step 2: Establish test evidence
 
-### Step 3: Write soft-seam tests and reach a green baseline
+Use the standard plan labels:
+- `[test: baseline]`: run the existing firm-seam safety net before implementation. It must start green and remain green.
+- `[test: criterion]`: add the test for new or changed behavior and demonstrate that it fails for the intended reason before implementation.
+- `[test: characterization]`: add or run a test that captures unchanged behavior. It starts green and remains green.
 
-Write any test tasks labeled `[seam: <id>] [firmness: soft]` in this section. Run the tests; the section must reach a green baseline before you move on. Do **not** refactor here — that happens once, below. Check off the section's verify task and repeat for the next section.
+Do not manufacture a failing test for already-supported behavior. Do not edit an existing firm-seam test merely to produce red.
+
+### Step 3: Implement to green
+
+Write the implementation tasks from the plan. Work the checklist top to bottom. Check off each task in `plan.md` as you complete it (update the file with `[x]`). Goal: get all planned test evidence green.
+
+Write soft-seam tests alongside the implementation as planned. Run the targeted tests until the section is green.
+
+### Step 4: Clean and converge locally
+
+While the section context is fresh, make one bounded pass over only the implemented section:
+- compare custom code with applicable standard/library and established repository machinery;
+- remove accidental parallel representations and duplicated domain facts that must evolve together;
+- simplify avoidable nesting or indirect control flow;
+- keep cohesive responsibilities together and distinct responsibilities separate;
+- remove dead, debug, placeholder, or redundant code introduced by the section.
+
+This is minor behavior-preserving convergence, not a second implementation, scope expansion, or per-section formal review. Do not revisit unrelated code. If convergence requires a material ownership, contract, compatibility, security, migration, or operational decision, kick back instead.
+
+### Step 5: Verify a clean green baseline
+
+Run the section's exact verification, including applicable format, lint, typecheck, build, and tests. Record first-pass lint/typecheck and test results in `implementation.md`, then record the final clean result. Check off the section's verify task and repeat for the next section.
 
 ## After all sections complete
 
@@ -56,7 +80,7 @@ Write any test tasks labeled `[seam: <id>] [firmness: soft]` in this section. Ru
 
 This runs **once**, over the whole change, and is required for implement approval. Full detail is in `references/implementation-review.md`.
 
-1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, and only idiom packs applicable to the effective scope. Following `references/adversarial-review.md`, it reviews deeply where applicable across data/state, data structures, interfaces/traits, errors, security, observability, simplicity, maintainability, and idioms. No mandatory `N/A` boilerplate.
+1. **One broad discovery pass.** Launch a fresh read-only auditor in a separate context. Give it the complete diff, relevant CONTEXT/seams, implementation approaches and deviations, verification evidence, and only idiom packs applicable to the effective scope. Always cover structure/ownership, applicable language idioms, and tests/behavior preservation. Add runtime, security, and operational lenses when the scope makes them relevant. No mandatory `N/A` boilerplate.
 2. **One consolidated batch.** Deduplicate all blocker/major findings. Record stable `RV-NNN` IDs in the plan's review table with severity `blocker|major`, category `correctness|security|simplicity|maintainability|idioms`, evidence, concrete impact, and concrete alternative. Do not emit nits or later batches. Attest with:
    ```
 node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-N --role auditor \
@@ -64,21 +88,23 @@ node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cy
       --finding '{"id":"RV-001","severity":"major","category":"maintainability","location":"<file:line>","impact":"<impact>","alternative":"<alternative>"}'
    ```
    If clean, record `approved` plus a brief evidence-based rationale in the plan.
-3. **One remediation.** Resolve the complete batch behavior-preservingly. Auto-select local/private/reversible idiomatic fixes. Kick back any remediation crossing the materiality boundary. Change only implementation and soft-seam tests. Firm-seam tests must stay green; failure means STOP and kick back, never edit the test.
+3. **One remediation.** Resolve the complete batch behavior-preservingly. Auto-select local/private/reversible idiomatic fixes. Kick back any remediation crossing the materiality boundary. Change only implementation, soft-seam tests, and new characterization tests that pin unchanged behavior before cleanup. Never modify an existing firm-seam test; it must stay green, and failure means STOP and kick back. A major structural rewrite indicates the implementation context or pre-code approach failed upstream; record it in `implementation.md` as a quality signal rather than treating final review as normal design generation.
 4. **Full green run.** Run the full applicable suite after remediation.
 5. **Focused verification.** Launch a distinct fresh read-only verifier. It checks only the original `RV-*` IDs and preservation evidence. It does not repeat discovery, expand scope, or introduce new low/major findings:
    ```
 node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase implement --cycle implement-N --role verifier \
       --reviewer "<distinct verifier label>" --verdict approved --resolution RV-001=resolved
    ```
-   A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.
+    A remediation-caused blocker regression is the sole new-ID exception: record it with `--regression`, correct it in the same focused scope, and close it with `--regression-resolution` during the one targeted reverification. If any ID remains unresolved or closure needs broad review, stop and kick back rather than extending the cycle.
+
+Record final blocker/major counts by category, post-review remediation diff size, recurring categories, unplanned ownership/representation changes, and orchestrator-reported model/cost data in `implementation.md`. These are measurement signals, not approval heuristics. Recurring major structural repair after prospective planning is evidence that the selected model or route may have reached a capability ceiling; routing a future approach or implementation to a stronger model does not change this generic workflow.
 
 ## Kickback protocol
 
 When you encounter:
 - An ambiguity the plan did not cover
 - A decision at the materiality boundary that the artifacts do not resolve
-- A firm-seam test that fails during the refactor pass (behavior change)
+- A firm-seam test that fails during local cleanup or final remediation (behavior change)
 - A conflict between the plan and reality that requires resolving
 
 **STOP IMMEDIATELY.** Do not proceed. Do not improvise.
@@ -106,7 +132,7 @@ node "$SKILL_DIR/scripts/context-verify.mjs" --path <context-file> --run-tests
    - New seams with firmness tags
    - Updated interfaces/contracts
    - New glossary terms
-   - New acceptance criteria (if firm seams were added)
+   - New acceptance criteria for modified seams; durable enforcement citations remain required for firm seams
    - Updated `Known-soft-spots` (add any tech debt introduced; remove any addressed)
    - Re-stamp provenance: `Provenance: validated-at: <current HEAD sha>`
 4. Run a verifier subagent:

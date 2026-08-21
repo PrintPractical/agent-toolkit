@@ -23,7 +23,7 @@ Description: what crosses this boundary and what doesn't.
 Criteria:
   - [SEAM-<id>] [AC-<id>] <behavioral assertion> → enforced-by: <repository-root-relative test path>; command: <exact test command>
 ```
-Every firm seam has at least one criterion with an acceptance-criterion ID, repository-root-relative enforcing test path, exact executable command, and matching `[SEAM-<id>]` marker in that test. Soft seams do not require enforcement.
+Every soft and firm seam has at least one behavioral criterion with an acceptance-criterion ID. Every firm seam criterion additionally has a repository-root-relative enforcing test path, exact executable command, and matching `[SEAM-<id>]` marker in that test. Soft seams do not require durable enforcement citations.
 
 **Interfaces/Contracts** — Public API, message formats, file layouts, or protocol surface. Firm interfaces carry a seam ID. Soft interfaces are described with the expectation they will evolve.
 

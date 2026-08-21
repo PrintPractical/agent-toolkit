@@ -57,12 +57,12 @@ Conduct a systematic confirmation interview in concise numbered batches. Rules:
 
 Examine these categories, but ask only where the choice crosses the materiality boundary:
 1. **Interface definitions** — exact signatures, types, error conditions, edge cases
-2. **Data contracts** — field names, types, required vs optional, validation rules
+2. **Data contracts and ownership** — field names, types, required vs optional, validation rules, canonical owner/dependency direction, and whether multiple representations intentionally evolve independently
 3. **Error handling** — every failure mode mentioned in `architecture.md`, what happens
 4. **Concurrency/ordering** — if the change touches concurrent code, ordering guarantees
 5. **Configuration** — new config knobs, their defaults, their validation
 6. **Migration/compatibility** — is this a breaking change? backward-compat requirements?
-7. **Test scenarios** — which scenarios must be covered for each firm seam?
+7. **Acceptance and test scenarios** — confirm behavioral criteria for every soft and firm seam and durable test obligations for firm seams
 8. **Observability specifics** — exact metric names, trace spans, log levels
 9. **Refactor scope** — for each approved refactor: exact files/modules, what changes
 
@@ -90,9 +90,11 @@ node "$SKILL_DIR/scripts/review-log.mjs" record --id <id> --phase specify --cycl
 Fill `decisions.md` from `references/templates/decisions.md.tmpl`. Include:
 - A complete confirmation ledger before the prose decisions
 - All interface changes (complete, exact)
+- Canonical ownership/dependency direction for shared contracts and any intentional representation separation
 - Full decision log (batch item → recommendation → explicit resolution, challenges, overrides)
 - The bounded `SV-*` review cycle and focused verification results
 - Architecture reconciliation notes (any disparities found in architecture.md and how they were fixed)
+- Confirmation that every seam retains behavioral acceptance criteria and the overall change has an observable completion criterion
 
 Write to: `.changes/active/<id>/decisions.md`
 
@@ -174,6 +176,7 @@ Use the standard materiality boundary and confirmation discipline, scoped strict
 - Which child owns (authors) each shared contract vs which children consume it
 - Versioning / evolution rules: can a shared interface change mid-epic without breaking other children?
 - Ordering constraints: if child A produces an interface that child B consumes, must A's interface be complete before B starts its `specify`?
+- Behavioral acceptance criteria for every shared seam, with durability obligations determined separately by firmness
 
 **Phase E3: Bounded cross-child review**
 

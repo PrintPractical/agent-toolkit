@@ -26,6 +26,8 @@ Every user-owned material decision must have an explicit response: public contra
 ### Interface: {{interface-name}}
 
 **Change type:** new | modified | removed
+**Owner and dependency direction:** {{canonical owner and who depends on this contract}}
+**Representation relationship:** {{single canonical representation | intentionally distinct representations and why}}
 **Definition:**
 ```
 {{type signature, message format, protocol definition, file schema — whatever is appropriate for the language/stack}}
@@ -110,11 +112,12 @@ Use the current manifest review epoch.
 
 ## Acceptance Criteria Confirmed
 
-{{Confirm before the specify approval that every firm seam has an acceptance criterion and a required test obligation. Plan will map these IDs to concrete tasks.}}
+{{Confirm before the specify approval that every soft and firm seam has a behavioral acceptance criterion. At least one criterion states the observable overall change outcome. Firmness determines test durability; plan maps every ID to concrete work and gives firm seams durable test obligations.}}
 
 ### AC-{{id}}-01
 
 - Seam: SEAM-{{id}}-01
-- Required test: firm-seam / behavioral
+- Firmness: soft | firm
+- Required evidence: {{observable assertion and planned test obligation}}
 
 <!-- Fill before the specify approval is approved. -->

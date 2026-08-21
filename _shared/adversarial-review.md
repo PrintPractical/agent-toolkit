@@ -59,4 +59,6 @@ The recording CLI permits one discovery auditor and at most two verifier entries
 
 Apply the cross-language review criteria in `engineering-fundamentals.md` together with every applicable language idiom pack.
 
+For completed implementation and refactor execution, `implementation-review.md` focuses the broad pass: structure/ownership, applicable language idioms, and tests/behavior preservation are standard lenses; runtime, security, and operational lenses activate from scope evidence. This focus does not require `N/A` boilerplate or split the consolidated finding batch.
+
 Opportunity IDs such as `RF-*`, acceptance criteria, decisions, and seams are not review finding IDs.

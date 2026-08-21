@@ -19,6 +19,7 @@ function implementationEvidence(id, cwd) {
   fs.writeFileSync(path.join(cwd, '.changes', 'active', id, 'implementation.md'), [
     '## Completed work', '- completed', '## Verification',
     '| Kind | Command | Result | Evidence |', '|---|---|---|---|', '| tests | `true` | pass | green |',
+    '| format/lint/typecheck | `true` | pass | clean |',
     '**Context verification:** pass - reconciled', '## Approval evidence', '**User response (verbatim):** approve',
   ].join('\n'));
 }

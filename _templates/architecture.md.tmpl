@@ -43,17 +43,19 @@ Every user-owned material architectural topic must have an explicit response. Us
 
 ## Seams
 
-{{Seams created or modified by this change. Each carries firmness and, if firm, initial acceptance criteria.}}
+{{Seams created or modified by this change. Each carries firmness and behavioral acceptance criteria. Firmness controls test durability, not whether behavior is specified.}}
+
+**Overall outcome criterion:** [AC-{{id}}-{{seq}}]
+
+{{Identify one criterion declared below that states the observable overall change outcome.}}
 
 ### Seam: {{seam-name}} [id: SEAM-{{id}}-{{seq}}] [firmness: soft | firm]
 
 **What crosses this boundary:** {{description}}
 **Testability approach:** {{How this seam will be tested.}}
 
-{{#if firm}}
 **Criteria:**
-- [AC-{{id}}-{{seq}}] {{behavioral assertion}} → enforced-by: {{repository-root-relative planned test path}}
-{{/if}}
+- [AC-{{id}}-{{seq}}] {{behavioral assertion}} → planned-evidence: {{test, command, or observable verification}}
 
 <!-- Repeat for each seam -->
 
@@ -63,7 +65,7 @@ Every user-owned material architectural topic must have an explicit response. Us
 
 ## Interface and Ownership Strategy
 
-{{When applicable, describe public seams, dependency direction, lifecycle, and why an interface/trait/protocol is warranted. Do not prescribe private abstractions.}}
+{{When applicable, describe public seams, canonical ownership of shared domain or wire facts, dependency direction, lifecycle, and why an interface/trait/protocol is warranted. State when multiple representations intentionally evolve independently. Do not prescribe private abstractions.}}
 
 ## Error and Failure Model
 

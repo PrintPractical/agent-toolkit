@@ -3,6 +3,20 @@
 **Change ID:** {{id}}
 **Date:** {{date}}
 
+## Section approaches
+
+<!-- Repeat per plan section. Record this before source edits for that section. It is agent-owned and may evolve when source evidence changes; explain nonmaterial evolution and kick back material changes. -->
+
+### {{plan section}}
+
+- **Recorded before source edits:** yes
+- **Verified mechanisms to reuse:** {{existing types, utilities, patterns, or library facilities}}
+- **Ownership and representation:** {{canonical owner, dependency direction, and intentional representation boundaries}}
+- **Standard language/library facilities:** {{applicable facilities; use custom machinery only with a concrete reason}}
+- **Responsibility boundaries:** {{cohesive responsibilities and intentionally separate concerns}}
+- **Custom machinery justification:** {{none | why existing/standard machinery does not fit}}
+- **Evolution or justified deviations:** {{none | evidence, rationale, and whether plan touchpoints changed}}
+
 ## Completed work
 
 - {{completed plan task, fix, or scoped implementation outcome}}
@@ -12,10 +26,22 @@
 | Kind | Command | Result | Evidence |
 |---|---|---|---|
 | tests | `{{command}}` | pass | {{summary}} |
-| format/static | `{{command or n/a}}` | pass | {{summary}} |
+| format/lint/typecheck | `{{command}}` | pass | {{summary}} |
+| build | `{{command or not applicable}}` | pass | {{summary or reason not applicable}} |
 
 **Context verification:** pass - {{targets verified after the reconciliation commit}}
 **Skipped checks and user-approved justification:** {{none or exact rationale}}
+
+## Quality signals
+
+- **Implementation model/route:** {{model or orchestrator label}}
+- **First-pass lint/typecheck result:** pass | fail - {{summary}}
+- **First-pass test result:** pass | fail - {{summary}}
+- **Unplanned ownership/representation changes:** none | {{what changed and why}}
+- **Final RV blocker/major findings by category:** {{none | counts/categories}}
+- **Post-review remediation size:** {{none | diff stat or changed files/lines}}
+- **Recurring finding categories:** {{none observed | categories}}
+- **Reported implementation/review cost:** {{value if available | unavailable}}
 
 ## Approval evidence
 
