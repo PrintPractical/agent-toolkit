@@ -95,7 +95,7 @@ function requireVerifiedCandidate(state, fingerprint) {
       ? "Current passing evidence for the recorded regression command is required for the verified fix"
       : "Current passing test evidence is required for the verified candidate");
   }
-  if (state.findings.some(item => !item.resolved)) throw new Error("Resolve all findings before completion");
+  if (state.findings.some(item => !item.retired && !item.resolved)) throw new Error("Resolve all findings before completion");
 }
 
 export async function requireCurrentDesign(root, state) {
@@ -119,10 +119,17 @@ export async function advance(root, state, config) {
       break;
     }
     case "design-remediation":
-      if (state.findings.some(item => item.stage === "design" && !item.resolved)) {
+      if (state.findings.some(item => !item.retired && item.stage === "design" && !item.resolved)) {
         throw new Error("Resolve all design findings before verification");
       }
-      state.phase = "design-verifier";
+      if (state.developerApproval?.fingerprint !== artifactHash) {
+        delete state.developerApproval;
+        state.developerReviewTarget = "design-verifier";
+        state.developerReviewFingerprint = artifactHash;
+        state.phase = "developer-review";
+      } else {
+        state.phase = "design-verifier";
+      }
       break;
     case "ready-to-build":
       if (!state.developerApproval) {
@@ -147,6 +154,8 @@ export async function advance(root, state, config) {
       break;
     case "implementing": {
       await requireCurrentDesign(root, state);
+      const problems = await validateArtifacts(root, state, { requireSystem: true, requireConformance: true });
+      if (problems.length) throw new Error(problems.join("\n"));
       const passing = hasCurrentPassingEvidence(state, codeHash);
       if (!passing) throw new Error("Current passing test evidence required before sealing the implementation");
       if (state.kind === "fix") {
@@ -168,7 +177,7 @@ export async function advance(root, state, config) {
       state.phase = "quality-critic";
       break;
     case "quality-remediation":
-      if (state.findings.some(item => item.stage === "quality" && !item.resolved)) {
+      if (state.findings.some(item => !item.retired && item.stage === "quality" && !item.resolved)) {
         throw new Error("Resolve all quality findings before verification");
       }
       if (!hasRequiredCurrentEvidence(state, codeHash)) {

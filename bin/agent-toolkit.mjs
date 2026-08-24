@@ -122,7 +122,7 @@ async function status() {
     design: state.designPath,
     issue: state.issue || null,
     commit: state.commitSha || null,
-    unresolvedFindings: state.findings.filter(item => !item.resolved).length,
+    unresolvedFindings: state.findings.filter(item => !item.retired && !item.resolved).length,
     developerFeedback: state.developerFeedback?.at(-1) || null,
     next: nextAction(state, config)
   };
@@ -186,9 +186,48 @@ async function review() {
     const remaining = current.filter(item => !required.includes(item));
     const selected = required.length ? [...required, ...remaining.slice(-(8 - required.length))] : current.slice(-8);
     const tests = selected.map(item => ({ kind: item.kind, expectFail: item.expectFail, command: item.command, code: item.code, output: item.output.slice(-1000), fingerprint: item.fingerprint, recordedAt: item.recordedAt }));
+    const criticInstructions = packet.stage === "design"
+      ? "Perform one comprehensive discovery pass. Check that every stated source requirement is traced, meaningful domain and infrastructure boundaries have inward-owned contracts, dependency direction and composition are explicit, direct coupling is justified, and each implementation slice delivers runnable vertical behavior. Report all material correctness, domain, contract, architecture, risk, and test defects now. Do not demand exhaustive specification of reversible local details."
+      : "Perform one comprehensive discovery pass. Compare the canonical candidate and Implementation Conformance section to every reviewed requirement, boundary, abstraction, dependency direction, composition point, transaction rule, and vertical slice. Concrete infrastructure leaking into inward policy, an omitted reviewed abstraction, horizontal incomplete scaffolding, or a claimed slice that does not build and run is a material finding. Then inspect correctness, cohesion, test quality, regressions, and design drift. Report all material defects now; omit preference-only comments.";
+    const verifierInstructions = "Perform a closure review, not a second critic pass. Check the supplied findings against the remediated candidate. Request changes only when a supplied finding remains unresolved or remediation introduced a new high-severity regression. Do not add pre-existing omissions, broaden scope, or demand greater specification completeness.";
+    const commonProperties = {
+      severity: { enum: ["high", "medium"] },
+      description: { type: "string", minLength: 1, pattern: "\\S" }
+    };
+    const criticFinding = {
+      type: "object",
+      additionalProperties: false,
+      required: ["severity", "description"],
+      properties: commonProperties
+    };
+    const verifierFindingForms = [];
+    if (packet.findingIds.length) verifierFindingForms.push({
+      type: "object",
+      additionalProperties: false,
+      required: ["severity", "description", "sourceFindingId"],
+      properties: { ...commonProperties, sourceFindingId: { type: "string", enum: packet.findingIds } }
+    });
+    if (state.reviews[`${packet.stage}-critic`]?.verdict === "changes-requested") verifierFindingForms.push({
+      type: "object",
+      additionalProperties: false,
+      required: ["severity", "description", "introducedByRemediation", "evidence"],
+      properties: {
+        severity: { const: "high" },
+        description: commonProperties.description,
+        introducedByRemediation: { const: true },
+        evidence: { type: "string", minLength: 1, pattern: "\\S" }
+      }
+    });
+    const verifierFinding = verifierFindingForms.length ? { oneOf: verifierFindingForms } : false;
     console.log(JSON.stringify({
       ...packet,
-      instructions: "Review only the supplied design, system map, canonical candidate, and test evidence in a fresh context. Report material correctness, domain, contract, risk, and test findings; omit preference-only comments.",
+      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings in a fresh context. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Return JSON only using the supplied schema.`,
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["findings"],
+        properties: { findings: { type: "array", items: packet.role === "critic" ? criticFinding : verifierFinding } }
+      },
       design,
       system,
       candidate: packet.candidate,

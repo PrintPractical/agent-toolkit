@@ -42,11 +42,23 @@ export async function recordDeveloperFeedback(root, state, { verdict, notesFile,
   (state.developerFeedback ||= []).push(record);
   if (verdict === "approved") {
     state.developerApproval = record;
-    state.phase = "design-critic";
+    state.phase = state.developerReviewTarget === "design-verifier"
+      && state.developerReviewFingerprint === record.fingerprint ? "design-verifier" : "design-critic";
   } else {
+    const retiredAt = new Date().toISOString();
+    for (const finding of state.findings) {
+      if (finding.stage === "design" && !finding.retired) Object.assign(finding, { retired: true, retiredAt });
+    }
+    for (const packet of state.packets) {
+      if (packet.stage === "design" && !packet.recordedAt && !packet.obsoleteAt) packet.obsoleteAt = retiredAt;
+    }
+    delete state.reviews["design-critic"];
+    delete state.reviews["design-verifier"];
     delete state.developerApproval;
     state.phase = "shaping";
   }
+  delete state.developerReviewTarget;
+  delete state.developerReviewFingerprint;
   await saveState(root, state);
   return record;
 }

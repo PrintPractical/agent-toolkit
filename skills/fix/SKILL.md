@@ -34,29 +34,29 @@ If no automated reproduction is technically possible, stop and record the concre
 
 ## Design Review
 
-Document root cause, regression evidence, proposed correction, risks, tests, and an implementation plan of observable slices. Run `agent-toolkit check` and `advance`, then present the design and plan to the developer during `developer-review`. Stop for their response; record requested changes with `agent-toolkit feedback record --verdict changes-requested --note "..."` (repeat `--note` or use `--notes <file>`), or explicit acceptance with `agent-toolkit feedback record --verdict approved`. Only then continue through design critic, remediation when requested, and a distinct verifier:
+Document source-requirement traceability, root cause, regression evidence, proposed correction, risks, boundary contracts, tests, and an implementation plan of runnable vertical slices. At meaningful storage, transport, time, identity, messaging, or external-system boundaries, prefer a narrow inward-owned contract and outward adapter even with one implementation; avoid only contract-free wrappers and generic CRUD. Prefer shallow cohesive modules over files mixing policy, orchestration, and infrastructure. Run `agent-toolkit check` and `advance`, then present the design and plan to the developer during `developer-review`. Stop for their response; record requested changes with `agent-toolkit feedback record --verdict changes-requested --note "..."` (repeat `--note` or use `--notes <file>`), or explicit acceptance with `agent-toolkit feedback record --verdict approved`. Only then continue through design critic, remediation when requested, and a distinct verifier:
 
 - `agent-toolkit review prepare --stage design --role critic|verifier`
 - `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`
 - `agent-toolkit findings resolve <id>` after each finding is actually remediated
 
-Critic and verifier must use fresh, separate contexts. If subagents are unavailable, send each prepared compact packet to a separate session. Do not self-approve.
+The critic makes one comprehensive discovery pass and saves all material findings to the packet's `findingsPath` using its JSON schema; Markdown findings are invalid. The verifier is a closure check, not another critic: it may only reopen a supplied finding or identify a high-severity regression introduced by remediation. Critic and verifier must use fresh, separate contexts. If subagents are unavailable, send each prepared compact packet to a separate session. Do not self-approve.
 
 ## Correct and Test
 
 1. Enter implementation only when the CLI reports `ready-to-build`.
-2. Make the smallest fix at the level that owns the violated rule or contract; avoid symptom patches and unrelated cleanup.
+2. Make the smallest complete fix at the level that owns the violated rule or contract. Preserve every reviewed abstraction and dependency direction; if a boundary was missed, restart design review rather than coupling policy to concrete infrastructure.
 3. Add meaningful unit tests for changed nontrivial rules and integration tests for affected real boundaries.
 4. Check adjacent failure modes and ensure the fix does not weaken errors, validation, consistency, or compatibility.
 5. Reconcile the fix artifact and system map with the implemented evidence. If reproduction, root cause, rules, boundaries, interfaces, test strategy, or slices changed materially, run `agent-toolkit review restart --stage design`; do not silently drift.
-6. Run the regression normally with `agent-toolkit test --kind regression -- <command>` and other tests with `--kind unit|integration`, then run the complete relevant suite against that exact candidate.
+6. Complete each runnable slice with formatting/static checks, compilation of affected targets, the regression via `agent-toolkit test --kind regression -- <command>`, and relevant unit/integration evidence before continuing. Leave no placeholders or unimplemented branches on the corrected path, then run the complete relevant suite against that exact candidate.
 
 ## Quality and Commit
 
-1. Run `agent-toolkit check`; follow `status`/`advance` to seal the baseline before review edits.
-2. Prepare a fresh quality critic with `agent-toolkit review prepare --stage quality --role critic`; record its verdict.
+1. Complete `Implementation Conformance`, mapping reviewed boundaries, abstractions, dependency rules, and slices to code and evidence. Run `agent-toolkit check`; follow `status`/`advance` to seal the baseline before review edits.
+2. Prepare a fresh quality critic with `agent-toolkit review prepare --stage quality --role critic`; require one comprehensive pass and record its JSON verdict.
 3. Remediate warranted correctness or refactoring findings, reconcile artifacts, rerun relevant tests against that exact candidate, and resolve findings through the CLI.
-4. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage quality --role verifier`; record its verdict.
+4. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage quality --role verifier`; require a closure review limited to supplied findings and remediation-introduced high-severity regressions, then record its verdict.
 5. Follow the CLI to `ready-to-commit`, run final relevant tests and `agent-toolkit check`.
 6. Follow `agent-toolkit status`: create the inspected conventional commit when requested, or use `advance` when commit integration is inactive.
 7. Confirm `agent-toolkit status` is `complete`. Never push.

@@ -176,7 +176,7 @@ export async function artifactFingerprint(root, state) {
   return snapshotFingerprint(await artifactSnapshot(root, state));
 }
 
-const evolvingSections = new Set(["Reviews", "Status"]);
+const evolvingSections = new Set(["Implementation Conformance", "Reviews", "Status"]);
 
 export async function designContractFingerprint(root, state) {
   const design = await readFile(path.join(root, state.designPath), "utf8");

@@ -40,7 +40,7 @@ Starts one active change and creates its design artifact and minimum system map.
 Shows the active change, lifecycle phase, artifacts, review state, and next command.`,
   check: `Usage: agent-toolkit check
 
-Validates artifact presence, implementation plan, system map, and closed questions.`,
+Validates artifact presence, requirements traceability, boundary and abstraction decisions, vertical implementation slices, implementation conformance when due, the system map, and closed questions.`,
   advance: `Usage: agent-toolkit advance
 
 Advances one lifecycle gate when its objective requirements are satisfied.`,
@@ -60,7 +60,7 @@ Runs the command and records its result against the unchanged project candidate.
   agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]
   agent-toolkit review restart --stage design|quality
 
-Critic and verifier must be fresh, distinct reviewers. Changes-requested requires a findings file.`,
+Critic and verifier must be fresh, distinct reviewers. The critic performs one comprehensive discovery pass. The verifier only checks supplied findings and high-severity regressions introduced by remediation; it is not a second critic. Save responses to the packet's runtime-only findingsPath. Changes-requested requires JSON matching outputSchema.`,
   findings: `Usage: agent-toolkit findings resolve <id>
 
 Marks one review finding resolved after its remediation is complete.`,

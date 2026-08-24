@@ -9,6 +9,9 @@ State the observable user or system outcome and how success is recognized.
 ## Non-goals
 List intentionally excluded behavior, scope, and cleanup.
 
+## Requirements Traceability
+List each explicit source requirement and point to the use case, rule, interface, test, or non-goal that addresses it. Do not silently drop requirements during refinement.
+
 ## Actors and Use Cases
 Name each actor and desired outcome.
 
@@ -31,19 +34,32 @@ Define the ubiquitous language and concept ownership used by this change.
 State enforceable rules, invariants, consistency needs, and where each is owned.
 
 ## Boundaries and Dependencies
-Describe responsibilities, dependency direction, external systems, data ownership, and relevant failure behavior.
+Name each responsibility and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency.
 
 ## Public Interfaces and Errors
 Specify changed commands, APIs, events, schemas, compatibility, idempotency, and error semantics. If none, say why.
 
 ## Abstraction and Extension Pressure
-Justify each new abstraction against known shared variation, an independent contract, a meaningful boundary, or costly retrofit. Otherwise record the direct design and the pressure that could change it.
+List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.
 
 ## Test Traceability
 Map each important rule, contract, edge, and failure risk to a unit, integration, or regression test. Explain any gap.
 
 ## Implementation Plan
-Order thin vertical slices by observable behavior. For each slice, name its outcome, likely code areas, boundary or data changes, tests, dependencies, and completion signal.
+Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.
+
+## Implementation Conformance
+Complete during build; record deviations only after design review restart.
+
+### Architecture Decisions
+- Decision:
+- Implementation:
+- Verification:
+
+### Slice Completion
+- Slice:
+- Implementation:
+- Verification:
 
 ## Material Decisions
 Record consequential decisions and alternatives rejected.

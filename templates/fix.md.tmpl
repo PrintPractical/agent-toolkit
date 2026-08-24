@@ -9,6 +9,9 @@ State the restored behavior and how success is recognized.
 ## Non-goals
 List excluded cleanup, redesign, and unrelated symptoms.
 
+## Requirements Traceability
+List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction.
+
 ## Failure and Impact
 Describe expected versus actual behavior, affected actors, severity, scope, and environment.
 
@@ -28,19 +31,32 @@ Give the failing example plus adjacent happy, edge, and failure cases.
 Define relevant language and the rules the correction must restore. If none, say why.
 
 ## Boundaries and Dependencies
-Describe affected responsibilities, data flow, external systems, and boundary failure behavior.
+Name affected responsibilities and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency.
 
 ## Public Interfaces and Errors
 Record compatibility, schemas, commands, APIs, events, and error semantics. If unchanged, say why.
 
 ## Correction and Extension Pressure
-Describe the smallest correction at the rule-owning level. Record related pressure without speculative abstraction.
+Describe the correction at the rule-owning level. List affected abstractions and contracts; prefer a narrow inward-owned port where the defect exposes an infrastructure or domain boundary. Record related extension pressure without generic layering.
 
 ## Test Traceability
 Map root cause, neighboring risks, rules, and boundaries to regression, unit, and integration tests. Explain any gap.
 
 ## Implementation Plan
-Order diagnosis lock-in, correction, boundary updates, and verification as observable slices. For each slice, name likely code areas, tests, dependencies, and completion signal.
+Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. Keep the regression lock-in observable and make correction slices runnable across every affected layer.
+
+## Implementation Conformance
+Complete during build; record deviations only after design review restart.
+
+### Architecture Decisions
+- Decision:
+- Implementation:
+- Verification:
+
+### Slice Completion
+- Slice:
+- Implementation:
+- Verification:
 
 ## Material Decisions
 Record consequential decisions and rejected alternatives.

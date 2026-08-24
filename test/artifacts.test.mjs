@@ -5,6 +5,15 @@ import test from "node:test";
 import { renderChange, renderSystem, slugify, validateArtifacts } from "../src/artifacts.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
 
+function completeArtifact(content) {
+  return content
+    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Payment requirement -> reproduction, rule, and tests.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns PaymentStore; the database adapter is composed at startup.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. PaymentStore owns the persistence contract and transaction behavior.\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Payment behavior is restored\n- Outcome: A payment succeeds.\n- Entry point: Payment command.\n- Core behavior: Enforce payment rules.\n- Boundary integration: Persist atomically through PaymentStore.\n- Tests: Regression and database integration tests.\n- Complete when: The command builds and tests pass.\n")
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: PaymentStore is application-owned.\n- Implementation: The database adapter implements PaymentStore outward.\n- Verification: Unit dependency test and database integration test.\n\n### Slice Completion\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and regression tests pass.\n");
+}
+
 test("brownfield start can bootstrap compact change and system artifacts", async () => {
   const root = await temporaryDirectory();
   const slug = slugify("Restore Invoice Payment");
@@ -15,7 +24,7 @@ test("brownfield start can bootstrap compact change and system artifacts", async
   const state = { designPath: `.agent/changes/${slug}.md` };
   assert.match((await validateArtifacts(root, state, { requireSystem: true })).join("\n"), /Complete the Implementation Plan/);
   const content = await readFile(design, "utf8");
-  await writeFile(design, content.replace(/(## Implementation Plan\n)[^\n]+/, "$11. Restore payment behavior with regression and boundary tests."));
+  await writeFile(design, completeArtifact(content));
   assert.deepEqual(await validateArtifacts(root, state, { requireSystem: true }), []);
 });
 
@@ -28,11 +37,33 @@ test("material open questions block artifact validation", async () => {
   assert.match((await validateArtifacts(root, { designPath: ".agent/changes/export-data.md" }, { requireSystem: true })).join("\n"), /open questions/);
 });
 
+test("artifact validation requires architecture evidence and real vertical slices", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
+  await renderSystem(root);
+  const content = completeArtifact(await readFile(design, "utf8"))
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Export request is accepted\n- Outcome: A request starts an export.\n- Entry point: Export command.\n- Core behavior: Validate export rules.\n- Boundary integration: Save through ExportStore.\n- Tests: Rule and adapter tests.\n- Complete when: The command builds and tests pass.\n\n### Phase 2: Persistence\nAdd storage details.\n\n### Slice 3: Export downloads\n- Outcome: The export downloads.\n- Entry point: Download command.\n- Core behavior: Select export data.\n- Boundary integration: Read through ExportStore.\n- Tests: Download integration test.\n- Complete when: Download passes.\n");
+  await writeFile(design, content);
+  const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md", phase: "shaping" }, { requireSystem: true });
+  assert.match(problems.join("\n"), /non-slice headings: Phase 2: Persistence/);
+  assert.match(problems.join("\n"), /slice numbers must start at 1 and be sequential/);
+});
+
+test("quality review requires completed architecture conformance", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
+  await renderSystem(root);
+  const completed = completeArtifact(await readFile(design, "utf8"));
+  await writeFile(design, completed.replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1Implemented.\n"));
+  const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md", phase: "quality-critic" }, { requireSystem: true });
+  assert.match(problems.join("\n"), /Complete Implementation Conformance/);
+});
+
 test("artifact validation does not impose arbitrary document size limits", async () => {
   const root = await temporaryDirectory();
   const design = await renderChange(root, { kind: "feature", title: "Model Complex Domain", slug: "model-complex-domain" });
   await renderSystem(root);
-  const content = (await readFile(design, "utf8")).replace(/(## Implementation Plan\n)[^\n]+/, "$11. Deliver the modeled behavior with traced tests.");
+  const content = completeArtifact(await readFile(design, "utf8"));
   await writeFile(design, `${content}\n${"Detailed design evidence.\n".repeat(800)}`);
   const system = path.join(root, ".agent", "SYSTEM.md");
   await writeFile(system, `${await readFile(system, "utf8")}\n${"Durable system evidence.\n".repeat(800)}`);

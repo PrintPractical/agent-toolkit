@@ -32,27 +32,27 @@ The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPract
 
 ## Workflow
 
-Use `design` for features and substantial changes, `fix` for defects that can be reproduced, and `build` after a reviewed design is ready. Each skill adapts its domain modeling, boundaries, contracts, and test depth to the evidence in the repository rather than requiring a fixed architecture.
+Use `design` for features and substantial changes, `fix` for defects that can be reproduced, and `build` after a reviewed design is ready. Each skill adapts its domain modeling and test depth to repository evidence while deliberately protecting meaningful boundaries. Storage, transport, time, identity, messaging, and external-system capabilities normally receive narrow contracts owned inward and concrete adapters outward, even with one implementation; contract-free wrappers and generic layering remain discouraged.
 
 `agent-toolkit init` creates the local configuration. Starting a change creates the smallest useful artifacts for either a new or existing system:
 
 - `.agent/SYSTEM.md`: a minimal, relevant system map, bootstrapped once and refined only with durable knowledge.
-- `.agent/changes/<slug>.md`: the active feature design or fix record, including examples, decisions, risks, test strategy, and an implementation plan of thin vertical slices. Review and status bookkeeping stays in runtime state so it cannot invalidate the candidate it describes.
+- `.agent/changes/<slug>.md`: the active feature design or fix record, including source-requirement traceability, examples, boundary and abstraction decisions, risks, tests, vertical slices, and implementation-conformance evidence. Review and status bookkeeping stays in runtime state so it cannot invalidate the candidate it describes.
 - `.agent/.state/`: CLI-owned lifecycle state and recorded evidence; it is added to `.gitignore` and must not be edited manually.
 
 The lifecycle is enforced rather than inferred from prose:
 
 1. Shape and validate the design, implementation plan, and minimal system map in one change artifact.
 2. Pause for developer feedback. Requested changes return to shaping; explicit developer approval advances to independent review.
-3. Send a fresh design packet to a critic, remediate material findings when requested, then use a distinct fresh verifier.
-4. Implement the reviewed plan as vertical slices. A fix must first record an expected-failing regression test.
-5. Record passing test evidence for the current project fingerprint, then seal the implementation baseline.
-6. Send the sealed result to a fresh quality critic, remediate and retest when needed, then use a distinct fresh verifier on the final result.
+3. Send a fresh design packet to a critic for one comprehensive discovery pass, remediate material findings when requested, then use a distinct fresh verifier for closure.
+4. Implement the reviewed architecture as runnable vertical slices, completing entry point, core behavior, real boundary integration, build, and tests before the next slice. A fix must first record an expected-failing regression test.
+5. Map reviewed abstractions and dependency rules to code in `Implementation Conformance`, record passing test evidence for the current project fingerprint, then seal the implementation baseline.
+6. Send the sealed result to a fresh quality critic for one comprehensive discovery pass, remediate and retest when needed, then use a distinct fresh verifier for closure.
 7. In Git repositories with commit integration enabled, inspect the commit plan and create one conventional final commit. The toolkit never pushes. In non-Git projects, or when commit integration is off, completion does not require a commit.
 
-Review packets become stale if their reviewed content changes. Reviewer IDs are required, and critic and verifier identities must differ; the skills require separate fresh contexts rather than self-approval. Test evidence records the command, kind (`regression`, `unit`, or `integration`), result, bounded output, timestamp, and project fingerprint; commands that mutate the candidate are rejected. Material design drift requires `review restart --stage design`. Candidate drift after critic approval or baseline sealing requires `review restart --stage design|quality` so a fresh critic sees the replacement candidate.
+Review packets become stale if their reviewed content changes. Reviewer IDs are required, and critic and verifier identities must differ; the skills require separate fresh contexts rather than self-approval. A critic performs the only discovery pass and must report all material findings together. A verifier is limited to reopening supplied findings or reporting a high-severity regression introduced by remediation, preventing repeated scope expansion. New packets provide a runtime-only `findingsPath` under `.agent/.state/`; responses must match the packet's JSON `outputSchema`, and Markdown is rejected. Test evidence records the command, kind (`regression`, `unit`, or `integration`), result, bounded output, timestamp, and project fingerprint; commands that mutate the candidate are rejected. Material design drift requires `review restart --stage design`. Candidate drift after critic approval or baseline sealing requires `review restart --stage design|quality` so a fresh critic sees the replacement candidate.
 
-There is no separate plan artifact or planning ceremony. The design skill writes the `Implementation Plan` section during shaping, as thin slices grounded in the same use cases, rules, boundaries, and tests. Developer feedback reviews that plan together with the design before either is sent to the independent critic.
+There is no separate plan artifact or planning ceremony. The design skill writes the `Implementation Plan` section during shaping. Each required slice subsection crosses every layer needed for one observable outcome; domain-only, persistence-only, transport-only, and wiring-only phases are rejected as plans. Developer feedback reviews that plan and the abstraction decisions together before independent criticism, and reviews the final remediated design again if critic changes altered it. During build, the default organization is a shallow module tree of small cohesive, independently testable concepts rather than layer-wide files or deeply nested ceremony.
 
 Commit preparation stages and exposes the exact reviewed tree, parent, files, and message. Creation runs standard commit hooks against an isolated index and temporary worktree, rejects hook changes to the inspected tree or message, and atomically updates `HEAD` only while the inspected parent is still current.
 
@@ -106,4 +106,4 @@ agent-toolkit commit prepare
 agent-toolkit commit create
 ```
 
-Run `status` after each gate and follow its reported next action. `check` validates the active artifacts; lifecycle transitions, reviews, evidence, issue association, and commits remain explicit commands.
+Run `status` after each gate and follow its reported next action. `check` validates requirements traceability, boundary and abstraction decisions, vertical plan structure, implementation conformance when due, and the active system map; lifecycle transitions, reviews, evidence, issue association, and commits remain explicit commands.

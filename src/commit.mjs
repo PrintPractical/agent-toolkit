@@ -20,7 +20,7 @@ export async function prepareCommit(root, state, config) {
       ? "Current passing regression evidence is required before commit preparation"
       : "Current passing test evidence is required before commit preparation");
   }
-  if (state.findings.some(item => !item.resolved)) throw new Error("Resolve all findings before commit preparation");
+  if (state.findings.some(item => !item.retired && !item.resolved)) throw new Error("Resolve all findings before commit preparation");
   const candidate = await projectSnapshot(root);
   const dirtySubmodules = candidate.changes.filter(item => item.mode === "160000" && item.worktree);
   if (dirtySubmodules.length) {

@@ -6,7 +6,7 @@ import { renderChange, renderSystem } from "../src/artifacts.mjs";
 import { DEFAULT_CONFIG } from "../src/config.mjs";
 import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
-import { prepareReview, recordReview, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
+import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
 import { advance, createState } from "../src/state-machine.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
@@ -15,7 +15,12 @@ async function project(kind = "feature") {
   const root = await temporaryDirectory();
   const design = await renderChange(root, { kind, title: "Deliver Result", slug: "deliver-result" });
   const content = await readFile(design, "utf8");
-  await writeFile(design, content.replace(/(## Implementation Plan\n)[^\n]+/, "$11. Deliver the observable result with its tests and boundary integration."));
+  await writeFile(design, content
+    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Requested result -> use case, contract, and tests.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns the ResultStore port; its real adapter is composed at the entry point.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore isolates the persistence contract and supports deterministic application tests.\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Complete when: The command builds and tests pass.\n")
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: ResultStore is application-owned.\n- Implementation: Its adapter is outward and composed at the entry point.\n- Verification: Dependency unit test and adapter integration test.\n\n### Slice Completion\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
   return { root, state };
@@ -36,6 +41,12 @@ async function reachDesignCritic(root, state) {
   await recordDeveloperFeedback(root, state, { verdict: "approved" });
 }
 
+async function writePacketFindings(root, packet, content) {
+  const file = path.join(root, packet.findingsPath);
+  await writeFile(file, content);
+  return file;
+}
+
 test("design requires a fresh critic and distinct verifier", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
@@ -43,8 +54,181 @@ test("design requires a fresh critic and distinct verifier", async () => {
   await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
   await assert.rejects(recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "critic-session" }), /distinct/);
+  const invented = await writePacketFindings(root, verifier, JSON.stringify({ findings: [{
+    severity: "high",
+    description: "Claimed remediation regression",
+    introducedByRemediation: true,
+    evidence: "No remediation actually occurred"
+  }] }));
+  await assert.rejects(recordReview(root, state, {
+    packetId: verifier.id,
+    verdict: "changes-requested",
+    reviewer: "verifier-session",
+    findingsFile: invented
+  }), /critic approved without remediation/);
   await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "verifier-session" });
   assert.equal(state.phase, "ready-to-build");
+});
+
+test("new review packets require structured JSON findings", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  const markdown = await writePacketFindings(root, critic, "# Findings\n\n- Material contract gap\n");
+  await assert.rejects(recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile: markdown
+  }), /valid JSON/);
+  const extra = await writePacketFindings(root, critic, JSON.stringify({ findings: [{ severity: "medium", description: "Gap", category: "contract" }] }));
+  await assert.rejects(recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile: extra
+  }), /unsupported properties/);
+  state.packets.find(item => item.id === critic.id).protocol = 3;
+  await assert.rejects(recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile: markdown
+  }), /Unsupported review packet protocol/);
+  await assert.rejects(recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "approved",
+    reviewer: "critic"
+  }), /Unsupported review packet protocol/);
+});
+
+test("legacy packets without a protocol retain Markdown and JSON compatibility", async () => {
+  for (const [name, content] of [
+    ["markdown", "- Preserve the legacy boundary\n"],
+    ["json", JSON.stringify({ findings: [{ description: "Preserve the legacy contract" }] })]
+  ]) {
+    const { root, state } = await project();
+    await reachDesignCritic(root, state);
+    const prepared = await prepareReview(root, state, { stage: "design", role: "critic" });
+    delete state.packets.find(packet => packet.id === prepared.id).protocol;
+    const findings = await writePacketFindings(root, prepared, content);
+    await recordReview(root, state, {
+      packetId: prepared.id,
+      verdict: "changes-requested",
+      reviewer: `legacy-${name}-critic`,
+      findingsFile: findings
+    });
+    assert.equal(state.findings.length, 1);
+    assert.equal(state.findings[0].severity, "medium");
+  }
+});
+
+test("verifier can only reopen supplied findings or report remediation regressions", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  const criticFindings = await writePacketFindings(root, critic, JSON.stringify({ findings: [{ severity: "medium", description: "Define ordering at the public boundary" }] }));
+  await recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile: criticFindings
+  });
+  const original = state.findings.at(-1);
+  await resolveFinding(root, state, original.id);
+  await advance(root, state, DEFAULT_CONFIG);
+
+  const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  assert.deepEqual(verifier.findings.map(item => item.id), [original.id]);
+  const expandedScope = await writePacketFindings(root, verifier, JSON.stringify({ findings: [{ severity: "medium", description: "Specify another pre-existing detail" }] }));
+  await assert.rejects(recordReview(root, state, {
+    packetId: verifier.id,
+    verdict: "changes-requested",
+    reviewer: "verifier",
+    findingsFile: expandedScope
+  }), /must reference a supplied finding ID/);
+
+  const closure = await writePacketFindings(root, verifier, JSON.stringify({ findings: [{ severity: "medium", description: "Ordering remains ambiguous in the revised example", sourceFindingId: original.id }] }));
+  await recordReview(root, state, {
+    packetId: verifier.id,
+    verdict: "changes-requested",
+    reviewer: "verifier",
+    findingsFile: closure
+  });
+  assert.equal(state.findings.length, 1);
+  assert.equal(original.resolved, false);
+  assert.match(original.verification.description, /remains ambiguous/);
+});
+
+test("closure packets retain evidence for regressions introduced by remediation", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  const criticFindings = await writePacketFindings(root, critic, JSON.stringify({ findings: [{ severity: "medium", description: "Clarify ownership" }] }));
+  await recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile: criticFindings
+  });
+  await resolveFinding(root, state, state.findings[0].id);
+  await advance(root, state, DEFAULT_CONFIG);
+  const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  const regressionFile = await writePacketFindings(root, verifier, JSON.stringify({ findings: [{
+    severity: "high",
+    description: "The remediation inverted dependency direction",
+    introducedByRemediation: true,
+    evidence: "The revised boundary now imports its concrete adapter"
+  }] }));
+  await recordReview(root, state, {
+    packetId: verifier.id,
+    verdict: "changes-requested",
+    reviewer: "verifier-one",
+    findingsFile: regressionFile
+  });
+  const regression = state.findings.at(-1);
+  await resolveFinding(root, state, regression.id);
+  await advance(root, state, DEFAULT_CONFIG);
+  const closure = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  const supplied = closure.findings.find(finding => finding.id === regression.id);
+  assert.equal(supplied.introducedByRemediation, true);
+  assert.match(supplied.evidence, /imports its concrete adapter/);
+});
+
+test("critic remediation changes return to developer approval before verification", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  const findingsFile = await writePacketFindings(root, critic, JSON.stringify({ findings: [{ severity: "medium", description: "Clarify adapter ownership" }] }));
+  await recordReview(root, state, {
+    packetId: critic.id,
+    verdict: "changes-requested",
+    reviewer: "critic",
+    findingsFile
+  });
+  const design = path.join(root, state.designPath);
+  await writeFile(design, (await readFile(design, "utf8")).replace("Application owns the ResultStore port", "Application exclusively owns the ResultStore port"));
+  await resolveFinding(root, state, state.findings.at(-1).id);
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "developer-review");
+  assert.equal(state.developerApproval, undefined);
+  await recordDeveloperFeedback(root, state, { verdict: "approved" });
+  assert.equal(state.phase, "design-verifier");
+  const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  assert.equal(verifier.cycleId, critic.id);
+});
+
+test("review restart invalidates prepared packets from the abandoned cycle", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const stale = await prepareReview(root, state, { stage: "design", role: "critic" });
+  await restartDesignReview(root, state);
+  await recordDeveloperFeedback(root, state, { verdict: "approved" });
+  await assert.rejects(recordReview(root, state, {
+    packetId: stale.id,
+    verdict: "approved",
+    reviewer: "stale-critic"
+  }), /invalidated by a review restart/);
 });
 
 test("developer can request design changes before approving critic review", async () => {
@@ -81,7 +265,7 @@ test("verifier cannot approve content changed after critic approval", async () =
   await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "State the revised observable"));
-  await assert.rejects(prepareReview(root, state, { stage: "design", role: "verifier" }), /changed after critic approval/);
+  await assert.rejects(prepareReview(root, state, { stage: "design", role: "verifier" }), /changed after developer approval/);
   await restartDesignReview(root, state);
   assert.equal(state.phase, "developer-review");
 });
@@ -97,6 +281,38 @@ test("verified design drift can restart from ready-to-build", async () => {
   assert.equal(state.phase, "developer-review");
 });
 
+test("design restart retires findings from abandoned review cycles", async () => {
+  const { root, state } = await project();
+  state.phase = "quality-remediation";
+  state.findings.push(
+    { id: "old-design", stage: "design", description: "Old design finding", resolved: false },
+    { id: "old-quality", stage: "quality", description: "Old quality finding", resolved: false }
+  );
+  await restartDesignReview(root, state);
+  assert.equal(state.phase, "developer-review");
+  assert.equal(state.findings.every(item => item.retired && item.retiredAt), true);
+  await assert.rejects(resolveFinding(root, state, "old-design"), /Unknown active finding/);
+
+  await recordDeveloperFeedback(root, state, { verdict: "approved" });
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "new-critic" });
+  const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  assert.deepEqual(verifier.findings, []);
+  await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "new-verifier" });
+  assert.equal(state.phase, "ready-to-build");
+});
+
+test("quality review can restart directly from remediation", async () => {
+  const { root, state } = await project();
+  await markDesignApproved(root, state);
+  state.phase = "quality-remediation";
+  state.findings.push({ id: "abandoned-quality", stage: "quality", description: "Old quality finding", resolved: false });
+  await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await restartQualityReview(root, state);
+  assert.equal(state.phase, "quality-critic");
+  assert.equal(state.findings.at(-1).retired, true);
+});
+
 test("implementation baseline requires current tests and separates quality review", async () => {
   const { root, state } = await project();
   state.phase = "implementing";
@@ -107,6 +323,16 @@ test("implementation baseline requires current tests and separates quality revie
   assert.equal(state.phase, "baseline-sealed");
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "quality-critic");
+});
+
+test("implementation cannot seal without architecture conformance evidence", async () => {
+  const { root, state } = await project();
+  state.phase = "implementing";
+  await markDesignApproved(root, state);
+  const design = path.join(root, state.designPath);
+  await writeFile(design, (await readFile(design, "utf8")).replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1Pending implementation.\n"));
+  await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Complete Implementation Conformance/);
 });
 
 test("quality critic cannot bypass a drifted sealed baseline", async () => {
@@ -277,8 +503,7 @@ test("approved reviews cannot smuggle unresolved findings", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const packet = await prepareReview(root, state, { stage: "design", role: "critic" });
-  const findings = path.join(root, "findings.txt");
-  await writeFile(findings, "- Material contract gap\n");
+  const findings = await writePacketFindings(root, packet, JSON.stringify({ findings: [{ severity: "medium", description: "Material contract gap" }] }));
   await assert.rejects(recordReview(root, state, {
     packetId: packet.id,
     verdict: "approved",

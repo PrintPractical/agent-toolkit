@@ -8,7 +8,12 @@ import { execute, initializeGit, runCli, temporaryDirectory } from "./helpers.mj
 async function completePlan(root, slug) {
   const file = path.join(root, ".agent", "changes", `${slug}.md`);
   const content = await readFile(file, "utf8");
-  await writeFile(file, content.replace(/(## Implementation Plan\n)[^\n]+/, "$11. Deliver search behavior with traced tests and boundary integration."));
+  await writeFile(file, content
+    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Search behavior -> use case, interface, and tests.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns a SearchIndex port; the storage adapter implements it outward and composition occurs at startup.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. SearchIndex has a query contract owned by its application consumer and a real storage implementation.\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the SearchIndex port through its storage adapter.\n- Tests: Ranking unit test and storage integration test.\n- Complete when: The command builds and both tests pass.\n")
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: SearchIndex is application-owned.\n- Implementation: The storage adapter implements SearchIndex outward.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
 }
 
 async function markDesignApproved(root, state) {
@@ -61,6 +66,45 @@ test("CLI pauses for developer feedback and supports requested revisions", async
   assert.match(approved.stdout, /Phase: design-critic/);
   const status = JSON.parse((await runCli(root, ["status", "--json"])).stdout);
   assert.equal(status.developerFeedback.verdict, "approved");
+});
+
+test("status excludes findings retired by an abandoned review cycle", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Retire Review"]);
+  const stateFile = path.join(root, ".agent", ".state", "retire-review.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.findings.push({ id: "retired", stage: "design", resolved: false, retired: true });
+  await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  const result = await runCli(root, ["status", "--json"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).unresolvedFindings, 0);
+});
+
+test("review packets distinguish critic discovery from verifier closure", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Add Search"]);
+  await completePlan(root, "add-search");
+  await runCli(root, ["advance"]);
+  await runCli(root, ["feedback", "record", "--verdict", "approved"]);
+
+  const criticResult = await runCli(root, ["review", "prepare", "--stage", "design", "--role", "critic"]);
+  assert.equal(criticResult.code, 0, criticResult.stderr);
+  const critic = JSON.parse(criticResult.stdout);
+  assert.equal(critic.protocol, 2);
+  assert.match(critic.instructions, /one comprehensive discovery pass/i);
+  assert.equal(critic.outputSchema.type, "object");
+  assert.deepEqual(critic.outputSchema.properties.findings.items.required, ["severity", "description"]);
+  assert.deepEqual(critic.outputSchema.properties.findings.items.properties.severity.enum, ["high", "medium"]);
+  await runCli(root, ["review", "record", "--packet", critic.id, "--verdict", "approved", "--reviewer", "critic-session"]);
+
+  const verifierResult = await runCli(root, ["review", "prepare", "--stage", "design", "--role", "verifier"]);
+  assert.equal(verifierResult.code, 0, verifierResult.stderr);
+  const verifier = JSON.parse(verifierResult.stdout);
+  assert.match(verifier.instructions, /closure review, not a second critic pass/i);
+  assert.deepEqual(verifier.findings, []);
+  assert.equal(verifier.outputSchema.properties.findings.items, false);
 });
 
 test("CLI blocks startup around unrelated dirty Git changes", async () => {
@@ -123,10 +167,16 @@ test("bounded fix packets retain the historical regression failure", async () =>
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   const prepared = await runCli(root, ["review", "prepare", "--stage", "quality", "--role", "critic"]);
   assert.equal(prepared.code, 0, prepared.stderr);
-  const tests = JSON.parse(prepared.stdout).tests;
+  const packet = JSON.parse(prepared.stdout);
+  assert.match(packet.instructions, /Concrete infrastructure leaking into inward policy/);
+  const tests = packet.tests;
   assert.equal(tests.length, 8);
   assert(tests.some(item => item.kind === "regression" && item.expectFail));
   assert(tests.some(item => item.kind === "regression" && !item.expectFail));
+  const findingsPath = path.join(root, packet.findingsPath);
+  await writeFile(findingsPath, JSON.stringify({ findings: [{ severity: "medium", description: "Concrete storage leaked into application policy" }] }));
+  const recorded = await runCli(root, ["review", "record", "--packet", packet.id, "--verdict", "changes-requested", "--reviewer", "quality-critic", "--findings", findingsPath]);
+  assert.equal(recorded.code, 0, recorded.stderr);
 });
 
 test("sealed commit creation produces one conventional commit and never pushes", async () => {
