@@ -8,7 +8,7 @@ import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
-import { advance, createState } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState } from "../src/state-machine.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
 
 async function project(kind = "feature") {
@@ -19,10 +19,11 @@ async function project(kind = "feature") {
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Requested result -> use case, contract, and tests.\n")
     .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns the ResultStore port; its real adapter is composed at the entry point.\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore isolates the persistence contract and supports deterministic application tests.\n")
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Complete when: The command builds and tests pass.\n")
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: ResultStore is application-owned.\n- Implementation: Its adapter is outward and composed at the entry point.\n- Verification: Dependency unit test and adapter integration test.\n\n### Slice Completion\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and tests pass.\n`)
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: ResultStore is application-owned.\n- Implementation: Its adapter is outward and composed at the entry point.\n- Verification: Dependency unit test and adapter integration test.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
+  state.artifactFormat = 1;
   return { root, state };
 }
 
@@ -322,6 +323,51 @@ test("implementation baseline requires current tests and separates quality revie
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "baseline-sealed");
   await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "quality-critic");
+});
+
+test("new workflows require exact sequential slice acceptance before baseline", async () => {
+  const { root, state } = await project();
+  state.artifactFormat = 2;
+  const design = path.join(root, state.designPath);
+  await writeFile(design, (await readFile(design, "utf8"))
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: First outcome\n- Outcome: The first result is observable.\n- Entry point: First command.\n- Core behavior: Apply first rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: First acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The first command passes.\n\n### Slice 2: Second outcome\n- Outcome: The second result is observable.\n- Entry point: Second command.\n- Core behavior: Apply second rules.\n- Boundary integration: Read through ResultStore.\n- Tests: Second acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The second command passes.\n`)
+    .replace(/(### Slice Completion\n)[\s\S]*?(?=\n## )/, "$1#### Slice 1: First outcome\n- Implementation: First command, rules, and adapter are integrated.\n- Verification: First acceptance command passes.\n"));
+  state.phase = "ready-to-build";
+  await markDesignApproved(root, state);
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.implementation.slices.length, 2);
+  await assert.rejects(completeSlice(root, state, 2), /next is Slice 1/);
+  await assert.rejects(completeSlice(root, state, 1), /reviewed acceptance command/);
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 1);
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Complete Slice 2/);
+  await writeFile(design, (await readFile(design, "utf8")).replace(
+    "- Verification: First acceptance command passes.",
+    "- Verification: First acceptance command passes.\n\n#### Slice 2: Second outcome\n- Implementation: Second command, rules, and adapter are integrated.\n- Verification: Second acceptance command passes."
+  ));
+  await assert.rejects(completeSlice(root, state, 2), /reviewed acceptance command/);
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 2);
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /each reviewed slice acceptance command/);
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "baseline-sealed");
+  await advance(root, state, DEFAULT_CONFIG);
+  state.phase = "quality-remediation";
+  await writeFile(path.join(root, "remediated.js"), "export default true;\n");
+  await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /relevant tests/);
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "quality-verifier");
+  await writeFile(path.join(root, "restarted.js"), "export default true;\n");
+  await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await assert.rejects(restartQualityReview(root, state), /all required tests/);
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await restartQualityReview(root, state);
   assert.equal(state.phase, "quality-critic");
 });
 

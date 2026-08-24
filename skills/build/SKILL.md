@@ -18,12 +18,14 @@ Implement the reviewed design in thin vertical slices. The CLI enforces order an
 ## Implement
 
 1. Use `agent-toolkit advance` to enter `implementing` when permitted.
-2. Follow the artifact's implementation plan in slice order. Complete an entry point, core behavior, real boundary integration, and tests for one runnable outcome before starting the next slice; do not implement horizontal domain, persistence, transport, or wiring phases.
+2. Follow the artifact's implementation plan in slice order. Implement only the next slice reported by `status`. Complete its entry point, core behavior, real boundary integration, and tests before starting another slice; do not implement horizontal domain, persistence, transport, or wiring batches.
 3. Preserve ubiquitous language, rules, boundaries, contracts, errors, and dependency direction from the reviewed design. Implement every reviewed port and outward adapter before placing concrete infrastructure behind it; compose concrete dependencies only at the system edge.
 4. Update the change artifact when implementation evidence changes a decision. For material product, domain, boundary, public-interface, or plan changes, run `agent-toolkit review restart --stage design`; this returns the revision to developer feedback before fresh review.
 5. Update `.agent/SYSTEM.md` only for durable system knowledge discovered or changed by the work.
 
 Treat reviewed abstractions as acceptance criteria. When implementation reveals a meaningful domain or infrastructure boundary that the design missed, stop and restart design review rather than coupling inward policy to a concrete dependency. Prefer a narrow consumer-owned abstraction over direct coupling when uncertain, but avoid generic CRUD repositories, pass-through wrappers, marker interfaces, and layers with no behavioral contract. Default to a shallow module tree of small cohesive, independently testable types and operations; split files that mix unrelated policy, orchestration, and infrastructure without creating file-per-type ceremony.
+
+Do not reinterpret a reviewed logical boundary as a crate, package, or directory preference. Keeping one deployable or one Rust crate never permits an application use case to call SQLite, protobuf, HTTP, clocks, or other reviewed outward concerns directly. Do not rewrite the design or system map after coding to ratify a convenience-driven deviation. Stop before the deviation, explain it to the developer, and restart design review only if they choose to change the architecture.
 
 ## Test
 
@@ -33,11 +35,11 @@ Add meaningful unit tests for nontrivial rules and integration tests for real bo
 
 Tests must assert behavior and contracts. Do not use a fake or mock as the system under test. Avoid tests that only restate structure, accessors, framework wiring, type declarations, or trivial delegation. Use substitutes only at boundaries when they make outcomes deterministic without replacing the behavior under test.
 
-After each slice, run formatting/static checks, compile or build every affected target, and execute the smallest relevant behavioral and boundary tests through the CLI. Do not continue while the slice's runnable path has placeholders, unimplemented branches, or compile failures. Record test traceability and any justified gap, then run the complete relevant suite against the reconciled candidate.
+After each slice, run formatting/static checks and compile or build every affected target. Update one exact `#### Slice N: <reviewed title>` conformance record, then execute the reviewed acceptance command against that reconciled candidate through `agent-toolkit test --kind acceptance -- <command>` and run `agent-toolkit slice complete --number N`. Do not continue while the slice's runnable path has placeholders, empty binaries, unimplemented branches, unsupported entry points, warnings treated as defects by repository policy, or compile failures. Never combine slice numbers or claim later slices from partial foundations. After the final slice, rerun every slice acceptance command against the final candidate before sealing so later work cannot regress earlier outcomes.
 
 ## Quality Gate
 
-1. Reconcile code, tests, the change artifact, and system map. Complete `Implementation Conformance` by mapping every reviewed boundary, abstraction, dependency rule, and slice to code and verification evidence; any material deviation requires design review restart. Then rerun relevant tests against that exact candidate.
+1. Reconcile code, tests, the change artifact, and system map. Complete `Implementation Conformance` by mapping every reviewed boundary, abstraction, dependency rule, and exact individual slice to code and verification evidence; any material deviation requires design review restart. Then rerun relevant tests against that exact candidate.
 2. Run `agent-toolkit check`, then use `status` and `advance` to seal the implementation baseline. Do not make quality-review edits before the CLI reports `baseline sealed`.
 3. Prepare a mandatory fresh critic with `agent-toolkit review prepare --stage quality --role critic`.
 4. Ask the critic to make one comprehensive pass over the sealed diff for correctness, requirements delivery, domain clarity, and exact architecture conformance. It must map reviewed ports, adapters, dependency directions, composition and transaction boundaries to the candidate, then inspect cohesion, test quality, regressions, and design drift. Concrete infrastructure leaking into an inward layer or an omitted reviewed abstraction is a material finding. Report all findings now, not optional improvements later.

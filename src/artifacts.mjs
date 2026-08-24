@@ -4,6 +4,29 @@ import { fileURLToPath } from "node:url";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+function sectionBody(content, ...names) {
+  return content.match(new RegExp(`^## (?:${names.join("|")})\\s*\\n([\\s\\S]*?)(?=\\n## [^#]|(?![\\s\\S]))`, "m"))?.[1]?.trim();
+}
+
+export function implementationSlices(content) {
+  const plan = sectionBody(content, "Implementation Plan", "Thin Vertical Slices") || "";
+  return [...plan.matchAll(/(?:^|\n)### Slice (\d+): ([^\n]+)\n([\s\S]*?)(?=\n### |$)/g)].map(match => {
+    const commandText = match[3].match(/^- Acceptance command:\s*(.+)$/mi)?.[1]?.trim();
+    let acceptanceCommand;
+    try {
+      acceptanceCommand = commandText ? JSON.parse(commandText) : undefined;
+    } catch {
+      acceptanceCommand = null;
+    }
+    return {
+      number: Number(match[1]),
+      title: match[2].trim(),
+      body: match[3],
+      acceptanceCommand
+    };
+  });
+}
+
 export function slugify(title) {
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   if (!slug) throw new Error("Title must contain a letter or number");
@@ -43,7 +66,7 @@ export async function renderSystem(root) {
   return true;
 }
 
-export async function validateArtifacts(root, state, { requireSystem = false, requireConformance = false } = {}) {
+export async function validateArtifacts(root, state, { requireSystem = false, requireConformance = false, conformanceSliceNumbers } = {}) {
   const problems = [];
   const design = path.join(root, state.designPath);
   let content = "";
@@ -52,7 +75,7 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
   } catch {
     problems.push(`Missing ${state.designPath}`);
   }
-  const section = (...names) => content.match(new RegExp(`^## (?:${names.join("|")})\\s*\\n([\\s\\S]*?)(?=\\n## [^#]|(?![\\s\\S]))`, "m"))?.[1]?.trim();
+  const section = (...names) => sectionBody(content, ...names);
   const plan = section("Implementation Plan", "Thin Vertical Slices");
   const placeholders = new Set([
     "Order thin vertical slices by observable behavior; include code, boundary work, and tests in each slice.",
@@ -78,6 +101,14 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     for (const [index, slice] of slices.entries()) {
       const missing = fields.filter(field => !new RegExp(`^- ${field}:\\s*\\S`, "mi").test(slice[1]));
       if (missing.length) problems.push(`Implementation slice ${index + 1} is missing: ${missing.join(", ")}`);
+    }
+    if (state.artifactFormat >= 2) {
+      for (const slice of implementationSlices(content)) {
+        if (!Array.isArray(slice.acceptanceCommand) || !slice.acceptanceCommand.length
+          || slice.acceptanceCommand.some(value => typeof value !== "string" || !value)) {
+          problems.push(`Implementation slice ${slice.number} requires Acceptance command as a non-empty JSON string array`);
+        }
+      }
     }
   }
   const requiredSections = [
@@ -105,8 +136,41 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     const sliceEvidence = part("Slice Completion");
     const completeFields = (body, fields) => fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
     if (!completeFields(architecture, ["Decision", "Implementation", "Verification"])
-      || !completeFields(sliceEvidence, ["Slice", "Implementation", "Verification"])) {
+      || (state.artifactFormat !== 2 && !completeFields(sliceEvidence, ["Slice", "Implementation", "Verification"]))) {
       problems.push("Complete Implementation Conformance with architecture-decision and slice-completion evidence before quality review");
+    }
+    if (state.artifactFormat >= 2) {
+      const planned = implementationSlices(content);
+      const requiredNumbers = conformanceSliceNumbers || planned.map(slice => slice.number);
+      const records = [...sliceEvidence.matchAll(/(?:^|\n)#### Slice (\d+): ([^\n]+)\n([\s\S]*?)(?=\n#### |$)/g)].map(match => ({
+        number: Number(match[1]),
+        title: match[2].trim(),
+        body: match[3]
+      }));
+      const headings = [...sliceEvidence.matchAll(/^#### (.+)$/gm)].map(match => match[1]);
+      const invalid = headings.filter(heading => !/^Slice \d+: \S/.test(heading));
+      if (invalid.length) problems.push(`Slice Completion contains invalid headings: ${invalid.join(", ")}`);
+      if (new Set(records.map(record => record.number)).size !== records.length) {
+        problems.push("Slice Completion must contain at most one record for each slice");
+      }
+      for (const number of requiredNumbers) {
+        const expected = planned.find(slice => slice.number === number);
+        const record = records.find(item => item.number === number);
+        if (!expected || !record) {
+          problems.push(`Complete Implementation Conformance for Slice ${number} before recording its completion`);
+          continue;
+        }
+        if (record.title !== expected.title) problems.push(`Slice ${number} conformance title must exactly match the reviewed plan`);
+        if (!completeFields(record.body, ["Implementation", "Verification"])) {
+          problems.push(`Slice ${number} conformance requires Implementation and Verification evidence`);
+        }
+      }
+      for (const record of records) {
+        if (!planned.some(slice => slice.number === record.number)) problems.push(`Slice Completion references unknown Slice ${record.number}`);
+        if (conformanceSliceNumbers && !requiredNumbers.includes(record.number)) {
+          problems.push(`Do not claim Slice ${record.number} completion before it is the active slice`);
+        }
+      }
     }
   }
   const questions = content.match(/## Open Questions\s*\n([\s\S]*?)(?=\n## |$)/)?.[1]?.trim();

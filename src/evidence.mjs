@@ -15,8 +15,8 @@ function execute(command, args, cwd) {
 }
 
 export async function recordTest(root, state, { kind, expectFail, command, args }) {
-  if (!["regression", "unit", "integration"].includes(kind)) {
-    throw new Error("Test kind must be regression, unit, or integration");
+  if (!["regression", "unit", "integration", "acceptance"].includes(kind)) {
+    throw new Error("Test kind must be regression, unit, integration, or acceptance");
   }
   if (!command) throw new Error("Test command required after --");
   const before = await projectFingerprint(root);

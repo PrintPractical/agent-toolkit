@@ -12,6 +12,7 @@ Commands:
   advance    Move through the next objective lifecycle gate
   feedback   Record developer approval or requested design changes
   test       Run a command and record fingerprinted test evidence
+  slice      Record sequential completion of a reviewed implementation slice
   review     Prepare, record, or restart independent reviews
   findings   Resolve a remediated review finding
   issue      Create or link an optional GitHub issue
@@ -49,12 +50,15 @@ Advances one lifecycle gate when its objective requirements are satisfied.`,
 Records the developer's response to the completed design and implementation plan before critic review.
   approved          Accept the current artifacts for independent design review
   changes-requested Return to shaping; requires repeatable --note text or a text/JSON notes file`,
-  test: `Usage: agent-toolkit test --kind regression|unit|integration [--expect-fail] -- <command> [args...]
+  test: `Usage: agent-toolkit test --kind regression|unit|integration|acceptance [--expect-fail] -- <command> [args...]
 
 Runs the command and records its result against the unchanged project candidate.
   --kind         Required evidence kind
   --expect-fail  Require and record a failing command, normally for pre-fix regression proof
   --             Separates toolkit options from the test command`,
+  slice: `Usage: agent-toolkit slice complete --number <n>
+
+Records one reviewed slice as complete. Slices must be completed in order, their one-to-one Implementation Conformance record must be present, and the current candidate must have passing acceptance evidence from the exact command reviewed in the plan.`,
   review: `Usage:
   agent-toolkit review prepare --stage design|quality --role critic|verifier
   agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]

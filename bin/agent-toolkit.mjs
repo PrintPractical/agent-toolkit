@@ -13,7 +13,7 @@ import { isGitRepository, statusPaths } from "../src/git.mjs";
 import { helpText } from "../src/help.mjs";
 import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
-import { advance, createState, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -124,6 +124,11 @@ async function status() {
     commit: state.commitSha || null,
     unresolvedFindings: state.findings.filter(item => !item.retired && !item.resolved).length,
     developerFeedback: state.developerFeedback?.at(-1) || null,
+    slices: state.implementation?.slices?.map(slice => ({
+      number: slice.number,
+      title: slice.title,
+      complete: Boolean(slice.completedAt)
+    })) || null,
     next: nextAction(state, config)
   };
   console.log(has("--json") ? JSON.stringify(summary, null, 2) : Object.entries(summary).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join("\n"));
@@ -166,6 +171,17 @@ async function test() {
     args: commandArgs
   });
   console.log(`Recorded ${evidence.kind} evidence (${evidence.expectFail ? "expected failure" : "passed"})`);
+}
+
+async function slice() {
+  if (args[1] !== "complete") throw new Error("Usage: agent-toolkit slice complete --number <n>");
+  const raw = option("--number", { required: true });
+  const number = Number(raw);
+  if (!Number.isInteger(number) || number < 1) throw new Error("--number must be a positive integer");
+  const state = await loadState(root);
+  const completed = await completeSlice(root, state, number);
+  const config = await readConfig(root);
+  console.log(`Completed Slice ${completed.number}: ${completed.title}\nNext: ${nextAction(state, config)}`);
 }
 
 async function review() {
@@ -309,6 +325,7 @@ async function main() {
     case "advance": return runAdvance();
     case "feedback": return feedback();
     case "test": return test();
+    case "slice": return slice();
     case "review": return review();
     case "findings": return findings();
     case "issue": return issue();

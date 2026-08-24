@@ -30,7 +30,7 @@ Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
 6. Locate domain, application, infrastructure, and external responsibilities. Name dependency direction, ownership, composition, and transaction boundaries wherever behavior crosses them.
 7. Specify public interfaces and inward-owned boundary contracts, including errors, idempotency, consistency, and outward adapters.
 8. Trace risk-based tests to rules, contracts, and failure modes.
-9. Write the implementation plan as ordered thin vertical slices using the template fields. Every slice must produce runnable behavior from an entry point through core policy to a real boundary where applicable; layer-only phases are not slices.
+9. Write the implementation plan as ordered thin vertical slices using the template fields. Every slice must produce runnable behavior from an entry point through core policy to a real boundary where applicable; layer-only phases are not slices. Give each slice one JSON-array acceptance command that executes its observable path, not merely compilation or isolated unit tests.
 
 Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
 
@@ -43,6 +43,8 @@ Create an abstraction only when at least one is true:
 - Retrofitting it later would be unusually costly.
 
 At a meaningful boundary, prefer a narrow contract owned by the inward consumer and an outward adapter even when only one implementation exists. Shape repositories and ports around behavior, transactions, and consistency rather than generic CRUD. Direct coupling is acceptable only for local, private mechanism with no policy boundary; justify it explicitly. Do not invent pass-through layers or interfaces without contracts. For every empty adaptive template section, write a one-line reason it does not apply.
+
+Logical dependency boundaries are independent of packaging. A single crate, package, or deployable may still require domain, application, port, adapter, and composition responsibilities; never treat package count as a substitute for dependency direction.
 
 ## Questions and Decisions
 

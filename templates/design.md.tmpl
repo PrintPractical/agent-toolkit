@@ -46,7 +46,7 @@ List each abstraction, its owner, behavioral contract, consumers, implementation
 Map each important rule, contract, edge, and failure risk to a unit, integration, or regression test. Explain any gap.
 
 ## Implementation Plan
-Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.
+Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the slice's observable path, for example `["npm", "test", "--", "checkout"]`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.
 
 ## Implementation Conformance
 Complete during build; record deviations only after design review restart.
@@ -57,7 +57,7 @@ Complete during build; record deviations only after design review restart.
 - Verification:
 
 ### Slice Completion
-- Slice:
+- Add one `#### Slice N: <exact reviewed title>` subsection per completed slice.
 - Implementation:
 - Verification:
 

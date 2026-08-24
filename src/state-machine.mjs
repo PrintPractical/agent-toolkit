@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "./fingerprints.mjs";
-import { validateArtifacts } from "./artifacts.mjs";
+import { implementationSlices, validateArtifacts } from "./artifacts.mjs";
 import { withDirectoryLock } from "./locks.mjs";
 
 export const PHASES = [
@@ -17,6 +17,7 @@ export async function createState(root, data) {
   await mkdir(stateDirectory(root), { recursive: true });
   const state = {
     version: 1,
+    artifactFormat: 2,
     id: randomUUID(),
     phase: "shaping",
     createdAt: new Date().toISOString(),
@@ -72,6 +73,19 @@ function commandKey(item) {
   return JSON.stringify(item.command);
 }
 
+function currentSliceAcceptance(state, fingerprint) {
+  const available = state.evidence.filter(item => item.kind === "acceptance"
+    && !item.expectFail && item.code === 0 && item.fingerprint === fingerprint);
+  const used = new Set();
+  for (const slice of state.implementation?.slices || []) {
+    const evidence = available.find(item => !used.has(item.id)
+      && commandKey(item) === JSON.stringify(slice.acceptanceCommand));
+    if (!evidence) return false;
+    used.add(evidence.id);
+  }
+  return true;
+}
+
 function hasPassingRegression(state, fingerprint) {
   const failure = state.evidence.find(item => item.id === state.regression?.evidenceId
     && item.kind === "regression" && item.expectFail && item.code !== 0);
@@ -82,7 +96,8 @@ function hasPassingRegression(state, fingerprint) {
 
 export function hasRequiredCurrentEvidence(state, fingerprint) {
   return hasCurrentPassingEvidence(state, fingerprint)
-    && (state.kind !== "fix" || hasPassingRegression(state, fingerprint));
+    && (state.kind !== "fix" || hasPassingRegression(state, fingerprint))
+    && (state.artifactFormat !== 2 || !state.implementation || currentSliceAcceptance(state, fingerprint));
 }
 
 function requireVerifiedCandidate(state, fingerprint) {
@@ -106,6 +121,41 @@ export async function requireCurrentDesign(root, state) {
   if (state.reviews["design-verifier"]?.contractFingerprint !== current) {
     throw new Error("Material design sections changed; run: agent-toolkit review restart --stage design");
   }
+}
+
+export async function completeSlice(root, state, number) {
+  if (state.phase !== "implementing") throw new Error("Slices can only be completed during implementation");
+  await requireCurrentDesign(root, state);
+  const slices = state.implementation?.slices;
+  if (!slices?.length) throw new Error("This workflow predates objective slice tracking; follow status and complete its existing lifecycle");
+  const next = slices.find(slice => !slice.completedAt);
+  if (!next) throw new Error("Every implementation slice is already complete; run: agent-toolkit advance");
+  if (number !== next.number) throw new Error(`Complete slices in reviewed order; next is Slice ${next.number}`);
+  const required = slices.filter(slice => slice.completedAt).map(slice => slice.number).concat(number);
+  const problems = await validateArtifacts(root, state, {
+    requireSystem: true,
+    requireConformance: true,
+    conformanceSliceNumbers: required
+  });
+  if (problems.length) throw new Error(problems.join("\n"));
+  const fingerprint = await projectFingerprint(root);
+  const priorEvidenceIds = new Set(slices.map(slice => slice.evidenceId).filter(Boolean));
+  const previousEvidenceId = slices.filter(slice => slice.completedAt).at(-1)?.evidenceId;
+  const previousEvidenceIndex = previousEvidenceId
+    ? state.evidence.findIndex(item => item.id === previousEvidenceId)
+    : state.implementation.evidenceStartIndex - 1;
+  const evidence = state.evidence.slice(previousEvidenceIndex + 1).reverse().find(item => item.kind === "acceptance"
+    && !item.expectFail && item.code === 0 && item.fingerprint === fingerprint
+    && commandKey(item) === JSON.stringify(next.acceptanceCommand)
+    && !priorEvidenceIds.has(item.id));
+  if (!evidence) {
+    throw new Error(`Run Slice ${number}'s reviewed acceptance command through: agent-toolkit test --kind acceptance -- ${next.acceptanceCommand.join(" ")}`);
+  }
+  next.completedAt = new Date().toISOString();
+  next.fingerprint = fingerprint;
+  next.evidenceId = evidence.id;
+  await saveState(root, state);
+  return next;
 }
 
 export async function advance(root, state, config) {
@@ -150,10 +200,29 @@ export async function advance(root, state, config) {
         if (!failure) throw new Error("Record an expected-failing regression test before implementation");
         state.regression = { evidenceId: failure.id, command: failure.command };
       }
+      if (state.artifactFormat >= 2) {
+        const design = await readFile(path.join(root, state.designPath), "utf8");
+        state.implementation = {
+          startedAt: new Date().toISOString(),
+          evidenceStartIndex: state.evidence.length,
+          slices: implementationSlices(design).map(slice => ({
+            number: slice.number,
+            title: slice.title,
+            acceptanceCommand: slice.acceptanceCommand
+          }))
+        };
+      }
       state.phase = "implementing";
       break;
     case "implementing": {
       await requireCurrentDesign(root, state);
+      if (state.artifactFormat >= 2) {
+        const incomplete = state.implementation?.slices?.find(slice => !slice.completedAt);
+        if (incomplete) throw new Error(`Complete Slice ${incomplete.number} before sealing the implementation`);
+        if (!currentSliceAcceptance(state, codeHash)) {
+          throw new Error("Run each reviewed slice acceptance command against the final candidate before sealing the implementation");
+        }
+      }
       const problems = await validateArtifacts(root, state, { requireSystem: true, requireConformance: true });
       if (problems.length) throw new Error(problems.join("\n"));
       const passing = hasCurrentPassingEvidence(state, codeHash);
@@ -210,6 +279,7 @@ export async function advance(root, state, config) {
 }
 
 export function nextAction(state, config) {
+  const pendingSlice = state.implementation?.slices?.find(slice => !slice.completedAt);
   const map = {
     shaping: "Complete the design, implementation plan, and system map, then run: agent-toolkit advance",
     "developer-review": "Review the design and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
@@ -217,7 +287,9 @@ export function nextAction(state, config) {
     "design-remediation": "Resolve design findings, then run: agent-toolkit advance",
     "design-verifier": "agent-toolkit review prepare --stage design --role verifier",
     "ready-to-build": config.github.issues.policy === "create" && !state.issue ? "agent-toolkit issue ensure" : config.github.issues.policy === "existing" && !state.issue ? "agent-toolkit issue link <number>" : "agent-toolkit advance",
-    implementing: "Implement and test the change, then run: agent-toolkit advance",
+    implementing: pendingSlice
+      ? `Implement only Slice ${pendingSlice.number}, run its reviewed acceptance command, then run: agent-toolkit slice complete --number ${pendingSlice.number}`
+      : "All slices are complete; run: agent-toolkit advance",
     "baseline-sealed": "agent-toolkit advance",
     "quality-critic": "agent-toolkit review prepare --stage quality --role critic",
     "quality-remediation": "Resolve quality findings, rerun tests, then run: agent-toolkit advance",
