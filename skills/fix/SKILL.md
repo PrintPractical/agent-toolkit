@@ -7,6 +7,10 @@ description: Use when diagnosing and correcting a defect, regression, production
 
 Prove the failure, diagnose its root cause, and make the smallest durable correction. Use the CLI for lifecycle state; never edit `.agent/.state`.
 
+## Project Instructions
+
+Before planning or editing, read every applicable `AGENTS.md` in the project. Treat its instructions as binding requirements for all subsequent work. If this skill's general guidance conflicts with an `AGENTS.md` requirement, the `AGENTS.md` takes precedence; do not simplify, reinterpret, or override that requirement.
+
 ## Start and Diagnose
 
 1. Run `agent-toolkit init` if needed, then `agent-toolkit start --kind fix --title "<title>"`.
@@ -34,7 +38,7 @@ If no automated reproduction is technically possible, stop and record the concre
 
 ## Design Review
 
-Document source-requirement traceability, root cause, regression evidence, proposed correction, risks, boundary contracts, tests, and an implementation plan of runnable vertical slices. Give every slice a JSON-array acceptance command for its observable corrected path. At meaningful storage, transport, time, identity, messaging, or external-system boundaries, prefer a narrow inward-owned contract and outward adapter even with one implementation; avoid only contract-free wrappers and generic CRUD. Logical boundaries still apply inside one crate or package. Prefer shallow cohesive modules over files mixing policy, orchestration, and infrastructure. Run `agent-toolkit check` and `advance`, then present the design and plan to the developer during `developer-review`. Stop for their response; record requested changes with `agent-toolkit feedback record --verdict changes-requested --note "..."` (repeat `--note` or use `--notes <file>`), or explicit acceptance with `agent-toolkit feedback record --verdict approved`. Only then continue through design critic, remediation when requested, and a distinct verifier:
+Document source-requirement traceability, root cause, regression evidence, proposed correction, risks, boundary contracts, tests, and an implementation plan of runnable vertical slices. Give every slice a JSON-array acceptance command for its observable corrected path. At meaningful storage, transport, time, identity, messaging, or external-system boundaries, prefer a narrow inward-owned contract and outward adapter even with one implementation; avoid only contract-free wrappers and generic CRUD. Logical boundaries still apply inside one crate or package. Where project instructions do not prescribe module layout, prefer shallow cohesive modules over files mixing policy, orchestration, and infrastructure. Run `agent-toolkit check` and `advance`, then present the design and plan to the developer during `developer-review`. Stop for their response; record requested changes with `agent-toolkit feedback record --verdict changes-requested --note "..."` (repeat `--note` or use `--notes <file>`), or explicit acceptance with `agent-toolkit feedback record --verdict approved`. Only then continue through design critic, remediation when requested, and a distinct verifier:
 
 - `agent-toolkit review prepare --stage design --role critic|verifier`
 - `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`

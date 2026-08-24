@@ -7,6 +7,10 @@ description: Use when shaping a greenfield or brownfield feature, change, or fix
 
 Turn intent into a reviewed, buildable change artifact. The `agent-toolkit` CLI owns lifecycle state; never edit `.agent/.state` or infer progress from files alone.
 
+## Project Instructions
+
+Before planning or editing, read every applicable `AGENTS.md` in the project. Treat its instructions as binding requirements for all subsequent work. If this skill's general guidance conflicts with an `AGENTS.md` requirement, the `AGENTS.md` takes precedence; do not simplify, reinterpret, or override that requirement.
+
 ## Start
 
 1. Run `agent-toolkit init` if `.agent/` is absent.
@@ -32,7 +36,7 @@ Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
 8. Trace risk-based tests to rules, contracts, and failure modes.
 9. Write the implementation plan as ordered thin vertical slices using the template fields. Every slice must produce runnable behavior from an entry point through core policy to a real boundary where applicable; layer-only phases are not slices. Give each slice one JSON-array acceptance command that executes its observable path, not merely compilation or isolated unit tests.
 
-Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
+Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
 
 Create an abstraction only when at least one is true:
 

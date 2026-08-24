@@ -12,6 +12,8 @@ test("repository exposes exactly the three public skills within budgets", async 
     const content = await readFile(path.join(directory, name, "SKILL.md"), "utf8");
     assert.match(content, new RegExp(`^---\\nname: ${name}\\n`, "m"));
     assert.match(content, /description: Use when /);
+    assert.match(content, /## Project Instructions\n\nBefore planning or editing, read every applicable `AGENTS\.md` in the project\. Treat its instructions as binding requirements for all subsequent work\. If this skill's general guidance conflicts with an `AGENTS\.md` requirement, the `AGENTS\.md` takes precedence; do not simplify, reinterpret, or override that requirement\./);
+    assert.match(content, /Where project instructions do not prescribe module layout,/);
     assert.ok(content.split("\n").length <= 140, `${name} exceeds 140 lines`);
     assert.ok(Buffer.byteLength(content) <= 10 * 1024, `${name} exceeds 10 KiB`);
   }

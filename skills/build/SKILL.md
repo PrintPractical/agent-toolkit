@@ -7,6 +7,10 @@ description: Use when implementing an agent-toolkit change whose reviewed design
 
 Implement the reviewed design in thin vertical slices. The CLI enforces order and owns `.agent/.state`; call it rather than editing state data.
 
+## Project Instructions
+
+Before planning or editing, read every applicable `AGENTS.md` in the project. Treat its instructions as binding requirements for all subsequent work. If this skill's general guidance conflicts with an `AGENTS.md` requirement, the `AGENTS.md` takes precedence; do not simplify, reinterpret, or override that requirement.
+
 ## Preconditions
 
 1. Run `agent-toolkit status` and `agent-toolkit check`.
@@ -23,7 +27,7 @@ Implement the reviewed design in thin vertical slices. The CLI enforces order an
 4. Update the change artifact when implementation evidence changes a decision. For material product, domain, boundary, public-interface, or plan changes, run `agent-toolkit review restart --stage design`; this returns the revision to developer feedback before fresh review.
 5. Update `.agent/SYSTEM.md` only for durable system knowledge discovered or changed by the work.
 
-Treat reviewed abstractions as acceptance criteria. When implementation reveals a meaningful domain or infrastructure boundary that the design missed, stop and restart design review rather than coupling inward policy to a concrete dependency. Prefer a narrow consumer-owned abstraction over direct coupling when uncertain, but avoid generic CRUD repositories, pass-through wrappers, marker interfaces, and layers with no behavioral contract. Default to a shallow module tree of small cohesive, independently testable types and operations; split files that mix unrelated policy, orchestration, and infrastructure without creating file-per-type ceremony.
+Treat reviewed abstractions as acceptance criteria. When implementation reveals a meaningful domain or infrastructure boundary that the design missed, stop and restart design review rather than coupling inward policy to a concrete dependency. Prefer a narrow consumer-owned abstraction over direct coupling when uncertain, but avoid generic CRUD repositories, pass-through wrappers, marker interfaces, and layers with no behavioral contract. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable types and operations; split files that mix unrelated policy, orchestration, and infrastructure without creating file-per-type ceremony.
 
 Do not reinterpret a reviewed logical boundary as a crate, package, or directory preference. Keeping one deployable or one Rust crate never permits an application use case to call SQLite, protobuf, HTTP, clocks, or other reviewed outward concerns directly. Do not rewrite the design or system map after coding to ratify a convenience-driven deviation. Stop before the deviation, explain it to the developer, and restart design review only if they choose to change the architecture.
 
