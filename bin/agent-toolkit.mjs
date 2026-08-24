@@ -7,8 +7,10 @@ import { renderChange, renderSystem, slugify, validateArtifacts } from "../src/a
 import { createCommit, prepareCommit } from "../src/commit.mjs";
 import { readConfig, writeDefaultConfig } from "../src/config.mjs";
 import { recordTest } from "../src/evidence.mjs";
+import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { checkGitHub, ensureIssue, linkIssue } from "../src/github.mjs";
 import { isGitRepository, statusPaths } from "../src/git.mjs";
+import { helpText } from "../src/help.mjs";
 import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
 import { advance, createState, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
@@ -23,8 +25,19 @@ function option(name, { required = false } = {}) {
   return value;
 }
 
+function optionValues(name) {
+  return args.flatMap((value, index) => value === name && args[index + 1] && !args[index + 1].startsWith("--") ? [args[index + 1]] : []);
+}
+
 function has(name) {
   return args.includes(name);
+}
+
+function isHelpRequested() {
+  if (!args.length || ["help", "--help", "-h"].includes(args[0])) return true;
+  const separator = args.indexOf("--");
+  const toolkitArgs = separator < 0 ? args : args.slice(0, separator);
+  return toolkitArgs.includes("--help") || toolkitArgs.includes("-h");
 }
 
 async function install() {
@@ -110,6 +123,7 @@ async function status() {
     issue: state.issue || null,
     commit: state.commitSha || null,
     unresolvedFindings: state.findings.filter(item => !item.resolved).length,
+    developerFeedback: state.developerFeedback?.at(-1) || null,
     next: nextAction(state, config)
   };
   console.log(has("--json") ? JSON.stringify(summary, null, 2) : Object.entries(summary).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join("\n"));
@@ -126,6 +140,18 @@ async function runAdvance() {
   const config = await readConfig(root);
   const state = await advance(root, await loadState(root), config);
   console.log(`Phase: ${state.phase}\nNext: ${nextAction(state, config)}`);
+}
+
+async function feedback() {
+  if (args[1] !== "record") throw new Error("Usage: agent-toolkit feedback record --verdict approved|changes-requested [--note \"...\"] [--notes <file>]");
+  const state = await loadState(root);
+  const record = await recordDeveloperFeedback(root, state, {
+    verdict: option("--verdict", { required: true }),
+    notesFile: option("--notes"),
+    notes: optionValues("--note")
+  });
+  const config = await readConfig(root);
+  console.log(`Developer feedback: ${record.verdict}\nPhase: ${state.phase}\nNext: ${nextAction(state, config)}`);
 }
 
 async function test() {
@@ -228,6 +254,13 @@ async function commit() {
 }
 
 async function main() {
+  if (isHelpRequested()) {
+    const topic = args[0] === "help"
+      ? (args[1]?.startsWith("-") ? "help" : args[1])
+      : (!args.length || args[0].startsWith("-") ? undefined : args[0]);
+    console.log(helpText(topic));
+    return;
+  }
   switch (args[0]) {
     case "install": return install();
     case "init": return initialize();
@@ -235,17 +268,19 @@ async function main() {
     case "status": return status();
     case "check": return check();
     case "advance": return runAdvance();
+    case "feedback": return feedback();
     case "test": return test();
     case "review": return review();
     case "findings": return findings();
     case "issue": return issue();
     case "commit": return commit();
     default:
-      throw new Error("Usage: agent-toolkit <install|init|start|status|check|advance|test|review|findings|issue|commit>");
+      throw new Error(`Unknown command: ${args[0]}. Run: agent-toolkit help`);
   }
 }
 
-const execution = ["install", "init", "status", "check"].includes(args[0]) ? main() : withStateLock(root, main);
+const helpRequested = isHelpRequested();
+const execution = helpRequested || ["install", "init", "status", "check"].includes(args[0]) ? main() : withStateLock(root, main);
 execution.catch(error => {
   console.error(`Error: ${error.message}`);
   process.exitCode = 1;

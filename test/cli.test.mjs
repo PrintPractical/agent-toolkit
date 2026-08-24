@@ -2,8 +2,19 @@ import assert from "node:assert/strict";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
+import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
 import { execute, initializeGit, runCli, temporaryDirectory } from "./helpers.mjs";
+
+async function completePlan(root, slug) {
+  const file = path.join(root, ".agent", "changes", `${slug}.md`);
+  const content = await readFile(file, "utf8");
+  await writeFile(file, content.replace(/(## Implementation Plan\n)[^\n]+/, "$11. Deliver search behavior with traced tests and boundary integration."));
+}
+
+async function markDesignApproved(root, state) {
+  state.developerApproval = { fingerprint: await artifactFingerprint(root, state) };
+  state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
+}
 
 test("CLI initializes and starts in a non-Git brownfield directory", async () => {
   const root = await temporaryDirectory();
@@ -14,6 +25,42 @@ test("CLI initializes and starts in a non-Git brownfield directory", async () =>
   assert.match(await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8"), /Use-Case Catalog/);
   const status = await runCli(root, ["status", "--json"]);
   assert.equal(JSON.parse(status.stdout).phase, "shaping");
+});
+
+test("CLI provides top-level and command-specific help without project state", async () => {
+  const root = await temporaryDirectory();
+  const top = await runCli(root, []);
+  assert.equal(top.code, 0, top.stderr);
+  assert.match(top.stdout, /Commands:/);
+  assert.match(top.stdout, /feedback\s+Record developer approval/);
+  const start = await runCli(root, ["start", "--help"]);
+  assert.equal(start.code, 0, start.stderr);
+  assert.match(start.stdout, /--kind feature\|fix/);
+  const feedback = await runCli(root, ["help", "feedback"]);
+  assert.equal(feedback.code, 0, feedback.stderr);
+  assert.match(feedback.stdout, /--note/);
+  const help = await runCli(root, ["help", "--help"]);
+  assert.equal(help.code, 0, help.stderr);
+  assert.match(help.stdout, /help \[command\]/);
+});
+
+test("CLI pauses for developer feedback and supports requested revisions", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Add Search"]);
+  await completePlan(root, "add-search");
+  const advanced = await runCli(root, ["advance"]);
+  assert.equal(advanced.code, 0, advanced.stderr);
+  assert.match(advanced.stdout, /developer-review/);
+  const requested = await runCli(root, ["feedback", "record", "--verdict", "changes-requested", "--note", "Clarify ranking", "--note", "Split indexing"]);
+  assert.equal(requested.code, 0, requested.stderr);
+  assert.match(requested.stdout, /Phase: shaping/);
+  await runCli(root, ["advance"]);
+  const approved = await runCli(root, ["feedback", "record", "--verdict", "approved"]);
+  assert.equal(approved.code, 0, approved.stderr);
+  assert.match(approved.stdout, /Phase: design-critic/);
+  const status = JSON.parse((await runCli(root, ["status", "--json"])).stdout);
+  assert.equal(status.developerFeedback.verdict, "approved");
 });
 
 test("CLI blocks startup around unrelated dirty Git changes", async () => {
@@ -41,9 +88,11 @@ test("review packets include bounded test output", async () => {
   const root = await temporaryDirectory();
   await runCli(root, ["init"]);
   await runCli(root, ["start", "--kind", "fix", "--title", "Repair Search"]);
+  await completePlan(root, "repair-search");
   const stateFile = path.join(root, ".agent", ".state", "repair-search.json");
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   state.phase = "design-critic";
+  await markDesignApproved(root, state);
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   const evidence = await runCli(root, ["test", "--kind", "regression", "--expect-fail", "--", process.execPath, "-e", "console.error('x'.repeat(2000) + 'diagnostic-marker'); process.exit(1)"]);
   assert.equal(evidence.code, 0, evidence.stderr);
@@ -58,11 +107,12 @@ test("bounded fix packets retain the historical regression failure", async () =>
   const root = await temporaryDirectory();
   await runCli(root, ["init"]);
   await runCli(root, ["start", "--kind", "fix", "--title", "Repair Search"]);
+  await completePlan(root, "repair-search");
   const stateFile = path.join(root, ".agent", ".state", "repair-search.json");
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   const fingerprint = await projectFingerprint(root);
   state.phase = "quality-critic";
-  state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
+  await markDesignApproved(root, state);
   state.baseline = { fingerprint };
   state.evidence = [{ id: "failure", kind: "regression", expectFail: true, command: ["test", "regression"], code: 1, output: "observed failure", fingerprint: "before" }];
   state.regression = { evidenceId: "failure", command: ["test", "regression"] };
@@ -89,6 +139,7 @@ test("sealed commit creation produces one conventional commit and never pushes",
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
   state.phase = "ready-to-commit";
+  await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -115,6 +166,7 @@ test("commit hooks cannot alter the reviewed tree", async () => {
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
   state.phase = "ready-to-commit";
+  await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -139,6 +191,7 @@ test("commit hooks cannot alter unstaged candidate files", async () => {
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
   state.phase = "ready-to-commit";
+  await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -164,6 +217,7 @@ test("post-commit hook failures do not invalidate a reviewed commit", async () =
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
   state.phase = "ready-to-commit";
+  await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
@@ -186,6 +240,7 @@ test("commit creation recovers when state was not persisted after HEAD advanced"
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
   state.phase = "ready-to-commit";
+  await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);

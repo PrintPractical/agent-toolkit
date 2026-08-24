@@ -34,7 +34,7 @@ If no automated reproduction is technically possible, stop and record the concre
 
 ## Design Review
 
-Document root cause, regression evidence, proposed correction, risks, tests, and slices. Run `agent-toolkit check`, then follow `status`/`advance` through design critic, remediation when requested, and a distinct verifier:
+Document root cause, regression evidence, proposed correction, risks, tests, and an implementation plan of observable slices. Run `agent-toolkit check` and `advance`, then present the design and plan to the developer during `developer-review`. Stop for their response; record requested changes with `agent-toolkit feedback record --verdict changes-requested --note "..."` (repeat `--note` or use `--notes <file>`), or explicit acceptance with `agent-toolkit feedback record --verdict approved`. Only then continue through design critic, remediation when requested, and a distinct verifier:
 
 - `agent-toolkit review prepare --stage design --role critic|verifier`
 - `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`

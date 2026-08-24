@@ -5,6 +5,7 @@ import test from "node:test";
 import { renderChange, renderSystem } from "../src/artifacts.mjs";
 import { DEFAULT_CONFIG } from "../src/config.mjs";
 import { recordTest } from "../src/evidence.mjs";
+import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { prepareReview, recordReview, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
 import { advance, createState } from "../src/state-machine.mjs";
@@ -12,13 +13,16 @@ import { temporaryDirectory } from "./helpers.mjs";
 
 async function project(kind = "feature") {
   const root = await temporaryDirectory();
-  await renderChange(root, { kind, title: "Deliver Result", slug: "deliver-result" });
+  const design = await renderChange(root, { kind, title: "Deliver Result", slug: "deliver-result" });
+  const content = await readFile(design, "utf8");
+  await writeFile(design, content.replace(/(## Implementation Plan\n)[^\n]+/, "$11. Deliver the observable result with its tests and boundary integration."));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
   return { root, state };
 }
 
 async function markDesignApproved(root, state) {
+  state.developerApproval = { fingerprint: await artifactFingerprint(root, state) };
   state.reviews["design-verifier"] = {
     verdict: "approved",
     fingerprint: await artifactFingerprint(root, state),
@@ -26,9 +30,15 @@ async function markDesignApproved(root, state) {
   };
 }
 
+async function reachDesignCritic(root, state) {
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "developer-review");
+  await recordDeveloperFeedback(root, state, { verdict: "approved" });
+}
+
 test("design requires a fresh critic and distinct verifier", async () => {
   const { root, state } = await project();
-  await advance(root, state, DEFAULT_CONFIG);
+  await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
   await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
@@ -37,16 +47,43 @@ test("design requires a fresh critic and distinct verifier", async () => {
   assert.equal(state.phase, "ready-to-build");
 });
 
-test("verifier cannot approve content changed after critic approval", async () => {
+test("developer can request design changes before approving critic review", async () => {
   const { root, state } = await project();
   await advance(root, state, DEFAULT_CONFIG);
+  const feedback = await recordDeveloperFeedback(root, state, {
+    verdict: "changes-requested",
+    notes: ["Clarify the ordering guarantee", "Split the persistence slice"]
+  });
+  assert.equal(state.phase, "shaping");
+  assert.deepEqual(feedback.notes, ["Clarify the ordering guarantee", "Split the persistence slice"]);
+  await advance(root, state, DEFAULT_CONFIG);
+  await recordDeveloperFeedback(root, state, { verdict: "approved" });
+  assert.equal(state.phase, "design-critic");
+});
+
+test("in-flight legacy state cannot bypass developer approval", async () => {
+  const { root, state } = await project();
+  state.phase = "ready-to-build";
+  state.reviews["design-verifier"] = {
+    verdict: "approved",
+    fingerprint: await artifactFingerprint(root, state),
+    contractFingerprint: await designContractFingerprint(root, state)
+  };
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Developer approval/);
+  await restartDesignReview(root, state);
+  assert.equal(state.phase, "developer-review");
+});
+
+test("verifier cannot approve content changed after critic approval", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
   await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "State the revised observable"));
   await assert.rejects(prepareReview(root, state, { stage: "design", role: "verifier" }), /changed after critic approval/);
   await restartDesignReview(root, state);
-  assert.equal(state.phase, "design-critic");
+  assert.equal(state.phase, "developer-review");
 });
 
 test("verified design drift can restart from ready-to-build", async () => {
@@ -57,7 +94,7 @@ test("verified design drift can restart from ready-to-build", async () => {
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "State the replacement observable"));
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /changed after verification/);
   await restartDesignReview(root, state);
-  assert.equal(state.phase, "design-critic");
+  assert.equal(state.phase, "developer-review");
 });
 
 test("implementation baseline requires current tests and separates quality review", async () => {
@@ -168,7 +205,7 @@ test("non-Git fingerprints include nested application state directories", async 
 
 test("review packets become stale when reviewed content changes", async () => {
   const { root, state } = await project();
-  await advance(root, state, DEFAULT_CONFIG);
+  await reachDesignCritic(root, state);
   const packet = await prepareReview(root, state, { stage: "design", role: "critic" });
   await writeFile(path.join(root, state.designPath), "changed\n");
   await assert.rejects(recordReview(root, state, { packetId: packet.id, verdict: "approved", reviewer: "critic" }), /changed/);
@@ -214,7 +251,7 @@ test("test commands cannot mutate the candidate they certify", async () => {
 
 test("material design drift requires a fresh design review", async () => {
   const { root, state } = await project();
-  await advance(root, state, DEFAULT_CONFIG);
+  await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
   await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic" });
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
@@ -224,7 +261,7 @@ test("material design drift requires a fresh design review", async () => {
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "Define the revised observable"));
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /review restart/);
   await restartDesignReview(root, state);
-  assert.equal(state.phase, "design-critic");
+  assert.equal(state.phase, "developer-review");
 });
 
 test("changed reproduction details require a fresh design review", async () => {
@@ -238,7 +275,7 @@ test("changed reproduction details require a fresh design review", async () => {
 
 test("approved reviews cannot smuggle unresolved findings", async () => {
   const { root, state } = await project();
-  await advance(root, state, DEFAULT_CONFIG);
+  await reachDesignCritic(root, state);
   const packet = await prepareReview(root, state, { stage: "design", role: "critic" });
   const findings = path.join(root, "findings.txt");
   await writeFile(findings, "- Material contract gap\n");

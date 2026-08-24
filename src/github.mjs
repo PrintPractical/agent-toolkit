@@ -26,7 +26,7 @@ function selectedDesignSections(design) {
     "Root Cause", "Concrete Examples", "Domain Concepts", "Rules and Invariants",
     "Domain Concepts, Rules, and Invariants", "Boundaries and Dependencies",
     "Public Interfaces and Errors", "Abstraction and Extension Pressure",
-    "Correction and Extension Pressure", "Test Traceability", "Thin Vertical Slices"
+    "Correction and Extension Pressure", "Test Traceability", "Implementation Plan", "Thin Vertical Slices"
   ]);
   const sections = design.split(/(?=^## )/m);
   return sections.filter(section => allowed.has(section.match(/^## (.+)$/m)?.[1])).join("\n").trim();

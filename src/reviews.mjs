@@ -24,6 +24,12 @@ export async function prepareReview(root, state, { stage, role }) {
   if (problems.length) throw new Error(problems.join("\n"));
   const snapshot = await reviewSnapshot(root, state, stage);
   const fingerprint = snapshotFingerprint(snapshot);
+  if (stage === "design" && !state.developerApproval) {
+    throw new Error("Developer approval is required before design review; run: agent-toolkit review restart --stage design");
+  }
+  if (stage === "design" && role === "critic" && state.developerApproval.fingerprint !== fingerprint) {
+    throw new Error("Design changed after developer approval; run: agent-toolkit review restart --stage design");
+  }
   if (stage === "quality" && role === "critic" && state.baseline?.fingerprint !== fingerprint) {
     throw new Error("Candidate changed after baseline sealing; run: agent-toolkit review restart --stage quality");
   }
@@ -75,6 +81,13 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
   if (state.phase !== expectedPhase(packet.stage, packet.role)) throw new Error("Review packet is no longer current");
   const current = snapshotFingerprint(await reviewSnapshot(root, state, packet.stage));
   if (current !== packet.fingerprint) throw new Error("Reviewed content changed; prepare a fresh review packet");
+  if (packet.stage === "design" && !state.developerApproval) {
+    throw new Error("Developer approval is required before recording design review");
+  }
+  if (packet.stage === "design" && packet.role === "critic" && state.developerApproval.fingerprint !== current) {
+    throw new Error("Design changed after developer approval; restart design review");
+  }
+  if (packet.stage === "quality") await requireCurrentDesign(root, state);
   const problems = await validateArtifacts(root, state, { requireSystem: true });
   if (problems.length) throw new Error(problems.join("\n"));
   if (packet.stage === "quality" && !hasRequiredCurrentEvidence(state, current)) {
@@ -121,7 +134,7 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
 }
 
 export async function restartDesignReview(root, state) {
-  if (!["design-verifier", "ready-to-build", "implementing", "baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "ready-to-commit"].includes(state.phase)) {
+  if (!["design-critic", "design-verifier", "ready-to-build", "implementing", "baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "ready-to-commit"].includes(state.phase)) {
     throw new Error(`Design review cannot be restarted during ${state.phase}`);
   }
   delete state.reviews["design-critic"];
@@ -130,7 +143,8 @@ export async function restartDesignReview(root, state) {
   delete state.reviews["quality-verifier"];
   delete state.baseline;
   delete state.commitPlan;
-  state.phase = "design-critic";
+  delete state.developerApproval;
+  state.phase = "developer-review";
   await saveState(root, state);
   return state;
 }

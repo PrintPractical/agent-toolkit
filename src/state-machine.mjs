@@ -6,7 +6,7 @@ import { validateArtifacts } from "./artifacts.mjs";
 import { withDirectoryLock } from "./locks.mjs";
 
 export const PHASES = [
-  "shaping", "design-critic", "design-remediation", "design-verifier",
+  "shaping", "developer-review", "design-critic", "design-remediation", "design-verifier",
   "ready-to-build", "implementing", "baseline-sealed", "quality-critic",
   "quality-remediation", "quality-verifier", "ready-to-commit", "complete"
 ];
@@ -99,6 +99,9 @@ function requireVerifiedCandidate(state, fingerprint) {
 }
 
 export async function requireCurrentDesign(root, state) {
+  if (!state.developerApproval) {
+    throw new Error("Developer approval is required; run: agent-toolkit review restart --stage design");
+  }
   const current = await designContractFingerprint(root, state);
   if (state.reviews["design-verifier"]?.contractFingerprint !== current) {
     throw new Error("Material design sections changed; run: agent-toolkit review restart --stage design");
@@ -112,7 +115,7 @@ export async function advance(root, state, config) {
     case "shaping": {
       const problems = await validateArtifacts(root, state, { requireSystem: true });
       if (problems.length) throw new Error(problems.join("\n"));
-      state.phase = "design-critic";
+      state.phase = "developer-review";
       break;
     }
     case "design-remediation":
@@ -122,6 +125,9 @@ export async function advance(root, state, config) {
       state.phase = "design-verifier";
       break;
     case "ready-to-build":
+      if (!state.developerApproval) {
+        throw new Error("Developer approval is required; run: agent-toolkit review restart --stage design");
+      }
       if (state.reviews["design-verifier"]?.fingerprint !== artifactHash) {
         throw new Error("Design artifacts changed after verification; review them again");
       }
@@ -173,6 +179,7 @@ export async function advance(root, state, config) {
       state.phase = "quality-verifier";
       break;
     case "ready-to-commit":
+      await requireCurrentDesign(root, state);
       requireVerifiedCandidate(state, codeHash);
       if (config.completion.commit.policy === "off" || !state.git) state.phase = "complete";
       else throw new Error("Commit required. Run: agent-toolkit commit prepare");
@@ -182,6 +189,8 @@ export async function advance(root, state, config) {
     case "quality-critic":
     case "quality-verifier":
       throw new Error(`Review required. Run: agent-toolkit review prepare --stage ${state.phase.startsWith("design") ? "design" : "quality"} --role ${state.phase.endsWith("critic") ? "critic" : "verifier"}`);
+    case "developer-review":
+      throw new Error("Developer feedback required. Run: agent-toolkit feedback record --verdict approved|changes-requested");
     case "complete":
       throw new Error("Change is already complete");
     default:
@@ -193,7 +202,8 @@ export async function advance(root, state, config) {
 
 export function nextAction(state, config) {
   const map = {
-    shaping: "Complete the design and system map, then run: agent-toolkit advance",
+    shaping: "Complete the design, implementation plan, and system map, then run: agent-toolkit advance",
+    "developer-review": "Review the design and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
     "design-critic": "agent-toolkit review prepare --stage design --role critic",
     "design-remediation": "Resolve design findings, then run: agent-toolkit advance",
     "design-verifier": "agent-toolkit review prepare --stage design --role verifier",

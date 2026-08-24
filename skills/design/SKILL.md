@@ -30,7 +30,7 @@ Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
 6. Locate domain, application, infrastructure, and external responsibilities only where those distinctions clarify ownership.
 7. Specify public interfaces, boundary contracts, errors, idempotency, consistency, and dependency direction where relevant.
 8. Trace risk-based tests to rules, contracts, and failure modes.
-9. Order thin vertical slices that produce observable behavior and include the tests needed for each slice.
+9. Write the implementation plan as ordered thin vertical slices. For each slice include its outcome, likely code areas, boundary or data changes, tests, dependencies, and completion signal.
 
 Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts only when behavior and language justify them.
 
@@ -50,13 +50,14 @@ Own local, reversible implementation choices. Ask at most five questions total, 
 ## Design Review
 
 1. Reconcile the artifact and run `agent-toolkit check`.
-2. Use `agent-toolkit advance` as directed until the design critic gate is available.
-3. Prepare a fresh critic with `agent-toolkit review prepare --stage design --role critic`.
-4. Have a separate context inspect examples, omissions, domain rules, contracts, abstraction claims, risks, and slice viability.
-5. Record it with `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`.
-6. If changes are requested, remediate each finding, run `agent-toolkit findings resolve <id>`, reconcile the artifacts, and follow `status`/`advance`.
-7. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage design --role verifier`; it must verify the remediated artifact rather than reuse the critic's conclusion.
-8. Record the verifier verdict and advance only when the CLI permits `ready-to-build`.
+2. Run `agent-toolkit advance` to enter `developer-review`. Present the completed design and implementation plan to the developer and explicitly invite corrections, omissions, and alternative decisions. Stop for their response; never infer approval.
+3. For requested changes, record their comments with repeatable `--note "..."` flags or `--notes <file>` using `agent-toolkit feedback record --verdict changes-requested`, revise the artifact, and repeat the developer review. When the developer explicitly accepts it, run `agent-toolkit feedback record --verdict approved`.
+4. Prepare a fresh critic with `agent-toolkit review prepare --stage design --role critic`.
+5. Have a separate context inspect examples, omissions, domain rules, contracts, abstraction claims, risks, and plan viability.
+6. Record it with `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`.
+7. If changes are requested, remediate each finding, run `agent-toolkit findings resolve <id>`, reconcile the artifacts, and follow `status`/`advance`.
+8. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage design --role verifier`; it must verify the remediated artifact rather than reuse the critic's conclusion.
+9. Record the verifier verdict and advance only when the CLI permits `ready-to-build`.
 
 When subagents are unavailable, use the prepared review packet as the complete compact prompt for a separate session. The author must not impersonate either fresh reviewer.
 

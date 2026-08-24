@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
+import { renderChange, renderSystem } from "../src/artifacts.mjs";
 import { prepareCommit } from "../src/commit.mjs";
 import { DEFAULT_CONFIG } from "../src/config.mjs";
-import { projectFingerprint, projectSnapshot } from "../src/fingerprints.mjs";
+import { designContractFingerprint, projectFingerprint, projectSnapshot } from "../src/fingerprints.mjs";
 import { statusPaths } from "../src/git.mjs";
 import { execute, initializeGit, temporaryDirectory } from "./helpers.mjs";
 
@@ -89,15 +90,22 @@ test("commit preparation rejects dirty submodule contents", async () => {
   await execute("git", ["-c", "protocol.file.allow=always", "submodule", "add", "-q", child, "vendor/child"], root);
   await execute("git", ["commit", "-q", "-am", "chore: add child"], root);
   await writeFile(path.join(root, "vendor", "child", "README.md"), "# Dirty child\n");
-  const fingerprint = await projectFingerprint(root);
+  await renderChange(root, { kind: "feature", title: "Inspect Submodule", slug: "inspect-submodule" });
+  await renderSystem(root);
   const state = {
     phase: "ready-to-commit",
     git: true,
     kind: "feature",
     title: "Inspect submodule",
+    designPath: ".agent/changes/inspect-submodule.md",
     findings: [],
-    evidence: [{ expectFail: false, code: 0, fingerprint }],
-    reviews: { "quality-verifier": { verdict: "approved", fingerprint } }
+    evidence: [],
+    reviews: {}
   };
+  state.developerApproval = {};
+  state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
+  const fingerprint = await projectFingerprint(root);
+  state.evidence.push({ expectFail: false, code: 0, fingerprint });
+  state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   await assert.rejects(prepareCommit(root, state, DEFAULT_CONFIG), /Dirty submodule contents/);
 });

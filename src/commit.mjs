@@ -4,10 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { projectFingerprint, projectSnapshot } from "./fingerprints.mjs";
 import { conventionalMessage, run, runGit, statusPaths } from "./git.mjs";
-import { hasRequiredCurrentEvidence, saveState } from "./state-machine.mjs";
+import { hasRequiredCurrentEvidence, requireCurrentDesign, saveState } from "./state-machine.mjs";
 
 export async function prepareCommit(root, state, config) {
   if (state.phase !== "ready-to-commit") throw new Error("Commit can only be prepared after quality verification");
+  await requireCurrentDesign(root, state);
   if (!state.git || config.completion.commit.policy === "off") throw new Error("Commit integration is not active");
   const fingerprint = await projectFingerprint(root);
   const verified = state.reviews["quality-verifier"];
@@ -82,6 +83,7 @@ async function commitMatchesPlan(root, sha, plan, expectedMessage) {
 }
 
 export async function createCommit(root, state) {
+  await requireCurrentDesign(root, state);
   if (!state.commitPlan) throw new Error("Prepare and inspect the commit before creating it");
   const expectedMessage = `${state.commitPlan.subject}\n\n${state.commitPlan.body}`;
   const existingHead = await runGit(root, ["rev-parse", "--verify", "HEAD"], { allowFailure: true });

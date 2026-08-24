@@ -17,9 +17,9 @@ Implement the reviewed design in thin vertical slices. The CLI enforces order an
 ## Implement
 
 1. Use `agent-toolkit advance` to enter `implementing` when permitted.
-2. Build slices in artifact order, keeping each slice observable and integrated.
+2. Follow the artifact's implementation plan in slice order, keeping each slice observable and integrated.
 3. Preserve ubiquitous language, rules, boundaries, contracts, errors, and dependency direction from the reviewed design.
-4. Update the change artifact when implementation evidence changes a decision. For material product, domain, boundary, or public-interface changes, run `agent-toolkit review restart --stage design`; do not silently drift.
+4. Update the change artifact when implementation evidence changes a decision. For material product, domain, boundary, public-interface, or plan changes, run `agent-toolkit review restart --stage design`; this returns the revision to developer feedback before fresh review.
 5. Update `.agent/SYSTEM.md` only for durable system knowledge discovered or changed by the work.
 
 Prefer direct code until the design's abstraction criteria are met. Do not add speculative layers, generic repositories, events, factories, or interfaces merely to resemble a pattern.

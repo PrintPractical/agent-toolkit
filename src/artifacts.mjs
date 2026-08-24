@@ -52,16 +52,21 @@ export async function validateArtifacts(root, state, { requireSystem = false } =
   } catch {
     problems.push(`Missing ${state.designPath}`);
   }
-  if (Buffer.byteLength(content) > 16 * 1024) problems.push("Active change exceeds 16 KiB");
-  if (content.split("\n").length > 250) problems.push("Active change exceeds 250 lines");
+  const plan = content.match(/^## (?:Implementation Plan|Thin Vertical Slices)\s*\n([\s\S]*?)(?=\n## |$)/m)?.[1]?.trim();
+  const placeholders = new Set([
+    "Order thin vertical slices by observable behavior; include code, boundary work, and tests in each slice.",
+    "Order diagnosis lock-in, correction, boundary updates, and verification as observable slices.",
+    "Order thin vertical slices by observable behavior. For each slice, name its outcome, likely code areas, boundary or data changes, tests, dependencies, and completion signal.",
+    "Order diagnosis lock-in, correction, boundary updates, and verification as observable slices. For each slice, name likely code areas, tests, dependencies, and completion signal."
+  ]);
+  if (!plan) problems.push("Missing Implementation Plan section");
+  else if (placeholders.has(plan)) problems.push("Complete the Implementation Plan before developer review");
   const questions = content.match(/## Open Questions\s*\n([\s\S]*?)(?=\n## |$)/)?.[1]?.trim();
   if (!questions) problems.push("Missing Open Questions section");
   else if (!/^[-*]\s+(None\.|None|No open questions\.?)$/i.test(questions)) problems.push("Material open questions remain");
   if (requireSystem) {
     try {
-      const system = await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8");
-      if (Buffer.byteLength(system) > 12 * 1024) problems.push("SYSTEM.md exceeds 12 KiB");
-      if (system.split("\n").length > 200) problems.push("SYSTEM.md exceeds 200 lines");
+      await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8");
     } catch {
       problems.push("Missing .agent/SYSTEM.md; create the minimum relevant system map");
     }
