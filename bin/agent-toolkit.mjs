@@ -10,6 +10,7 @@ import { recordTest } from "../src/evidence.mjs";
 import { checkGitHub, ensureIssue, linkIssue } from "../src/github.mjs";
 import { isGitRepository, statusPaths } from "../src/git.mjs";
 import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
+import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
 import { advance, createState, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
 
 const root = process.cwd();
@@ -24,6 +25,10 @@ function option(name, { required = false } = {}) {
 
 function has(name) {
   return args.includes(name);
+}
+
+async function install() {
+  await installSkills(parseInstallOptions(args.slice(1)));
 }
 
 async function ensureGitignore() {
@@ -224,6 +229,7 @@ async function commit() {
 
 async function main() {
   switch (args[0]) {
+    case "install": return install();
     case "init": return initialize();
     case "start": return start();
     case "status": return status();
@@ -235,11 +241,11 @@ async function main() {
     case "issue": return issue();
     case "commit": return commit();
     default:
-      throw new Error("Usage: agent-toolkit <init|start|status|check|advance|test|review|findings|issue|commit>");
+      throw new Error("Usage: agent-toolkit <install|init|start|status|check|advance|test|review|findings|issue|commit>");
   }
 }
 
-const execution = ["init", "status", "check"].includes(args[0]) ? main() : withStateLock(root, main);
+const execution = ["install", "init", "status", "check"].includes(args[0]) ? main() : withStateLock(root, main);
 execution.catch(error => {
   console.error(`Error: ${error.message}`);
   process.exitCode = 1;

@@ -1,6 +1,6 @@
 {
   "name": "agent-toolkit",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Adaptive domain-to-delivery skills with objective workflow gates",
   "type": "module",
   "bin": {
@@ -9,6 +9,8 @@
   "files": [
     "bin",
     "src",
+    "skills",
+    "skills.sh.json",
     "templates",
     "README.md",
     "image.png"

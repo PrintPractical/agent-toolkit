@@ -14,19 +14,21 @@ Adaptive domain-to-delivery skills for greenfield and brownfield software work. 
 
 ## Install
 
-Install all three agent skills with [skills.sh](https://skills.sh):
-
-```bash
-npx skills add PrintPractical/agent-toolkit --all
-```
-
-The skills call a separate CLI distributed as the npm package `agent-toolkit`. Install it globally or invoke it with `npx`:
+Install the CLI, then let it install its bundled skills. Installation is project-scoped by default; use `--global` to make the skills available across projects:
 
 ```bash
 npm install --global agent-toolkit
-# or
-npx agent-toolkit <command>
+agent-toolkit install --global
 ```
+
+`agent-toolkit install` invokes a pinned Node 20-compatible release of the standard [skills.sh](https://skills.sh) installer so it can detect and use the correct paths for supported agents. Use repeatable `--agent <name>` flags for a non-interactive targeted install, project-only `--all` for every agent, or `--copy` to copy instead of symlink:
+
+```bash
+agent-toolkit install --global --agent opencode --agent claude-code
+agent-toolkit install --all
+```
+
+The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPractical/agent-toolkit --all`. The CLI itself can also be invoked without global installation as `npx agent-toolkit <command>`.
 
 ## Workflow
 
@@ -83,6 +85,7 @@ GitHub issues are optional. Set the policy to `off` (default), `create`, or `exi
 ## CLI
 
 ```text
+agent-toolkit install [--global] [--agent <name>...] [--all] [--copy]
 agent-toolkit init
 agent-toolkit start --kind feature|fix --title "..." [--issue <number>]
 agent-toolkit status [--json]

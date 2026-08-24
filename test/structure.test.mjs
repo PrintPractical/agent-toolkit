@@ -24,4 +24,7 @@ test("templates stay compact and skills metadata names only public skills", asyn
   }
   const metadata = JSON.parse(await readFile(path.join(repositoryRoot, "skills.sh.json"), "utf8"));
   assert.deepEqual(metadata.groupings.flatMap(group => group.skills).sort(), ["build", "design", "fix"]);
+  const packageMetadata = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8"));
+  assert(packageMetadata.files.includes("skills"));
+  assert(packageMetadata.files.includes("skills.sh.json"));
 });
