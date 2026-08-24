@@ -1,0 +1,3 @@
+.agent/.state/
+node_modules/
+*.tgz

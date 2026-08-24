@@ -1,0 +1,24 @@
+{
+  "name": "agent-toolkit",
+  "version": "2.0.0",
+  "description": "Adaptive domain-to-delivery skills with objective workflow gates",
+  "type": "module",
+  "bin": {
+    "agent-toolkit": "./bin/agent-toolkit.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "README.md",
+    "image.png"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "verify": "npm test && npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT"
+}

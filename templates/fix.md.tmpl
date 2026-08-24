@@ -1,0 +1,55 @@
+# {{TITLE}}
+
+Change: `{{SLUG}}`
+Kind: `{{KIND}}`
+
+## Outcome
+State the restored behavior and how success is recognized.
+
+## Non-goals
+List excluded cleanup, redesign, and unrelated symptoms.
+
+## Failure and Impact
+Describe expected versus actual behavior, affected actors, severity, scope, and environment.
+
+## Reproduction
+Give deterministic steps, inputs, preconditions, and observed evidence.
+
+## Root Cause
+Explain the violated rule or contract and its owning location. Separate root cause, trigger, symptom, and contributing conditions.
+
+## Regression Test
+Identify the test, why its level is reliable, the command, and its expected behavior before and after correction. The CLI records actual results.
+
+## Concrete Examples
+Give the failing example plus adjacent happy, edge, and failure cases.
+
+## Domain Concepts, Rules, and Invariants
+Define relevant language and the rules the correction must restore. If none, say why.
+
+## Boundaries and Dependencies
+Describe affected responsibilities, data flow, external systems, and boundary failure behavior.
+
+## Public Interfaces and Errors
+Record compatibility, schemas, commands, APIs, events, and error semantics. If unchanged, say why.
+
+## Correction and Extension Pressure
+Describe the smallest correction at the rule-owning level. Record related pressure without speculative abstraction.
+
+## Test Traceability
+Map root cause, neighboring risks, rules, and boundaries to regression, unit, and integration tests. Explain any gap.
+
+## Thin Vertical Slices
+Order diagnosis lock-in, correction, boundary updates, and verification as observable slices.
+
+## Material Decisions
+Record consequential decisions and rejected alternatives.
+
+## Open Questions
+- None.
+
+## Reviews
+Review packets, verdicts, findings, resolutions, and reviewer identities are recorded in CLI runtime state; do not duplicate them here.
+
+## Status
+The CLI is the source of truth for lifecycle status and the next action; do not duplicate mutable status here.

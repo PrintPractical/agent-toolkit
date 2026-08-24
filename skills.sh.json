@@ -1,0 +1,16 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Shape",
+      "description": "Turn feature intent or a diagnosed defect into reviewed, buildable evidence.",
+      "skills": ["design", "fix"]
+    },
+    {
+      "title": "Deliver",
+      "description": "Implement, test, independently verify, and complete a reviewed change.",
+      "skills": ["build"]
+    }
+  ]
+}
