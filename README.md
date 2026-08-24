@@ -17,7 +17,7 @@ Adaptive domain-to-delivery skills for greenfield and brownfield software work. 
 Install the CLI, then let it install its bundled skills. Installation is project-scoped by default; use `--global` to make the skills available across projects:
 
 ```bash
-npm install --global agent-toolkit
+npm install --global github:PrintPractical/agent-toolkit#v2
 agent-toolkit install --global
 ```
 
@@ -28,7 +28,7 @@ agent-toolkit install --global --agent opencode --agent claude-code
 agent-toolkit install --all
 ```
 
-The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPractical/agent-toolkit --all`. The CLI itself can also be invoked without global installation as `npx agent-toolkit <command>`.
+The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPractical/agent-toolkit --all`. From a local checkout, the CLI can also be linked globally with `npm install --global .`.
 
 ## Workflow
 

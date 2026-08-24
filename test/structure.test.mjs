@@ -28,3 +28,10 @@ test("templates stay compact and skills metadata names only public skills", asyn
   assert(packageMetadata.files.includes("skills"));
   assert(packageMetadata.files.includes("skills.sh.json"));
 });
+
+test("installation docs do not reference the reserved npm package", async () => {
+  const readme = await readFile(path.join(repositoryRoot, "README.md"), "utf8");
+  assert.doesNotMatch(readme, /npm install --global agent-toolkit(?:\s|$)/);
+  assert.doesNotMatch(readme, /npx agent-toolkit(?:\s|$)/);
+  assert.match(readme, /npm install --global github:PrintPractical\/agent-toolkit#v2/);
+});
