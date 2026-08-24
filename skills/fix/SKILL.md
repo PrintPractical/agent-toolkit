@@ -11,7 +11,7 @@ Prove the failure, diagnose its root cause, and make the smallest durable correc
 
 1. Run `agent-toolkit init` if needed, then `agent-toolkit start --kind fix --title "<title>"`.
 2. Run `agent-toolkit status`; associate an issue with `agent-toolkit issue ensure` or `agent-toolkit issue link` when required.
-3. Read `.agent/SYSTEM.md`, affected contracts, code history when useful, and nearby tests.
+3. Read `.agent/SYSTEM.md`, the projects AGENTS.md file if exists, affected contracts, code history when useful, and nearby tests.
 4. Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
 5. Describe expected versus actual behavior, impact, environment, and the narrowest reliable reproduction.
 6. Trace the execution and data path. Distinguish the root cause from trigger, symptom, and contributing conditions.

@@ -12,7 +12,7 @@ Turn intent into a reviewed, buildable change artifact. The `agent-toolkit` CLI 
 1. Run `agent-toolkit init` if `.agent/` is absent.
 2. Run `agent-toolkit start --kind feature --title "<title>"` for a feature or change. For a defect, hand off to the fix skill.
 3. Run `agent-toolkit status`; follow the CLI's required next action.
-4. Read the repository, tests, nearby contracts, and existing `.agent/SYSTEM.md` before proposing structure.
+4. Read the repository, tests, nearby contracts, the projects AGENTS.md file if exists, and existing `.agent/SYSTEM.md` before proposing structure.
 
 ## System Map
 

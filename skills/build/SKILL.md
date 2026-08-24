@@ -11,7 +11,7 @@ Implement the reviewed design in thin vertical slices. The CLI enforces order an
 
 1. Run `agent-toolkit status` and `agent-toolkit check`.
 2. Require state `ready-to-build` and a reviewed `.agent/changes/<slug>.md`. If either is missing, return to design.
-3. Read `.agent/SYSTEM.md`, the change artifact, affected code, tests, and repository conventions.
+3. Read `.agent/SYSTEM.md`, the projects AGENTS.md file if exists, the change artifact, affected code, tests, and repository conventions.
 4. Use `agent-toolkit issue ensure` or `agent-toolkit issue link` when the workflow reports that issue association is required.
 5. Before editing, extract a conformance checklist from the reviewed artifact: required ports, adapters, dependency directions, composition points, transaction boundaries, module constraints, and slice completion signals. Reviewed architecture is mandatory, not advisory.
 
