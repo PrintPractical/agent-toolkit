@@ -73,17 +73,31 @@ function commandKey(item) {
   return JSON.stringify(item.command);
 }
 
-function currentSliceAcceptance(state, fingerprint) {
+function missingSliceAcceptance(state, fingerprint) {
   const available = state.evidence.filter(item => item.kind === "acceptance"
     && !item.expectFail && item.code === 0 && item.fingerprint === fingerprint);
   const used = new Set();
+  const missing = [];
   for (const slice of state.implementation?.slices || []) {
     const evidence = available.find(item => !used.has(item.id)
       && commandKey(item) === JSON.stringify(slice.acceptanceCommand));
-    if (!evidence) return false;
-    used.add(evidence.id);
+    if (!evidence) missing.push(slice);
+    else used.add(evidence.id);
   }
-  return true;
+  return missing;
+}
+
+function currentSliceAcceptance(state, fingerprint) {
+  return missingSliceAcceptance(state, fingerprint).length === 0;
+}
+
+function remediationEvidenceError(state, fingerprint) {
+  const missing = missingSliceAcceptance(state, fingerprint);
+  if (missing.length) {
+    const commands = missing.map(slice => `Slice ${slice.number}: agent-toolkit test --kind acceptance -- ${slice.acceptanceCommand.join(" ")}`);
+    return `Rerun each reviewed slice acceptance command against the remediated candidate:\n${commands.join("\n")}`;
+  }
+  return "Run relevant tests for the remediated candidate";
 }
 
 function hasPassingRegression(state, fingerprint) {
@@ -252,7 +266,7 @@ export async function advance(root, state, config) {
       if (!hasRequiredCurrentEvidence(state, codeHash)) {
         throw new Error(state.kind === "fix"
           ? "Run the recorded regression command successfully for the remediated fix"
-          : "Run relevant tests for the remediated candidate");
+          : remediationEvidenceError(state, codeHash));
       }
       state.phase = "quality-verifier";
       break;

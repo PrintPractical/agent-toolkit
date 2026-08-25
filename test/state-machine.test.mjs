@@ -360,7 +360,10 @@ test("new workflows require exact sequential slice acceptance before baseline", 
   state.phase = "quality-remediation";
   await writeFile(path.join(root, "remediated.js"), "export default true;\n");
   await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
-  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /relevant tests/);
+  await assert.rejects(
+    advance(root, state, DEFAULT_CONFIG),
+    new RegExp(`Slice 1: agent-toolkit test --kind acceptance -- ${process.execPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} -e process.exit\\(0\\)`)
+  );
   await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   await advance(root, state, DEFAULT_CONFIG);
