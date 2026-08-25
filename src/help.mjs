@@ -61,10 +61,10 @@ Runs the command and records its result against the unchanged project candidate.
 Records one reviewed slice as complete. Slices must be completed in order, their one-to-one Implementation Conformance record must be present, and the current candidate must have passing acceptance evidence from the exact command reviewed in the plan.`,
   review: `Usage:
   agent-toolkit review prepare --stage design|quality --role critic|verifier
-  agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]
+  agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <packet-findingsPath>
   agent-toolkit review restart --stage design|quality
 
-Critic and verifier must be fresh, distinct reviewers. The critic performs one comprehensive discovery pass. The verifier only checks supplied findings and high-severity regressions introduced by remediation; it is not a second critic. Save responses to the packet's runtime-only findingsPath. Changes-requested requires JSON matching outputSchema.`,
+Critic and verifier must be fresh, distinct reviewers. The critic performs one comprehensive discovery pass. The verifier only checks supplied findings and high-severity regressions introduced by remediation; it is not a second critic. Every response, including approval, must be JSON matching outputSchema saved to the packet's exact runtime-only findingsPath.`,
   findings: `Usage: agent-toolkit findings resolve <id>
 
 Marks one review finding resolved after its remediation is complete.`,

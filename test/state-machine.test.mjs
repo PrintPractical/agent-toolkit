@@ -50,11 +50,21 @@ async function writePacketFindings(root, packet, content) {
   return file;
 }
 
+async function approveReview(root, state, packet, reviewer) {
+  const findingsFile = await writePacketFindings(root, packet, JSON.stringify({ findings: [] }));
+  return recordReview(root, state, {
+    packetId: packet.id,
+    verdict: "approved",
+    reviewer,
+    findingsFile
+  });
+}
+
 test("design requires a fresh critic and distinct verifier", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
-  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
+  await approveReview(root, state, critic, "critic-session");
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
   await assert.rejects(recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "critic-session" }), /distinct/);
   const invented = await writePacketFindings(root, verifier, JSON.stringify({ findings: [{
@@ -69,7 +79,7 @@ test("design requires a fresh critic and distinct verifier", async () => {
     reviewer: "verifier-session",
     findingsFile: invented
   }), /critic approved without remediation/);
-  await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "verifier-session" });
+  await approveReview(root, state, verifier, "verifier-session");
   assert.equal(state.phase, "ready-to-build");
   assert.match(nextAction(state, DEFAULT_CONFIG), /Stop the design workflow and start the build skill/);
 });
@@ -104,6 +114,29 @@ test("new review packets require structured JSON findings", async () => {
     verdict: "approved",
     reviewer: "critic"
   }), /Unsupported review packet protocol/);
+});
+
+test("protocol 2 approvals require the packet's runtime response path", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const packet = await prepareReview(root, state, { stage: "design", role: "critic" });
+  await assert.rejects(recordReview(root, state, {
+    packetId: packet.id,
+    verdict: "approved",
+    reviewer: "critic"
+  }), /must be saved to .*\.agent\/\.state\/reviews/);
+
+  const scratch = path.join(root, "design-critic.json");
+  await writeFile(scratch, JSON.stringify({ findings: [] }));
+  await assert.rejects(recordReview(root, state, {
+    packetId: packet.id,
+    verdict: "approved",
+    reviewer: "critic",
+    findingsFile: scratch
+  }), /packet's findingsPath/);
+
+  await approveReview(root, state, packet, "critic");
+  assert.equal(state.phase, "design-verifier");
 });
 
 test("legacy packets without a protocol retain Markdown and JSON compatibility", async () => {
@@ -266,7 +299,7 @@ test("verifier cannot approve content changed after critic approval", async () =
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
-  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic-session" });
+  await approveReview(root, state, critic, "critic-session");
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "State the revised observable"));
   await assert.rejects(prepareReview(root, state, { stage: "design", role: "verifier" }), /changed after developer approval/);
@@ -299,10 +332,10 @@ test("design restart retires findings from abandoned review cycles", async () =>
 
   await recordDeveloperFeedback(root, state, { verdict: "approved" });
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
-  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "new-critic" });
+  await approveReview(root, state, critic, "new-critic");
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
   assert.deepEqual(verifier.findings, []);
-  await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "new-verifier" });
+  await approveReview(root, state, verifier, "new-verifier");
   assert.equal(state.phase, "ready-to-build");
 });
 
@@ -501,16 +534,16 @@ test("quality gates require current tests and reject post-verifier changes", asy
   const critic = await prepareReview(root, state, { stage: "quality", role: "critic" });
   assert.equal(critic.candidate.repository, "directory");
   assert(critic.candidate.files.some(item => item.path === "app.js" && item.content.includes("value = 1")));
-  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "quality-critic" });
+  await approveReview(root, state, critic, "quality-critic");
 
   await writeFile(path.join(root, "app.js"), "export const value = 2;\n");
   await assert.rejects(prepareReview(root, state, { stage: "quality", role: "verifier" }), /changed after critic approval/);
   await recordTest(root, state, pass);
   await restartQualityReview(root, state);
   const replacementCritic = await prepareReview(root, state, { stage: "quality", role: "critic" });
-  await recordReview(root, state, { packetId: replacementCritic.id, verdict: "approved", reviewer: "replacement-critic" });
+  await approveReview(root, state, replacementCritic, "replacement-critic");
   const verifier = await prepareReview(root, state, { stage: "quality", role: "verifier" });
-  await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "quality-verifier" });
+  await approveReview(root, state, verifier, "quality-verifier");
 
   await writeFile(path.join(root, "app.js"), "export const value = 3;\n");
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /approved quality-verifier candidate/);
@@ -531,9 +564,9 @@ test("material design drift requires a fresh design review", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
-  await recordReview(root, state, { packetId: critic.id, verdict: "approved", reviewer: "critic" });
+  await approveReview(root, state, critic, "critic");
   const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
-  await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "verifier" });
+  await approveReview(root, state, verifier, "verifier");
   await advance(root, state, DEFAULT_CONFIG);
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8")).replace("State the observable", "Define the revised observable"));

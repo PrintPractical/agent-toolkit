@@ -237,7 +237,7 @@ async function review() {
     const verifierFinding = verifierFindingForms.length ? { oneOf: verifierFindingForms } : false;
     console.log(JSON.stringify({
       ...packet,
-      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings in a fresh context. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Return JSON only using the supplied schema.`,
+      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings in a fresh context. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Write JSON matching the supplied schema directly to findingsPath, including {"findings":[]} for approval. Do not create review output anywhere else in the project.`,
       outputSchema: {
         type: "object",
         additionalProperties: false,

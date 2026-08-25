@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { artifactFingerprint, artifactSnapshot, designContractFingerprint, projectFingerprint, projectSnapshot, snapshotFingerprint } from "./fingerprints.mjs";
@@ -102,7 +102,9 @@ async function parseFindings(file, packet, state) {
     return parseLegacyFindings(await readFile(file, "utf8"));
   }
   if (packet.protocol !== 2) throw new Error(`Unsupported review packet protocol: ${packet.protocol}`);
-  if (!file) return [];
+  if (!file) {
+    throw new Error(`Protocol 2 review responses must be saved to ${packet.findingsPath} and recorded with --findings ${packet.findingsPath}`);
+  }
   const content = await readFile(file, "utf8");
   let parsed;
   try {
@@ -190,12 +192,13 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
   if (packet.recordedAt) throw new Error("Review packet has already been recorded");
   if (state.phase !== expectedPhase(packet.stage, packet.role)) throw new Error("Review packet is no longer current");
   if (findingsFile && packet.protocol === 2) {
-    const relative = path.relative(root, path.resolve(root, findingsFile));
-    const insideProject = relative !== "" && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
-    const stateDirectory = path.join(".agent", ".state");
-    const inRuntimeState = relative === stateDirectory || relative.startsWith(`${stateDirectory}${path.sep}`);
-    if (insideProject && !inRuntimeState) {
-      throw new Error(`Findings are runtime data; save them to ${packet.findingsPath || ".agent/.state/reviews/<packet>.json"} or outside the project`);
+    const [canonicalRoot, provided] = await Promise.all([
+      realpath(root),
+      realpath(path.resolve(root, findingsFile))
+    ]);
+    const expected = path.resolve(canonicalRoot, packet.findingsPath);
+    if (provided !== expected) {
+      throw new Error(`Review responses must use this packet's findingsPath: ${packet.findingsPath}`);
     }
   }
   const current = snapshotFingerprint(await reviewSnapshot(root, state, packet.stage));

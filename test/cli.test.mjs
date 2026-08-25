@@ -99,7 +99,10 @@ test("review packets distinguish critic discovery from verifier closure", async 
   assert.equal(critic.outputSchema.type, "object");
   assert.deepEqual(critic.outputSchema.properties.findings.items.required, ["severity", "description"]);
   assert.deepEqual(critic.outputSchema.properties.findings.items.properties.severity.enum, ["high", "medium"]);
-  await runCli(root, ["review", "record", "--packet", critic.id, "--verdict", "approved", "--reviewer", "critic-session"]);
+  const criticFindings = path.join(root, critic.findingsPath);
+  await writeFile(criticFindings, JSON.stringify({ findings: [] }));
+  const recorded = await runCli(root, ["review", "record", "--packet", critic.id, "--verdict", "approved", "--reviewer", "critic-session", "--findings", criticFindings]);
+  assert.equal(recorded.code, 0, recorded.stderr);
 
   const verifierResult = await runCli(root, ["review", "prepare", "--stage", "design", "--role", "verifier"]);
   assert.equal(verifierResult.code, 0, verifierResult.stderr);
