@@ -286,7 +286,7 @@ export function nextAction(state, config) {
     "design-critic": "agent-toolkit review prepare --stage design --role critic",
     "design-remediation": "Resolve design findings, then run: agent-toolkit advance",
     "design-verifier": "agent-toolkit review prepare --stage design --role verifier",
-    "ready-to-build": config.github.issues.policy === "create" && !state.issue ? "agent-toolkit issue ensure" : config.github.issues.policy === "existing" && !state.issue ? "agent-toolkit issue link <number>" : "agent-toolkit advance",
+    "ready-to-build": config.github.issues.policy === "create" && !state.issue ? "agent-toolkit issue ensure" : config.github.issues.policy === "existing" && !state.issue ? "agent-toolkit issue link <number>" : state.kind === "fix" ? "agent-toolkit advance" : "Stop the design workflow and start the build skill; it will verify this handoff before running: agent-toolkit advance",
     implementing: pendingSlice
       ? `Implement only Slice ${pendingSlice.number}, run its reviewed acceptance command, then run: agent-toolkit slice complete --number ${pendingSlice.number}`
       : "All slices are complete; run: agent-toolkit advance",

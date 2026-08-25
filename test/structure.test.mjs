@@ -19,6 +19,11 @@ test("repository exposes exactly the three public skills within budgets", async 
   }
 });
 
+test("design stops at the reviewed build handoff", async () => {
+  const content = await readFile(path.join(repositoryRoot, "skills", "design", "SKILL.md"), "utf8");
+  assert.match(content, /Do not run `agent-toolkit advance` from `ready-to-build`; the build skill owns the transition to `implementing`\./);
+});
+
 test("templates stay compact and skills metadata names only public skills", async () => {
   for (const file of await readdir(path.join(repositoryRoot, "templates"))) {
     const content = await readFile(path.join(repositoryRoot, "templates", file), "utf8");

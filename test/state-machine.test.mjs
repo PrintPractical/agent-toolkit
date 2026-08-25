@@ -8,7 +8,7 @@ import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
-import { advance, completeSlice, createState } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState, nextAction } from "../src/state-machine.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
 
 async function project(kind = "feature") {
@@ -69,6 +69,7 @@ test("design requires a fresh critic and distinct verifier", async () => {
   }), /critic approved without remediation/);
   await recordReview(root, state, { packetId: verifier.id, verdict: "approved", reviewer: "verifier-session" });
   assert.equal(state.phase, "ready-to-build");
+  assert.match(nextAction(state, DEFAULT_CONFIG), /Stop the design workflow and start the build skill/);
 });
 
 test("new review packets require structured JSON findings", async () => {

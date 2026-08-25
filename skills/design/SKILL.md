@@ -64,10 +64,10 @@ Own local, reversible implementation choices. Ask at most five questions total, 
 6. Save requested findings to the packet's `findingsPath` using its exact JSON schema, then record them with `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`. Markdown findings are invalid.
 7. If changes are requested, remediate each finding, run `agent-toolkit findings resolve <id>`, reconcile the artifacts, and follow `status`/`advance`.
 8. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage design --role verifier`. This is a closure check, not another critic: it may only reopen a supplied finding or identify a high-severity regression introduced by remediation, using the packet's JSON schema.
-9. Record the verifier verdict and advance only when the CLI permits `ready-to-build`.
+9. Record the verifier verdict. Its approval moves the change to `ready-to-build`. Run `agent-toolkit status` to confirm it, then end the design workflow. Do not run `agent-toolkit advance` from `ready-to-build`; the build skill owns the transition to `implementing`.
 
 When subagents are unavailable, use the prepared review packet as the complete compact prompt for a separate session. The author must not impersonate either fresh reviewer.
 
 ## Exit
 
-Before handoff, run `agent-toolkit check` and `agent-toolkit status`. The artifact must be reviewed, questions that block implementation must be closed, and state must be `ready-to-build`.
+Before handoff, run `agent-toolkit check` and `agent-toolkit status`. The artifact must be reviewed, questions that block implementation must be closed, and state must be `ready-to-build`. Stop there and hand off to the build skill.
