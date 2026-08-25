@@ -125,6 +125,12 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
       "Describe the correction at the rule-owning level. List affected abstractions and contracts; prefer a narrow inward-owned port where the defect exposes an infrastructure or domain boundary. Record related extension pressure without generic layering."
     ]]
   ];
+  if (state.artifactFormat >= 3) {
+    requiredSections.push(["File and Module Placement Plan", [
+      "List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: build may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.",
+      "List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: correction may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature."
+    ]]);
+  }
   for (const [names, untouched] of requiredSections) {
     const body = section(...names.split("|"));
     if (!body || untouched.includes(body)) problems.push(`Complete the ${names.split("|")[0]} section before developer review`);
@@ -136,7 +142,7 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     const sliceEvidence = part("Slice Completion");
     const completeFields = (body, fields) => fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
     if (!completeFields(architecture, ["Decision", "Implementation", "Verification"])
-      || (state.artifactFormat !== 2 && !completeFields(sliceEvidence, ["Slice", "Implementation", "Verification"]))) {
+      || (!(state.artifactFormat >= 2) && !completeFields(sliceEvidence, ["Slice", "Implementation", "Verification"]))) {
       problems.push("Complete Implementation Conformance with architecture-decision and slice-completion evidence before quality review");
     }
     if (state.artifactFormat >= 2) {

@@ -10,6 +10,7 @@ function completeArtifact(content) {
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Payment requirement -> reproduction, rule, and tests.\n")
     .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns PaymentStore; the database adapter is composed at startup.\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. PaymentStore owns the persistence contract and transaction behavior.\n")
+    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/payment.js | Modify | Apply payment rules | Keep policy separate from storage | 1 |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Payment behavior is restored\n- Outcome: A payment succeeds.\n- Entry point: Payment command.\n- Core behavior: Enforce payment rules.\n- Boundary integration: Persist atomically through PaymentStore.\n- Tests: Regression and database integration tests.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: The command builds and tests pass.\n")
     .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: PaymentStore is application-owned.\n- Implementation: The database adapter implements PaymentStore outward.\n- Verification: Unit dependency test and database integration test.\n\n### Slice Completion\n#### Slice 1: Payment behavior is restored\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and regression tests pass.\n");
 }
@@ -26,6 +27,20 @@ test("brownfield start can bootstrap compact change and system artifacts", async
   const content = await readFile(design, "utf8");
   await writeFile(design, completeArtifact(content));
   assert.deepEqual(await validateArtifacts(root, state, { requireSystem: true }), []);
+});
+
+test("format 3 artifacts require a completed file and module placement plan", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
+  await renderSystem(root);
+  const state = { designPath: ".agent/changes/export-data.md", artifactFormat: 3 };
+  const initialProblems = await validateArtifacts(root, state, { requireSystem: true });
+  assert.match(initialProblems.join("\n"), /File and Module Placement Plan/);
+  const completed = completeArtifact(await readFile(design, "utf8"));
+  await writeFile(design, completed);
+  assert.deepEqual(await validateArtifacts(root, state, { requireSystem: true }), []);
+  await writeFile(design, completed.replace(/## File and Module Placement Plan\n[\s\S]*?(?=\n## )/, ""));
+  assert.deepEqual(await validateArtifacts(root, { ...state, artifactFormat: 2 }, { requireSystem: true }), []);
 });
 
 test("material open questions block artifact validation", async () => {

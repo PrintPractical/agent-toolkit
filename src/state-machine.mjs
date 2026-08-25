@@ -17,7 +17,7 @@ export async function createState(root, data) {
   await mkdir(stateDirectory(root), { recursive: true });
   const state = {
     version: 1,
-    artifactFormat: 2,
+    artifactFormat: 3,
     id: randomUUID(),
     phase: "shaping",
     createdAt: new Date().toISOString(),
@@ -97,7 +97,7 @@ function hasPassingRegression(state, fingerprint) {
 export function hasRequiredCurrentEvidence(state, fingerprint) {
   return hasCurrentPassingEvidence(state, fingerprint)
     && (state.kind !== "fix" || hasPassingRegression(state, fingerprint))
-    && (state.artifactFormat !== 2 || !state.implementation || currentSliceAcceptance(state, fingerprint));
+    && (!(state.artifactFormat >= 2) || !state.implementation || currentSliceAcceptance(state, fingerprint));
 }
 
 function requireVerifiedCandidate(state, fingerprint) {
@@ -281,8 +281,8 @@ export async function advance(root, state, config) {
 export function nextAction(state, config) {
   const pendingSlice = state.implementation?.slices?.find(slice => !slice.completedAt);
   const map = {
-    shaping: "Complete the design, implementation plan, and system map, then run: agent-toolkit advance",
-    "developer-review": "Review the design and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
+    shaping: "Complete the design, file/module placement plan, implementation plan, and system map, then run: agent-toolkit advance",
+    "developer-review": "Review the design, expected file/module placement, and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
     "design-critic": "agent-toolkit review prepare --stage design --role critic",
     "design-remediation": "Resolve design findings, then run: agent-toolkit advance",
     "design-verifier": "agent-toolkit review prepare --stage design --role verifier",

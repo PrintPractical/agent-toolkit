@@ -42,11 +42,14 @@ Describe the correction at the rule-owning level. List affected abstractions and
 ## Test Traceability
 Map root cause, neighboring risks, rules, and boundaries to regression, unit, and integration tests. Explain any gap.
 
+## File and Module Placement Plan
+List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: correction may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.
+
 ## Implementation Plan
 Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the corrected observable path. Keep the regression lock-in observable and make correction slices runnable across every affected layer.
 
 ## Implementation Conformance
-Complete during build; record deviations only after design review restart.
+Complete during build. Record non-material placement deviations with rationale; restart design review for material architecture or plan deviations.
 
 ### Architecture Decisions
 - Decision:

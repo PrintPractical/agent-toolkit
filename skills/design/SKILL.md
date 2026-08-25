@@ -27,14 +27,15 @@ If `.agent/SYSTEM.md` is absent or empty, bootstrap only the minimum relevant ma
 Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
 
 1. State the observable outcome and explicit non-goals.
-2. Enumerate every explicit source requirement and trace it to a use case, rule, interface, test, or non-goal. Then identify actors and desired outcomes across now, next, and later horizons without designing speculative features.
+2. Enumerate every explicit source requirement, including applicable project instructions, and trace it to a use case, rule, interface, test, placement constraint, or non-goal. Then identify actors and desired outcomes across now, next, and later horizons without designing speculative features.
 3. Establish ubiquitous language and use it consistently in prose, interfaces, and tests.
 4. Write concrete happy, edge, and failure examples with inputs, context, and observable results.
 5. Extract rules and invariants from examples. Resolve contradictions explicitly.
 6. Locate domain, application, infrastructure, and external responsibilities. Name dependency direction, ownership, composition, and transaction boundaries wherever behavior crosses them.
-7. Specify public interfaces and inward-owned boundary contracts, including errors, idempotency, consistency, and outward adapters.
-8. Trace risk-based tests to rules, contracts, and failure modes.
-9. Write the implementation plan as ordered thin vertical slices using the template fields. Every slice must produce runnable behavior from an entry point through core policy to a real boundary where applicable; layer-only phases are not slices. Give each slice one JSON-array acceptance command that executes its observable path, not merely compilation or isolated unit tests.
+7. Translate those responsibilities and every applicable `AGENTS.md` organization rule into a compact file and module placement plan. Name expected additions, modifications, moves, or deletions, their responsibilities and slices; use directories or globs when exact paths are premature. Treat paths as a reviewed forecast rather than an exhaustive manifest, while module constraints, ownership, and dependency direction remain binding.
+8. Specify public interfaces and inward-owned boundary contracts, including errors, idempotency, consistency, and outward adapters.
+9. Trace risk-based tests to rules, contracts, and failure modes.
+10. Write the implementation plan as ordered thin vertical slices using the template fields. Every slice must produce runnable behavior from an entry point through core policy to a real boundary where applicable; layer-only phases are not slices. Give each slice one JSON-array acceptance command that executes its observable path, not merely compilation or isolated unit tests.
 
 Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
 
@@ -60,7 +61,7 @@ Own local, reversible implementation choices. Ask at most five questions total, 
 2. Run `agent-toolkit advance` to enter `developer-review`. Present the completed design and implementation plan to the developer and explicitly invite corrections, omissions, and alternative decisions. Stop for their response; never infer approval.
 3. For requested changes, record their comments with repeatable `--note "..."` flags or `--notes <file>` using `agent-toolkit feedback record --verdict changes-requested`, revise the artifact, and repeat the developer review. When the developer explicitly accepts it, run `agent-toolkit feedback record --verdict approved`.
 4. Prepare a fresh critic with `agent-toolkit review prepare --stage design --role critic`.
-5. Have a separate context make one comprehensive pass over requirements traceability, examples, domain rules, dependency direction, boundary contracts, abstraction decisions, risks, and whether every plan slice is truly vertical. It must report every material finding now, without demanding exhaustive detail for agent-owned reversible implementation choices.
+5. Have a separate context make one comprehensive pass over requirements traceability, applicable project instructions, examples, domain rules, dependency direction, boundary contracts, abstraction decisions, the file/module placement plan, risks, and whether every plan slice is truly vertical. It must report every material finding now, without treating forecast paths as an exhaustive manifest or demanding detail for agent-owned reversible implementation choices.
 6. Save requested findings to the packet's `findingsPath` using its exact JSON schema, then record them with `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> [--findings <file>]`. Markdown findings are invalid.
 7. If changes are requested, remediate each finding, run `agent-toolkit findings resolve <id>`, reconcile the artifacts, and follow `status`/`advance`.
 8. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage design --role verifier`. This is a closure check, not another critic: it may only reopen a supplied finding or identify a high-severity regression introduced by remediation, using the packet's JSON schema.

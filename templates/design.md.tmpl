@@ -45,11 +45,14 @@ List each abstraction, its owner, behavioral contract, consumers, implementation
 ## Test Traceability
 Map each important rule, contract, edge, and failure risk to a unit, integration, or regression test. Explain any gap.
 
+## File and Module Placement Plan
+List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: build may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.
+
 ## Implementation Plan
 Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the slice's observable path, for example `["npm", "test", "--", "checkout"]`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.
 
 ## Implementation Conformance
-Complete during build; record deviations only after design review restart.
+Complete during build. Record non-material placement deviations with rationale; restart design review for material architecture or plan deviations.
 
 ### Architecture Decisions
 - Decision:

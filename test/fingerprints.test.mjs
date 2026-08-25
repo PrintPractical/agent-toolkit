@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { renderChange, renderSystem } from "../src/artifacts.mjs";
@@ -8,6 +8,26 @@ import { DEFAULT_CONFIG } from "../src/config.mjs";
 import { designContractFingerprint, projectFingerprint, projectSnapshot } from "../src/fingerprints.mjs";
 import { statusPaths } from "../src/git.mjs";
 import { execute, initializeGit, temporaryDirectory } from "./helpers.mjs";
+
+test("file and module placement remains part of the reviewed design contract", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Place Modules", slug: "place-modules" });
+  await renderSystem(root);
+  const state = { designPath: ".agent/changes/place-modules.md" };
+  const initial = await designContractFingerprint(root, state);
+  const content = await readFile(design, "utf8");
+  await writeFile(design, content.replace(
+    /(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/,
+    "$1- `src/domain/result.js`: own result rules.\n"
+  ));
+  const placementChanged = await designContractFingerprint(root, state);
+  assert.notEqual(placementChanged, initial);
+  await writeFile(design, (await readFile(design, "utf8")).replace(
+    /(## Implementation Conformance\n)[\s\S]*?(?=\n## )/,
+    "$1Placement differed only by filename.\n"
+  ));
+  assert.equal(await designContractFingerprint(root, state), placementChanged);
+});
 
 test("Git candidates include their base commit and untracked content", async () => {
   const root = await temporaryDirectory();
