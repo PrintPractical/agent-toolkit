@@ -84,6 +84,21 @@ test("design requires a fresh critic and distinct verifier", async () => {
   assert.match(nextAction(state, DEFAULT_CONFIG), /Stop the design workflow and start the build skill/);
 });
 
+test("critic packets require a complete risk sweep before findings", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const design = await prepareReview(root, state, { stage: "design", role: "critic" });
+  assert(design.checklist.some(item => item.includes("state freshness")));
+  assert.match(design.checklist.at(-1), /do not stop after the first defect/);
+
+  state.phase = "quality-critic";
+  await markDesignApproved(root, state);
+  state.baseline = { fingerprint: await projectFingerprint(root) };
+  await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  const quality = await prepareReview(root, state, { stage: "quality", role: "critic" });
+  assert(quality.checklist.some(item => item.includes("concurrency and locking")));
+});
+
 test("new review packets require structured JSON findings", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);

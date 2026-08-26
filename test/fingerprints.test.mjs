@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { renderChange, renderSystem } from "../src/artifacts.mjs";
@@ -128,4 +128,36 @@ test("commit preparation rejects dirty submodule contents", async () => {
   state.evidence.push({ expectFail: false, code: 0, fingerprint });
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   await assert.rejects(prepareCommit(root, state, DEFAULT_CONFIG), /Dirty submodule contents/);
+});
+
+test("commit preparation clears a deleted embedded repository from the index", async () => {
+  const root = await temporaryDirectory();
+  await initializeGit(root);
+  await renderChange(root, { kind: "feature", title: "Prepare Candidate", slug: "prepare-candidate" });
+  await renderSystem(root);
+  await writeFile(path.join(root, "app.js"), "export const value = 1;\n");
+  const state = {
+    phase: "ready-to-commit",
+    git: true,
+    kind: "feature",
+    title: "Prepare candidate",
+    designPath: ".agent/changes/prepare-candidate.md",
+    findings: [],
+    evidence: [],
+    reviews: {}
+  };
+  state.developerApproval = {};
+  state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
+  const fingerprint = await projectFingerprint(root);
+  state.evidence.push({ expectFail: false, code: 0, fingerprint });
+  state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
+
+  const embedded = path.join(root, "generated");
+  await mkdir(embedded);
+  await initializeGit(embedded);
+  await assert.rejects(prepareCommit(root, state, DEFAULT_CONFIG), /approved quality-verifier fingerprint/);
+
+  await rm(embedded, { recursive: true, force: true });
+  const plan = await prepareCommit(root, state, DEFAULT_CONFIG);
+  assert.equal(plan.fingerprint, fingerprint);
 });

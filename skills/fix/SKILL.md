@@ -44,7 +44,7 @@ Document source-requirement traceability including applicable project instructio
 - `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <findingsPath>`
 - `agent-toolkit findings resolve <id>` after each finding is actually remediated
 
-The critic makes one comprehensive discovery pass. Every reviewer writes its response directly to the packet's `findingsPath` using its JSON schema, including `{"findings":[]}` for approval, and creates no review scratch files elsewhere in the project; Markdown findings are invalid. The verifier is a closure check, not another critic: it may only reopen a supplied finding or identify a high-severity regression introduced by remediation. Critic and verifier must use fresh, separate contexts. If subagents are unavailable, send each prepared compact packet to a separate session. Do not self-approve.
+The critic completes every item in the prepared packet's checklist before writing findings, making one comprehensive discovery pass rather than stopping at the first defect. Every reviewer writes its response directly to the packet's `findingsPath` using its JSON schema, including `{"findings":[]}` for approval, and creates no review scratch files elsewhere in the project; Markdown findings are invalid. The verifier is a closure check, not another critic: it may only reopen a supplied finding or identify a high-severity regression introduced by remediation. Critic and verifier must use fresh, separate contexts. If subagents are unavailable, send each prepared compact packet to a separate session. Do not self-approve.
 
 ## Correct and Test
 
@@ -58,7 +58,7 @@ The critic makes one comprehensive discovery pass. Every reviewer writes its res
 ## Quality and Commit
 
 1. Implement only the next reported slice. Add its exact individual conformance record, run its acceptance command against that candidate through the CLI, and run `agent-toolkit slice complete --number N`; never combine slice numbers. After all slices, rerun every slice acceptance command against the final candidate, run `agent-toolkit check`, and follow `status`/`advance` to seal the baseline before review edits.
-2. Prepare a fresh quality critic with `agent-toolkit review prepare --stage quality --role critic`; require one comprehensive pass over behavior, reviewed architecture, project module constraints, and expected placement, distinguishing harmless forecast-path changes from organization violations, then record its JSON verdict.
+2. Prepare a fresh quality critic with `agent-toolkit review prepare --stage quality --role critic`; require it to complete the packet checklist and make one comprehensive pass over behavior, reviewed architecture, project module constraints, and expected placement, distinguishing harmless forecast-path changes from organization violations, then record its JSON verdict.
 3. Remediate warranted correctness or refactoring findings, reconcile artifacts, rerun relevant tests against that exact candidate, and resolve findings through the CLI.
 4. Prepare a distinct fresh verifier with `agent-toolkit review prepare --stage quality --role verifier`; require a closure review limited to supplied findings and remediation-introduced high-severity regressions, then record its verdict.
 5. Follow the CLI to `ready-to-commit`, run final relevant tests and `agent-toolkit check`.

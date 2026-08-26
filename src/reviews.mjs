@@ -9,6 +9,25 @@ function expectedPhase(stage, role) {
   return `${stage}-${role}`;
 }
 
+function criticChecklist(stage) {
+  if (stage === "design") {
+    return [
+      "Trace every requirement and example to an observable outcome, contract, and test.",
+      "Inspect domain rules, boundary ownership, dependency direction, and applicable project instructions.",
+      "Check placement responsibilities, risks, and that each planned slice is independently vertical.",
+      "Identify applicable edge cases, invalid inputs, state freshness, concurrency, and failure handling before reporting findings.",
+      "Finish this complete sweep before writing findings; do not stop after the first defect."
+    ];
+  }
+  return [
+    "Trace every requirement and reviewed architecture decision to the candidate and its tests.",
+    "Inspect all changed paths and relevant callers for observable behavior, errors, invalid inputs, and regressions.",
+    "Assess applicable state freshness, concurrency and locking, persistence consistency, resource lifecycle, and failure handling.",
+    "Check conformance with reviewed boundaries, dependency direction, placement responsibilities, and project instructions.",
+    "Finish this complete sweep before writing findings; do not stop after the first defect."
+  ];
+}
+
 async function reviewSnapshot(root, state, stage) {
   return stage === "design" ? artifactSnapshot(root, state) : projectSnapshot(root);
 }
@@ -62,6 +81,7 @@ export async function prepareReview(root, state, { stage, role }) {
     fingerprint,
     designPath: state.designPath,
     findingsPath,
+    ...(role === "critic" ? { checklist: criticChecklist(stage) } : {}),
     preparedAt: new Date().toISOString()
   };
   state.packets.push(packet);

@@ -10,6 +10,8 @@ export async function prepareCommit(root, state, config) {
   if (state.phase !== "ready-to-commit") throw new Error("Commit can only be prepared after quality verification");
   await requireCurrentDesign(root, state);
   if (!state.git || config.completion.commit.policy === "off") throw new Error("Commit integration is not active");
+  // Normalize stale index entries before comparing the reviewed working-tree candidate.
+  await runGit(root, ["add", "-A"]);
   const fingerprint = await projectFingerprint(root);
   const verified = state.reviews["quality-verifier"];
   if (!verified || verified.verdict !== "approved" || verified.fingerprint !== fingerprint) {
@@ -26,7 +28,6 @@ export async function prepareCommit(root, state, config) {
   if (dirtySubmodules.length) {
     throw new Error("Dirty submodule contents cannot be represented by the parent commit; commit them in the submodule, then rerun tests and quality review");
   }
-  await runGit(root, ["add", "-A"]);
   if (await projectFingerprint(root) !== fingerprint) {
     throw new Error("Commit candidate changed while staging; prepare it again");
   }
