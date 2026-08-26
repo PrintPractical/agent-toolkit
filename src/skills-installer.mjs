@@ -50,7 +50,7 @@ export async function installSkills(options = {}, {
   stdout = process.stdout,
   stderr = process.stderr
 } = {}) {
-  for (const name of ["design", "build", "fix"]) {
+  for (const name of ["ideate", "design", "build", "fix"]) {
     await access(path.join(bundledSkillsRoot, "skills", name, "SKILL.md"));
   }
   const args = skillsInstallArguments(options);

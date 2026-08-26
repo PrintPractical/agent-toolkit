@@ -13,6 +13,8 @@ Before planning or editing, read every applicable `AGENTS.md` in the project. Tr
 
 ## Start
 
+When the engineer arrives from ideation in the same conversation, treat its established goal, use cases, decisions, rejected alternatives, constraints, and unresolved questions as source context. Do not ask them to repeat resolved information; verify it against repository evidence while shaping the managed artifact.
+
 1. Run `agent-toolkit init` if `.agent/` is absent.
 2. Run `agent-toolkit start --kind feature --title "<title>"` for a feature or change. For a defect, hand off to the fix skill.
 3. Run `agent-toolkit status`; follow the CLI's required next action.

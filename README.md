@@ -4,7 +4,7 @@
   <img src="image.png" width="350" />
 </p>
 
-Adaptive domain-to-delivery skills for greenfield and brownfield software work. The toolkit keeps the agent focused on the domain evidence relevant to the change, then carries that evidence through design, implementation, testing, independent review, and completion. It provides only three skills: `design`, `build`, and `fix`.
+Adaptive idea-to-delivery skills for greenfield and brownfield software work. The toolkit helps the agent challenge and develop an idea, then carries relevant domain evidence through design, implementation, testing, independent review, and completion. It provides four skills: `ideate`, `design`, `build`, and `fix`.
 
 ## Requirements
 
@@ -32,7 +32,9 @@ The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPract
 
 ## Workflow
 
-Use `design` for features and substantial changes, `fix` for defects that can be reproduced, and `build` after a reviewed design is ready. Each skill adapts its domain modeling and test depth to repository evidence while deliberately protecting meaningful boundaries. Storage, transport, time, identity, messaging, and external-system capabilities normally receive narrow contracts owned inward and concrete adapters outward, even with one implementation; contract-free wrappers and generic layering remain discouraged.
+Use `ideate` to collaboratively explore a goal and its use cases before choosing a direction, `design` for features and substantial changes, `fix` for defects that can be reproduced, and `build` after a reviewed design is ready. The managed workflow skills adapt their domain modeling and test depth to repository evidence while deliberately protecting meaningful boundaries. Storage, transport, time, identity, messaging, and external-system capabilities normally receive narrow contracts owned inward and concrete adapters outward, even with one implementation; contract-free wrappers and generic layering remain discouraged.
+
+`ideate` is deliberately outside the managed workflow. It does not invoke the CLI or use `.agent/` assets. It brainstorms with the engineer, develops goals and concrete use cases, inspects repository evidence when useful, and constructively challenges anti-patterns, unnecessary complexity, unsafe behavior, and conflicts with the existing system. Pushback explains the consequence and offers alternatives with tradeoffs rather than rejecting unconventional ideas by default. When the engineer explicitly asks to formalize a direction in the same conversation, `design` carries the established context into its normal artifacts and lifecycle without repeating resolved questions.
 
 `agent-toolkit init` creates the local configuration. Starting a change creates the smallest useful artifacts for either a new or existing system:
 

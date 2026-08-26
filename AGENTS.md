@@ -2,7 +2,8 @@
 
 ## Scope
 
-- Keep the package focused on the three public skills: `design`, `build`, and `fix`.
+- Keep the package focused on the four public skills: `ideate`, `design`, `build`, and `fix`.
+- Keep `ideate` independent of the CLI and `.agent/` assets; it may hand conversational context to `design` only when the engineer explicitly requests the managed workflow.
 - Treat the CLI state machine as the source of truth. Skills and documentation must match behavior in `bin/` and `src/`.
 - Keep workflow artifacts compact, evidence-based, and useful for both greenfield and brownfield repositories.
 - Preserve mandatory fresh critic and distinct verifier gates; do not add self-approval or gate-bypass paths.

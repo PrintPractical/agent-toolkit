@@ -3,6 +3,11 @@
   "notGrouped": "bottom",
   "groupings": [
     {
+      "title": "Explore",
+      "description": "Develop goals, use cases, alternatives, and tradeoffs before starting a managed workflow.",
+      "skills": ["ideate"]
+    },
+    {
       "title": "Shape",
       "description": "Turn feature intent or a diagnosed defect into reviewed, buildable evidence.",
       "skills": ["design", "fix"]

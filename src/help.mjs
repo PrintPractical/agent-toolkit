@@ -4,7 +4,7 @@ const help = {
 Usage: agent-toolkit <command> [options]
 
 Commands:
-  install    Install the bundled design, build, and fix skills
+  install    Install the bundled ideate, design, build, and fix skills
   init       Initialize .agent configuration in the current project
   start      Start a feature or fix workflow
   status     Show the active phase and exact next action
