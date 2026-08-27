@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
+import { artifactFingerprint, designContractFingerprint, executableFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
 import { execute, initializeGit, runCli, temporaryDirectory } from "./helpers.mjs";
 
 async function completePlan(root, slug) {
@@ -15,6 +15,22 @@ async function completePlan(root, slug) {
     .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/search.js | Modify | Search application behavior | Preserve the SearchIndex boundary | 1 |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the SearchIndex port through its storage adapter.\n- Tests: Ranking unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and both tests pass.\n`)
     .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: SearchIndex is application-owned.\n- Implementation: The storage adapter implements SearchIndex outward.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
+}
+
+async function completeProject(root, slug, { complete = false } = {}) {
+  const file = path.join(root, ".agent", "projects", `${slug}.md`);
+  const content = await readFile(file, "utf8");
+  await writeFile(file, content
+    .replace(/(## Outcome\n)[\s\S]*?(?=\n## )/, "$1Teams deliver reviewed milestones with visible project completion.\n")
+    .replace(/(## Non-goals\n)[\s\S]*?(?=\n## )/, "$1Automatic Git and worktree manipulation are excluded.\n")
+    .replace(/(## Required Outcomes\n)[\s\S]*?(?=\n## )/, "$1### Requirement REQ-1: Deliver search\n- Outcome: Search ships as an independently reviewed milestone.\n- Acceptance: The search workflow completes its lifecycle.\n")
+    .replace(/(## Known Constraints\n)[\s\S]*?(?=\n## )/, "$1Non-Git operation remains supported and no command pushes.\n")
+    .replace(/(## Quality Attributes\n)[\s\S]*?(?=\n## )/, "$1Review and evidence records are candidate-fingerprinted.\n")
+    .replace(/(## Decisions and Hypotheses\n)[\s\S]*?(?=\n## )/, "$1- [committed] Search is delivered through one normal feature milestone.\n")
+    .replace(/(## Roadmap\n)[\s\S]*?(?=\n## )/, `$1### Milestone 1: Deliver search\n- Kind: feature\n- Outcome: Users receive search results.\n- Requirements: ["REQ-1"]\n- Dependencies: []\n- Status: ${complete ? "complete" : "active"}\n`)
+    .replace(/(## Requirement Coverage\n)[\s\S]*?(?=\n## )/, `$1- REQ-1: Milestone 1 ${complete ? "complete" : "planned"}.\n`)
+    .replace(/(## Completion Criteria\n)[\s\S]*?(?=\n## )/, "$1Search is reconciled and final integration passes.\n")
+    .replace("- Assessment: Complete before final project review.", complete ? "- Assessment: Search and final integration satisfy completion criteria." : "- Assessment: Complete before final project review."));
 }
 
 async function markDesignApproved(root, state) {
@@ -31,6 +47,113 @@ test("CLI initializes and starts in a non-Git brownfield directory", async () =>
   assert.match(await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8"), /Use-Case Catalog/);
   const status = await runCli(root, ["status", "--json"]);
   assert.equal(JSON.parse(status.stdout).phase, "shaping");
+});
+
+test("CLI registers projects and linked milestones with project-aware review packets", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await writeFile(path.join(root, "requirements.md"), "Search must be independently deliverable.\n");
+  const started = await runCli(root, ["project", "start", "--title", "Search Platform", "--source", "requirements.md"]);
+  assert.equal(started.code, 0, started.stderr);
+  await completeProject(root, "search-platform");
+  const projectStateFile = path.join(root, ".agent", ".state", "search-platform.json");
+  const projectState = JSON.parse(await readFile(projectStateFile, "utf8"));
+  projectState.phase = "active";
+  await markDesignApproved(root, projectState);
+  await writeFile(projectStateFile, `${JSON.stringify(projectState, null, 2)}\n`);
+
+  const milestone = await runCli(root, ["start", "--kind", "feature", "--title", "Add Search", "--project", "search-platform", "--milestone", "1"]);
+  assert.equal(milestone.code, 0, milestone.stderr);
+  const status = JSON.parse((await runCli(root, ["status", "--json"])).stdout);
+  assert.equal(status.project, "search-platform");
+  assert.equal(status.milestone.number, 1);
+  const listed = JSON.parse((await runCli(root, ["workflow", "list", "--json"])).stdout);
+  assert.deepEqual(listed.workflows.map(item => item.slug), ["search-platform", "add-search"]);
+  assert.equal(listed.workflows.filter(item => item.current).length, 1);
+
+  await completePlan(root, "add-search");
+  await runCli(root, ["advance"]);
+  await runCli(root, ["feedback", "record", "--verdict", "approved"]);
+  const packet = JSON.parse((await runCli(root, ["review", "prepare", "--stage", "design", "--role", "critic"])).stdout);
+  assert.match(packet.project, /# Search Platform/);
+  assert.match(packet.design, /# Add Search/);
+  assert.match(packet.instructions, /project framing/i);
+});
+
+test("linked milestone startup rejects source drift", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  const source = path.join(root, "requirements.md");
+  await writeFile(source, "Search must be independently deliverable.\n");
+  await runCli(root, ["project", "start", "--title", "Search Platform", "--source", "requirements.md"]);
+  await completeProject(root, "search-platform");
+  const stateFile = path.join(root, ".agent", ".state", "search-platform.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.phase = "active";
+  await markDesignApproved(root, state);
+  await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  await writeFile(source, "Search requirements changed after review.\n");
+  const result = await runCli(root, ["start", "--kind", "feature", "--title", "Add Search", "--project", "search-platform", "--milestone", "1"]);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /source changed since ingestion/);
+  await assert.rejects(readFile(path.join(root, ".agent", "changes", "add-search.md")));
+});
+
+test("Git projects can start a milestone with their reviewed untracked source", async () => {
+  const root = await temporaryDirectory();
+  await initializeGit(root);
+  await runCli(root, ["init"]);
+  await writeFile(path.join(root, "requirements.md"), "Search must be independently deliverable.\n");
+  const project = await runCli(root, ["project", "start", "--title", "Search Platform", "--source", "requirements.md"]);
+  assert.equal(project.code, 0, project.stderr);
+  await completeProject(root, "search-platform");
+  const stateFile = path.join(root, ".agent", ".state", "search-platform.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.phase = "active";
+  await markDesignApproved(root, state);
+  await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  const milestone = await runCli(root, ["start", "--kind", "feature", "--title", "Add Search", "--project", "search-platform", "--milestone", "1"]);
+  assert.equal(milestone.code, 0, milestone.stderr);
+});
+
+test("project startup validates initialization before creating artifacts", async () => {
+  const root = await temporaryDirectory();
+  await initializeGit(root);
+  const result = await runCli(root, ["project", "start", "--title", "Uninitialized Project"]);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Toolkit is not initialized/);
+  await assert.rejects(readFile(path.join(root, ".agent", "projects", "uninitialized-project.md")));
+  await assert.rejects(readFile(path.join(root, ".agent", ".state", "registry.json")));
+});
+
+test("Git rolling projects reject disabled milestone commits", async () => {
+  const root = await temporaryDirectory();
+  await initializeGit(root);
+  await runCli(root, ["init"]);
+  const configFile = path.join(root, ".agent", "config.json");
+  const config = JSON.parse(await readFile(configFile, "utf8"));
+  config.completion.commit.policy = "off";
+  await writeFile(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = await runCli(root, ["project", "start", "--title", "Uncommitted Project"]);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /require completion\.commit\.policy to be if-git/);
+  await assert.rejects(readFile(path.join(root, ".agent", "projects", "uncommitted-project.md")));
+});
+
+test("non-Git workflow selection validates every target candidate and same-current selection is a no-op", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "First Change"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Second Change"]);
+  assert.equal((await runCli(root, ["workflow", "select", "first-change"])).code, 0);
+  await writeFile(path.join(root, "candidate.js"), "export const candidate = true;\n");
+  assert.equal((await runCli(root, ["workflow", "select", "first-change"])).code, 0);
+  const blocked = await runCli(root, ["workflow", "select", "second-change"]);
+  assert.equal(blocked.code, 1);
+  assert.match(blocked.stderr, /Restore the executable candidate for second-change/);
+  const startBlocked = await runCli(root, ["start", "--kind", "fix", "--title", "Third Change"]);
+  assert.equal(startBlocked.code, 1);
+  assert.match(startBlocked.stderr, /Finish or restore the executable candidate for first-change/);
 });
 
 test("CLI provides top-level and command-specific help without project state", async () => {
@@ -142,8 +265,8 @@ test("disabled start issue fails before creating change state", async () => {
   assert.equal(result.code, 1);
   assert.match(result.stderr, /requires github\.issues\.policy/);
   const status = await runCli(root, ["status"]);
-  assert.equal(status.code, 1);
-  assert.match(status.stderr, /No active change/);
+  assert.equal(status.code, 0);
+  assert.match(status.stdout, /No current workflow/);
 });
 
 test("review packets include bounded test output", async () => {
@@ -173,14 +296,15 @@ test("fix packets retain distinct evidence summaries and bound detailed output",
   const stateFile = path.join(root, ".agent", ".state", "repair-search.json");
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "quality-critic";
   await markDesignApproved(root, state);
   state.baseline = { fingerprint };
   state.evidence = [{ id: "failure", kind: "regression", expectFail: true, command: ["test", "regression"], code: 1, output: "observed failure", fingerprint: "before" }];
   state.regression = { evidenceId: "failure", command: ["test", "regression"] };
-  state.evidence.push({ kind: "regression", expectFail: false, command: ["test", "regression"], code: 0, output: "regression passed", fingerprint });
+  state.evidence.push({ kind: "regression", expectFail: false, command: ["test", "regression"], code: 0, output: "regression passed", fingerprint: evidenceFingerprint });
   for (let index = 0; index < 8; index += 1) {
-    state.evidence.push({ kind: "unit", expectFail: false, command: ["test", String(index)], code: 0, output: "passed", fingerprint });
+    state.evidence.push({ kind: "unit", expectFail: false, command: ["test", String(index)], code: 0, output: "passed", fingerprint: evidenceFingerprint });
   }
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   const prepared = await runCli(root, ["review", "prepare", "--stage", "quality", "--role", "critic"]);
@@ -214,10 +338,11 @@ test("sealed commit creation produces one conventional commit and never pushes",
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "ready-to-commit";
   await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
-  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint: evidenceFingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   const prepared = await runCli(root, ["commit", "prepare"]);
   assert.equal(prepared.code, 0, prepared.stderr);
@@ -241,10 +366,11 @@ test("commit hooks cannot alter the reviewed tree", async () => {
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "ready-to-commit";
   await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
-  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint: evidenceFingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   assert.equal((await runCli(root, ["commit", "prepare"])).code, 0);
   const hook = path.join(root, ".git", "hooks", "pre-commit");
@@ -266,10 +392,11 @@ test("commit hooks cannot alter unstaged candidate files", async () => {
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "ready-to-commit";
   await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
-  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint: evidenceFingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   assert.equal((await runCli(root, ["commit", "prepare"])).code, 0);
   const hook = path.join(root, ".git", "hooks", "pre-commit");
@@ -292,10 +419,11 @@ test("post-commit hook failures do not invalidate a reviewed commit", async () =
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "ready-to-commit";
   await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
-  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint: evidenceFingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   assert.equal((await runCli(root, ["commit", "prepare"])).code, 0);
   const hook = path.join(root, ".git", "hooks", "post-commit");
@@ -315,10 +443,11 @@ test("commit creation recovers when state was not persisted after HEAD advanced"
   const state = JSON.parse(await readFile(stateFile, "utf8"));
   await writeFile(path.join(root, "search.js"), "export const search = value => value;\n");
   const fingerprint = await projectFingerprint(root);
+  const evidenceFingerprint = await executableFingerprint(root);
   state.phase = "ready-to-commit";
   await markDesignApproved(root, state);
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
-  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ kind: "unit", expectFail: false, code: 0, fingerprint: evidenceFingerprint });
   await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
   assert.equal((await runCli(root, ["commit", "prepare"])).code, 0);
   const preparedState = await readFile(stateFile, "utf8");

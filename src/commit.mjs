@@ -2,22 +2,24 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { constants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { executableFingerprint, projectFingerprint, projectSnapshot } from "./fingerprints.mjs";
-import { conventionalMessage, run, runGit, statusPaths } from "./git.mjs";
-import { hasRequiredCurrentEvidence, requireCurrentDesign, saveState } from "./state-machine.mjs";
+import { candidateFingerprint, candidateSnapshot, executableFingerprint } from "./fingerprints.mjs";
+import { conventionalMessage, currentHead, run, runGit, statusPaths } from "./git.mjs";
+import { hasRequiredCurrentEvidence, recordMilestoneDelivery, requireCurrentDesign, saveState } from "./state-machine.mjs";
 
 export async function prepareCommit(root, state, config) {
   if (state.phase !== "ready-to-commit") throw new Error("Commit can only be prepared after quality verification");
+  if (state.type !== "change") throw new Error("Projects do not create a separate completion commit");
   await requireCurrentDesign(root, state);
   if (!state.git || config.completion.commit.policy === "off") throw new Error("Commit integration is not active");
+  if (await currentHead(root) !== state.baseHead) throw new Error(`Restore the workflow checkout at ${state.baseHead || "an unborn HEAD"} before preparing the commit`);
   // Normalize stale index entries before comparing the reviewed working-tree candidate.
   await runGit(root, ["add", "-A"]);
-  const fingerprint = await projectFingerprint(root);
+  const fingerprint = await candidateFingerprint(root, state);
   const verified = state.reviews["quality-verifier"];
   if (!verified || verified.verdict !== "approved" || verified.fingerprint !== fingerprint) {
     throw new Error("Current change does not match an approved quality-verifier fingerprint");
   }
-  if (!hasRequiredCurrentEvidence(state, await executableFingerprint(root), fingerprint)) {
+  if (!hasRequiredCurrentEvidence(state, await executableFingerprint(root))) {
     throw new Error(state.kind === "fix"
       ? "Current passing regression evidence is required before commit preparation"
       : "Current passing test evidence is required before commit preparation");
@@ -25,17 +27,17 @@ export async function prepareCommit(root, state, config) {
   if (state.findings.some(item => !["resolved", "disposition-verified", "retired"].includes(item.status || (item.retired ? "retired" : item.resolved ? "resolved" : "open")))) {
     throw new Error("Resolve or verify a disposition for all findings before commit preparation");
   }
-  const candidate = await projectSnapshot(root);
+  const candidate = await candidateSnapshot(root, state);
   const dirtySubmodules = candidate.changes.filter(item => item.mode === "160000" && item.worktree);
   if (dirtySubmodules.length) {
     throw new Error("Dirty submodule contents cannot be represented by the parent commit; commit them in the submodule, then rerun tests and quality review");
   }
-  if (await projectFingerprint(root) !== fingerprint) {
+  if (await candidateFingerprint(root, state) !== fingerprint) {
     throw new Error("Commit candidate changed while staging; prepare it again");
   }
   const tree = (await runGit(root, ["write-tree"])).stdout;
-  const currentHead = await runGit(root, ["rev-parse", "--verify", "HEAD"], { allowFailure: true });
-  const baseHead = currentHead.code === 0 ? currentHead.stdout : null;
+  const headResult = await runGit(root, ["rev-parse", "--verify", "HEAD"], { allowFailure: true });
+  const baseHead = headResult.code === 0 ? headResult.stdout : null;
   if (candidate.head !== baseHead) throw new Error("Git HEAD changed while preparing the commit");
   const files = await statusPaths(root);
   if (!files.length) throw new Error("No changes to commit");
@@ -94,9 +96,10 @@ export async function createCommit(root, state) {
     state.commitSha = existingHead.stdout;
     state.phase = "complete";
     await saveState(root, state);
+    await recordMilestoneDelivery(root, state, { commitSha: existingHead.stdout });
     return existingHead.stdout;
   }
-  const current = await projectFingerprint(root);
+  const current = await candidateFingerprint(root, state);
   if (current !== state.commitPlan.fingerprint) throw new Error("Commit candidate changed; prepare it again");
   const head = await runGit(root, ["rev-parse", "--verify", "HEAD"], { allowFailure: true });
   const baseHead = head.code === 0 ? head.stdout : null;
@@ -121,7 +124,7 @@ export async function createCommit(root, state) {
     const hookMessage = (await readFile(messageFile, "utf8")).trim();
     if (hookMessage !== expectedMessage) throw new Error("A commit hook changed the inspected message; prepare it again");
     await assertPreparedGitState(root, state.commitPlan, env);
-    if (await projectFingerprint(root) !== state.commitPlan.fingerprint) {
+    if (await candidateFingerprint(root, state) !== state.commitPlan.fingerprint) {
       throw new Error("A commit hook changed the reviewed candidate; prepare and review it again");
     }
     const arguments_ = ["commit-tree", state.commitPlan.tree];
@@ -139,5 +142,6 @@ export async function createCommit(root, state) {
   state.commitSha = sha;
   state.phase = "complete";
   await saveState(root, state);
+  await recordMilestoneDelivery(root, state, { commitSha: sha });
   return sha;
 }

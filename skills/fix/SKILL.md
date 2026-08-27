@@ -13,13 +13,13 @@ Before planning or editing, read every applicable `AGENTS.md` in the project. Tr
 
 ## Start and Diagnose
 
-1. Run `agent-toolkit init` if needed, then `agent-toolkit start --kind fix --title "<title>"`.
-2. Run `agent-toolkit status`; associate an issue with `agent-toolkit issue ensure` or `agent-toolkit issue link` when required.
-3. Read `.agent/SYSTEM.md`, the projects AGENTS.md file if exists, affected contracts, code history when useful, and nearby tests.
-4. Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
-5. Describe expected versus actual behavior, impact, environment, and the narrowest reliable reproduction.
-6. Trace the execution and data path. Distinguish the root cause from trigger, symptom, and contributing conditions.
-7. Check sibling paths that share the faulty rule or boundary.
+1. Run `agent-toolkit init` if needed, then inspect `agent-toolkit status --json` and `agent-toolkit workflow list --json`. Resume a matching fix or safely select one explicitly identified by the engineer; selection never restores or manipulates candidate files.
+2. Otherwise start a standalone fix with `agent-toolkit start --kind fix --title "<title>"`, or a roadmap fix with `--project <slug> --milestone <number>` when the active milestone calls for `fix`.
+3. Follow `status`; associate an issue with `agent-toolkit issue ensure` or `agent-toolkit issue link` when required.
+4. Read `.agent/SYSTEM.md`, applicable project instructions, affected contracts, code history when useful, and nearby tests. For a linked fix also read its project frame, sources, requirement coverage, discoveries, and milestone link.
+5. Shape the `.agent/changes/<slug>.md` artifact created by the CLI.
+6. Describe expected versus actual behavior, impact, environment, and the narrowest reliable reproduction.
+7. Trace the execution and data path. Distinguish the root cause from trigger, symptom, and contributing conditions; check sibling paths that share the faulty rule or boundary.
 
 Ask at most five questions, only about product behavior, domain meaning, boundaries, public interfaces, or consequential irreversible choices. Own reversible diagnostic and implementation choices.
 
@@ -57,7 +57,7 @@ The critic makes the cycle's one comprehensive discovery pass and must catch omi
 
 ## Quality and Commit
 
-1. Implement only the next reported slice. Add its exact individual conformance record, run its acceptance command against that candidate through the CLI, and run `agent-toolkit slice complete --number N`; never combine slice numbers. After all slices, run only distinct acceptance commands lacking current executable evidence, run `agent-toolkit check`, and follow `status`/`advance` to seal the baseline before review edits.
+1. Implement only the next reported slice. Add its exact individual conformance record, run its acceptance command against that candidate through the CLI, and run `agent-toolkit slice complete --number N`; never combine slice numbers. After linked work, update project coverage, discoveries, decisions, and roadmap, mark the milestone complete, and run `agent-toolkit project reconcile`. Then run only distinct acceptance commands lacking current executable evidence, `check`, and `advance` to seal the baseline before review edits.
 2. Prepare a fresh quality critic with `agent-toolkit review prepare --stage quality --role critic`; require it to complete the packet checklist and make one comprehensive pass over behavior, reviewed architecture, project module constraints, and expected placement, distinguishing harmless forecast-path changes from organization violations, then record its JSON verdict.
 3. Make only the smallest warranted remediation, reconcile artifacts, rerun evidence invalidated by executable changes, and resolve findings through the CLI.
 4. Prepare one distinct fresh verifier and reuse its context for closure retries; after two rejections, follow explicit escalation. Developer dispositions still require final verifier approval.

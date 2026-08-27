@@ -41,6 +41,17 @@ export async function isGitRepository(root) {
   return result.code === 0 && result.stdout === "true";
 }
 
+export async function currentHead(root) {
+  const result = await runGit(root, ["rev-parse", "--verify", "HEAD"], { allowFailure: true });
+  return result.code === 0 ? result.stdout : null;
+}
+
+export async function requireCleanWorktree(root, { allow = [], operation = "Operation" } = {}) {
+  const allowed = new Set(allow);
+  const unexpected = (await statusPaths(root)).filter(file => !allowed.has(file));
+  if (unexpected.length) throw new Error(`${operation} requires a clean worktree; unexpected changes:\n${unexpected.join("\n")}`);
+}
+
 export async function statusPaths(root) {
   const output = await runGitBuffer(root, ["status", "--porcelain=v1", "-z", "-uall"]);
   const records = [];

@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { renderChange, renderSystem } from "../src/artifacts.mjs";
+import { renderChange, renderProject, renderSystem } from "../src/artifacts.mjs";
 import { DEFAULT_CONFIG } from "../src/config.mjs";
 import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { dispositionFinding, prepareReview, recordEscalation, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, executableFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
-import { advance, completeSlice, createState, nextAction } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState, finalizeProject, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, recordMilestoneDelivery, registerMilestone, saveState, selectState } from "../src/state-machine.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
 
 async function project(kind = "feature") {
@@ -24,9 +24,40 @@ async function project(kind = "feature") {
     .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: ResultStore is application-owned.\n- Implementation: Its adapter is outward and composed at the entry point.\n- Verification: Dependency unit test and adapter integration test.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
-  assert.equal(state.artifactFormat, 3);
-  state.artifactFormat = 1;
+  assert.equal(state.artifactFormat, 4);
   return { root, state };
+}
+
+async function rollingProject() {
+  const root = await temporaryDirectory();
+  const artifact = await renderProject(root, { title: "Delivery Platform", slug: "delivery-platform" });
+  const command = [process.execPath, "-e", "process.exit(0)"];
+  const content = (await readFile(artifact, "utf8"))
+    .replace(/(## Outcome\n)[\s\S]*?(?=\n## )/, "$1Teams deliver independently reviewed milestones and recognize project completion from integration evidence.\n")
+    .replace(/(## Non-goals\n)[\s\S]*?(?=\n## )/, "$1Automated Git operations and predictive architecture are excluded.\n")
+    .replace(/(## Required Outcomes\n)[\s\S]*?(?=\n## )/, "$1### Requirement REQ-1: Deliver a reviewed milestone\n- Outcome: A milestone completes the normal change lifecycle.\n- Acceptance: Its quality verifier approves the integrated candidate.\n")
+    .replace(/(## Known Constraints\n)[\s\S]*?(?=\n## )/, "$1Non-Git operation remains supported and no command pushes.\n")
+    .replace(/(## Quality Attributes\n)[\s\S]*?(?=\n## )/, "$1Review and evidence records remain candidate-fingerprinted.\n")
+    .replace(/(## Decisions and Hypotheses\n)[\s\S]*?(?=\n## )/, "$1- [committed] A milestone is a normal feature workflow with all existing gates.\n")
+    .replace(/(## Roadmap\n)[\s\S]*?(?=\n## )/, "$1### Milestone 1: Deliver one workflow\n- Kind: feature\n- Outcome: One milestone is independently delivered.\n- Requirements: [\"REQ-1\"]\n- Dependencies: []\n- Status: active\n")
+    .replace(/(## Requirement Coverage\n)[\s\S]*?(?=\n## )/, "$1- REQ-1: Milestone 1 planned.\n")
+    .replace(/(## Completion Criteria\n)[\s\S]*?(?=\n## )/, "$1The milestone is reconciled and final integration succeeds.\n")
+    .replace('- Acceptance commands: [["npm", "test"]]', `- Acceptance commands: ${JSON.stringify([command])}`);
+  await writeFile(artifact, content);
+  await renderSystem(root);
+  const state = await createState(root, {
+    type: "project",
+    kind: "project",
+    slug: "delivery-platform",
+    title: "Delivery Platform",
+    projectPath: ".agent/projects/delivery-platform.md",
+    designPath: ".agent/projects/delivery-platform.md",
+    sources: [],
+    milestones: {},
+    git: false,
+    baseExecutableFingerprint: await executableFingerprint(root)
+  });
+  return { root, state, artifact, command };
 }
 
 async function markDesignApproved(root, state) {
@@ -92,6 +123,116 @@ test("design requires a fresh critic and distinct verifier", async () => {
   await approveReview(root, state, verifier, "verifier-session");
   assert.equal(state.phase, "ready-to-build");
   assert.match(nextAction(state, DEFAULT_CONFIG), /Stop the design workflow and start the build skill/);
+});
+
+test("project framing requires developer approval, a fresh critic, and a distinct verifier", async () => {
+  const { root, state } = await rollingProject();
+  await reachDesignCritic(root, state);
+  const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
+  assert(critic.checklist.some(item => item.includes("roadmap coverage")));
+  await approveReview(root, state, critic, "project-critic");
+  const verifier = await prepareReview(root, state, { stage: "design", role: "verifier" });
+  await assert.rejects(approveReview(root, state, verifier, "project-critic"), /distinct/);
+  await approveReview(root, state, verifier, "project-verifier");
+  assert.equal(state.phase, "active");
+  assert.match(nextAction(state, DEFAULT_CONFIG), /next unblocked roadmap milestone/);
+});
+
+test("project completion requires delivered milestones, fresh integration evidence, critic, and verifier", async () => {
+  const { root, state: projectState, artifact, command } = await rollingProject();
+  let state = projectState;
+  await reachDesignCritic(root, state);
+  await approveReview(root, state, await prepareReview(root, state, { stage: "design", role: "critic" }), "project-critic");
+  await approveReview(root, state, await prepareReview(root, state, { stage: "design", role: "verifier" }), "project-verifier");
+  await writeFile(artifact, (await readFile(artifact, "utf8"))
+    .replace("- Status: active", "- Status: complete")
+    .replace("- REQ-1: Milestone 1 planned.", "- REQ-1: Milestone 1 complete with integration evidence.")
+    .replace("- Assessment: Complete before final project review.", "- Assessment: The reconciled milestone and integration evidence satisfy completion criteria."));
+  await renderChange(root, { kind: "feature", title: "Deliver Workflow", slug: "deliver-workflow" });
+  const child = await createState(root, {
+    slug: "deliver-workflow",
+    kind: "feature",
+    title: "Deliver Workflow",
+    designPath: ".agent/changes/deliver-workflow.md",
+    git: false,
+    projectSlug: state.slug,
+    milestone: { number: 1, title: "Deliver one workflow", requirements: ["REQ-1"] }
+  });
+  child.projectSlug = state.slug;
+  child.milestone = { number: 1, title: "Deliver one workflow", requirements: ["REQ-1"] };
+  child.phase = "complete";
+  child.reviews["quality-verifier"] = { verdict: "approved" };
+  state.milestones[1] = { workflow: child.slug, reconciledAt: new Date().toISOString(), deliveredAt: "interrupted-delivery" };
+  await saveState(root, state);
+  await saveState(root, child);
+  assert.equal(await milestoneDeliveryComplete(root, state, 1), false);
+  await assert.rejects(finalizeProject(root, state), /Deliver every completed milestone/);
+  await writeFile(path.join(root, "delivered.js"), "export const delivered = true;\n");
+  const deliveredFingerprint = await executableFingerprint(root);
+  await recordTest(root, child, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  child.reviews["quality-verifier"].fingerprint = await projectFingerprint(root);
+  await saveState(root, child);
+  await recordMilestoneDelivery(root, child);
+  state = await loadState(root, state.slug);
+  assert.equal(state.baseExecutableFingerprint, deliveredFingerprint);
+  await writeFile(path.join(root, "delivered.js"), "export const delivered = false;\n");
+  await assert.rejects(advance(root, child, DEFAULT_CONFIG), /Restore the quality-verified milestone candidate/);
+  await writeFile(path.join(root, "delivered.js"), "export const delivered = true;\n");
+  await finalizeProject(root, state);
+  const original = await readFile(artifact, "utf8");
+  await writeFile(artifact, original.replace(JSON.stringify([command]), JSON.stringify([[process.execPath, "-e", "process.exit(1)"]])));
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Final Integration commands changed after finalization/);
+  await writeFile(artifact, original);
+  await finalizeProject(root, state);
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Run every reviewed final integration command/);
+  await recordTest(root, state, { kind: "integration", expectFail: false, command: command[0], args: command.slice(1) });
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "baseline-sealed");
+  await advance(root, state, DEFAULT_CONFIG);
+  const critic = await prepareReview(root, state, { stage: "quality", role: "critic" });
+  assert(critic.checklist.some(item => item.includes("cross-milestone")));
+  await approveReview(root, state, critic, "integration-critic");
+  await approveReview(root, state, await prepareReview(root, state, { stage: "quality", role: "verifier" }), "integration-verifier");
+  assert.equal(state.phase, "complete");
+});
+
+test("workflow registry retains multiple states and changes only the current selector", async () => {
+  const root = await temporaryDirectory();
+  const first = await createState(root, { slug: "first-change", kind: "feature", title: "First Change", designPath: ".agent/changes/first-change.md", git: false });
+  const second = await createState(root, { slug: "second-change", kind: "fix", title: "Second Change", designPath: ".agent/changes/second-change.md", git: false });
+  assert.deepEqual((await loadRegistry(root)).workflows, [first.slug, second.slug]);
+  assert.equal((await loadState(root)).slug, second.slug);
+  assert.deepEqual((await listStates(root)).map(state => state.slug), [first.slug, second.slug]);
+  await selectState(root, first.slug);
+  assert.equal((await loadState(root)).slug, first.slug);
+  assert.equal((await loadState(root, second.slug)).phase, "shaping");
+});
+
+test("reopening a reconciled milestone invalidates its project reconciliation", async () => {
+  const { root, state: parent, artifact } = await rollingProject();
+  parent.phase = "active";
+  await markDesignApproved(root, parent);
+  const childArtifact = path.join(root, ".agent", "changes", "milestone-one.md");
+  await renderChange(root, { kind: "feature", title: "Milestone One", slug: "milestone-one" });
+  const linked = await createState(root, {
+    slug: "milestone-one",
+    kind: "feature",
+    title: "Milestone One",
+    designPath: path.relative(root, childArtifact),
+    git: false,
+    baseExecutableFingerprint: await executableFingerprint(root)
+  });
+  await registerMilestone(root, parent, linked, 1);
+  linked.phase = "implementing";
+  linked.implementation = { slices: [{ number: 1, completedAt: new Date().toISOString() }] };
+  await writeFile(artifact, (await readFile(artifact, "utf8"))
+    .replace("- Status: active", "- Status: complete")
+    .replace("- REQ-1: Milestone 1 planned.", "- REQ-1: Milestone 1 complete."));
+  await reconcileMilestone(root, linked);
+  assert((await loadState(root, parent.slug)).milestones[1].reconciledAt);
+  await restartDesignReview(root, linked);
+  assert.equal((await loadState(root, parent.slug)).milestones[1].reconciledAt, undefined);
+  assert.equal(linked.milestoneReconciledAt, undefined);
 });
 
 test("critic packets require a complete risk sweep before findings", async () => {
@@ -164,35 +305,30 @@ test("protocol 3 approvals require the packet's runtime response path", async ()
   assert.equal(state.phase, "design-verifier");
 });
 
-test("protocol 2 packets from active workflows remain recordable", async () => {
+test("protocol 2 packets are rejected", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const packet = await prepareReview(root, state, { stage: "design", role: "critic" });
   state.packets.find(item => item.id === packet.id).protocol = 2;
-  const findingsFile = await writePacketFindings(root, packet, JSON.stringify({ findings: [{ severity: "medium", description: "Legacy structured finding" }] }));
-  await recordReview(root, state, { packetId: packet.id, verdict: "changes-requested", reviewer: "protocol-2-critic", findingsFile });
-  assert.equal(state.findings.at(-1).description, "Legacy structured finding");
+  const findingsFile = await writePacketFindings(root, packet, JSON.stringify({ findings: [finding("Structured finding")] }));
+  await assert.rejects(
+    recordReview(root, state, { packetId: packet.id, verdict: "changes-requested", reviewer: "protocol-2-critic", findingsFile }),
+    /Unsupported review packet protocol/
+  );
 });
 
-test("legacy packets without a protocol retain Markdown and JSON compatibility", async () => {
-  for (const [name, content] of [
-    ["markdown", "- Preserve the legacy boundary\n"],
-    ["json", JSON.stringify({ findings: [{ description: "Preserve the legacy contract" }] })]
-  ]) {
-    const { root, state } = await project();
-    await reachDesignCritic(root, state);
-    const prepared = await prepareReview(root, state, { stage: "design", role: "critic" });
-    delete state.packets.find(packet => packet.id === prepared.id).protocol;
-    const findings = await writePacketFindings(root, prepared, content);
-    await recordReview(root, state, {
-      packetId: prepared.id,
-      verdict: "changes-requested",
-      reviewer: `legacy-${name}-critic`,
-      findingsFile: findings
-    });
-    assert.equal(state.findings.length, 1);
-    assert.equal(state.findings[0].severity, "medium");
-  }
+test("packets without a protocol are rejected", async () => {
+  const { root, state } = await project();
+  await reachDesignCritic(root, state);
+  const prepared = await prepareReview(root, state, { stage: "design", role: "critic" });
+  delete state.packets.find(packet => packet.id === prepared.id).protocol;
+  const findings = await writePacketFindings(root, prepared, JSON.stringify({ findings: [] }));
+  await assert.rejects(recordReview(root, state, {
+    packetId: prepared.id,
+    verdict: "approved",
+    reviewer: "critic",
+    findingsFile: findings
+  }), /Unsupported review packet protocol/);
 });
 
 test("verifier can only reopen supplied findings or report remediation regressions", async () => {
@@ -317,7 +453,7 @@ test("developer can request design changes before approving critic review", asyn
   assert.equal(state.phase, "design-critic");
 });
 
-test("in-flight legacy state cannot bypass developer approval", async () => {
+test("in-flight state cannot bypass developer approval", async () => {
   const { root, state } = await project();
   state.phase = "ready-to-build";
   state.reviews["design-verifier"] = {
@@ -399,7 +535,6 @@ test("implementation baseline requires current tests and separates quality revie
 
 test("new workflows require exact sequential slice acceptance before baseline", async () => {
   const { root, state } = await project();
-  state.artifactFormat = 2;
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8"))
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: First outcome\n- Outcome: The first result is observable.\n- Entry point: First command.\n- Core behavior: Apply first rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: First acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The first command passes.\n\n### Slice 2: Second outcome\n- Outcome: The second result is observable.\n- Entry point: Second command.\n- Core behavior: Apply second rules.\n- Boundary integration: Read through ResultStore.\n- Tests: Second acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The second command passes.\n`)
@@ -478,6 +613,8 @@ test("fix cannot enter implementation without an observed regression failure", a
   assert.equal(state.phase, "implementing");
   await writeFile(path.join(root, "fixed"), "yes\n");
   await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 1);
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /regression command successfully/);
   await recordTest(root, state, { kind: "regression", expectFail: false, command: process.execPath, args: command });
   await advance(root, state, DEFAULT_CONFIG);
@@ -508,9 +645,12 @@ test("fix remains bound to the regression selected before implementation", async
   await recordTest(root, state, { kind: "regression", expectFail: true, command: process.execPath, args: unrelated });
   await writeFile(path.join(root, "other"), "yes\n");
   await recordTest(root, state, { kind: "regression", expectFail: false, command: process.execPath, args: unrelated });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 1);
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /recorded regression command/);
   await writeFile(path.join(root, "fixed"), "yes\n");
   await recordTest(root, state, { kind: "regression", expectFail: false, command: process.execPath, args: original });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "baseline-sealed");
 });
@@ -524,6 +664,8 @@ test("fix remediation requires a current pass of the recorded regression", async
   await advance(root, state, DEFAULT_CONFIG);
   await writeFile(path.join(root, "fixed"), "yes\n");
   await recordTest(root, state, { kind: "regression", expectFail: false, command: process.execPath, args: command });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 1);
   await advance(root, state, DEFAULT_CONFIG);
   await advance(root, state, DEFAULT_CONFIG);
   state.phase = "quality-remediation";
@@ -531,6 +673,7 @@ test("fix remediation requires a current pass of the recorded regression", async
   await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /regression command successfully/);
   await recordTest(root, state, { kind: "regression", expectFail: false, command: process.execPath, args: command });
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "quality-verifier");
 });
@@ -735,7 +878,7 @@ test("a timed-out expected failure cannot establish a fix regression", async () 
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /expected-failing regression/);
 });
 
-test("legacy project-fingerprint regression evidence remains usable after upgrade", async () => {
+test("project-fingerprint regression evidence is not accepted by the new state format", async () => {
   const { root, state } = await project("fix");
   state.phase = "ready-to-build";
   await markDesignApproved(root, state);
@@ -750,9 +893,7 @@ test("legacy project-fingerprint regression evidence remains usable after upgrad
     fingerprint: await projectFingerprint(root),
     recordedAt: new Date().toISOString()
   });
-  await advance(root, state, DEFAULT_CONFIG);
-  assert.equal(state.phase, "implementing");
-  assert.equal(state.regression.evidenceId, "legacy-regression");
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /expected-failing regression/);
 });
 
 test("artifact-only edits preserve executable evidence", async () => {

@@ -1,10 +1,10 @@
 import { mkdir, readFile, realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { artifactFingerprint, artifactSnapshot, designContractFingerprint, executableFingerprint, projectFingerprint, projectSnapshot, snapshotFingerprint } from "./fingerprints.mjs";
+import { artifactFingerprint, artifactSnapshot, candidateFingerprint, candidateSnapshot, designContractFingerprint, executableFingerprint, snapshotFingerprint } from "./fingerprints.mjs";
 import { validateArtifacts } from "./artifacts.mjs";
 import { DEFAULT_CONFIG } from "./config.mjs";
-import { findingBlocksCompletion, findingNeedsClosure, findingStatus, hasRequiredCurrentEvidence, requireCurrentDesign, saveState } from "./state-machine.mjs";
+import { findingBlocksCompletion, findingNeedsClosure, findingStatus, hasRequiredCurrentEvidence, loadState, requireCurrentDesign, saveState } from "./state-machine.mjs";
 
 const DISPOSITION_OUTCOMES = ["not-applicable", "outside-contract", "not-material", "duplicate", "deferred"];
 
@@ -12,7 +12,22 @@ function expectedPhase(stage, role) {
   return `${stage}-${role}`;
 }
 
-function criticChecklist(stage) {
+function criticChecklist(stage, state) {
+  if (state.type === "project") {
+    return stage === "design" ? [
+      "Trace source material and every required outcome to observable acceptance and roadmap coverage.",
+      "Check users, outcome, non-goals, binding constraints, quality attributes, risks, and completion criteria.",
+      "Distinguish observed facts and commitments from hypotheses; reject predictive architecture presented as established.",
+      "Check milestone coherence, kinds, dependencies, independent deliverability, and requirement coverage.",
+      "Finish this complete project-framing sweep before writing findings; do not stop after the first defect."
+    ] : [
+      "Trace every required outcome and completion criterion to reconciled delivery and final integration evidence.",
+      "Inspect cross-milestone behavior, complete repository interactions, errors, regressions, and operational readiness.",
+      "Check roadmap and coverage claims against committed milestone candidates and the current system map.",
+      "Verify final integration commands and assessment address the whole reviewed project outcome.",
+      "Finish this complete project-integration sweep before writing findings; do not stop after the first defect."
+    ];
+  }
   if (stage === "design") {
     return [
       "Trace every requirement and example to an observable outcome, contract, and test.",
@@ -32,7 +47,7 @@ function criticChecklist(stage) {
 }
 
 async function reviewSnapshot(root, state, stage) {
-  return stage === "design" ? artifactSnapshot(root, state) : projectSnapshot(root);
+  return stage === "design" ? artifactSnapshot(root, state) : candidateSnapshot(root, state);
 }
 
 export async function prepareReview(root, state, { stage, role }, config = DEFAULT_CONFIG) {
@@ -43,7 +58,7 @@ export async function prepareReview(root, state, { stage, role }, config = DEFAU
     throw new Error(`Cannot prepare ${stage} ${role} review during ${state.phase}`);
   }
   if (stage === "quality") await requireCurrentDesign(root, state);
-  const problems = await validateArtifacts(root, state, { requireSystem: true });
+  const problems = await validateArtifacts(root, state, { requireSystem: true, requireProjectCompletion: stage === "quality" && state.type === "project" });
   if (problems.length) throw new Error(problems.join("\n"));
   const snapshot = await reviewSnapshot(root, state, stage);
   const fingerprint = snapshotFingerprint(snapshot);
@@ -85,8 +100,9 @@ export async function prepareReview(root, state, { stage, role }, config = DEFAU
     fingerprint,
     evidenceFingerprint,
     designPath: state.designPath,
+    projectPath: state.projectPath || null,
     findingsPath,
-    ...(role === "critic" ? { checklist: criticChecklist(stage) } : {
+    ...(role === "critic" ? { checklist: criticChecklist(stage, state) } : {
       reuseReviewer: config.review.reuseVerifierContext,
       escalation: state.reviewEscalation?.cycleId === cycleId ? state.reviewEscalation : null
     }),
@@ -112,27 +128,8 @@ export async function prepareReview(root, state, { stage, role }, config = DEFAU
   };
 }
 
-async function parseLegacyFindings(content) {
-  try {
-    const parsed = JSON.parse(content);
-    const list = Array.isArray(parsed) ? parsed : parsed.findings;
-    if (!Array.isArray(list)) throw new Error("Expected an array or { findings: [] }");
-    return list.map(item => ({ severity: "medium", description: typeof item === "string" ? item : item.description })).filter(item => item.description);
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return content.split("\n").map(line => line.replace(/^[-*]\s*/, "").trim()).filter(Boolean)
-        .map(description => ({ severity: "medium", description }));
-    }
-    throw error;
-  }
-}
-
 async function parseFindings(file, packet, state) {
-  if (packet.protocol === undefined) {
-    if (!file) return [];
-    return parseLegacyFindings(await readFile(file, "utf8"));
-  }
-  if (![2, 3].includes(packet.protocol)) throw new Error(`Unsupported review packet protocol: ${packet.protocol}`);
+  if (packet.protocol !== 3) throw new Error(`Unsupported review packet protocol: ${packet.protocol}`);
   if (!file) {
     throw new Error(`Protocol ${packet.protocol} review responses must be saved to ${packet.findingsPath} and recorded with --findings ${packet.findingsPath}`);
   }
@@ -157,15 +154,13 @@ async function parseFindings(file, packet, state) {
       throw new Error(`Finding ${index + 1} requires severity high|medium and a description`);
     }
     const finding = { severity: item.severity, description: item.description.trim() };
-    if (packet.protocol === 3) {
-      for (const key of ["contractReference", "evidence", "observableImpact"]) {
-        if (typeof item[key] !== "string" || !item[key].trim()) {
-          throw new Error(`Finding ${index + 1} requires a concrete ${key}`);
-        }
-        finding[key] = item[key].trim();
+    for (const key of ["contractReference", "evidence", "observableImpact"]) {
+      if (typeof item[key] !== "string" || !item[key].trim()) {
+        throw new Error(`Finding ${index + 1} requires a concrete ${key}`);
       }
+      finding[key] = item[key].trim();
     }
-    const evidenceProperties = packet.protocol === 3 ? ["contractReference", "evidence", "observableImpact"] : [];
+    const evidenceProperties = ["contractReference", "evidence", "observableImpact"];
     if (packet.role === "critic") {
       if (Object.keys(item).some(key => !["severity", "description", ...evidenceProperties].includes(key))) {
         throw new Error(`Critic finding ${index + 1} contains unsupported properties`);
@@ -237,7 +232,7 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
   if (packet.obsoleteAt) throw new Error("Review packet was invalidated by a review restart");
   if (packet.recordedAt) throw new Error("Review packet has already been recorded");
   if (state.phase !== expectedPhase(packet.stage, packet.role)) throw new Error("Review packet is no longer current");
-  if (findingsFile && packet.protocol >= 2) {
+  if (findingsFile) {
     const [canonicalRoot, provided] = await Promise.all([
       realpath(root),
       realpath(path.resolve(root, findingsFile))
@@ -256,10 +251,10 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
     throw new Error("Design changed after developer approval; restart design review");
   }
   if (packet.stage === "quality") await requireCurrentDesign(root, state);
-  const problems = await validateArtifacts(root, state, { requireSystem: true });
+  const problems = await validateArtifacts(root, state, { requireSystem: true, requireProjectCompletion: packet.stage === "quality" && state.type === "project" });
   if (problems.length) throw new Error(problems.join("\n"));
   const evidenceFingerprint = packet.stage === "quality" ? await executableFingerprint(root) : current;
-  if (packet.stage === "quality" && !hasRequiredCurrentEvidence(state, evidenceFingerprint, current)) {
+  if (packet.stage === "quality" && !hasRequiredCurrentEvidence(state, evidenceFingerprint)) {
     throw new Error(state.kind === "fix"
       ? "Current passing regression evidence is required before recording quality approval"
       : "Current passing test evidence is required before recording quality approval");
@@ -346,7 +341,9 @@ export async function recordReview(root, state, { packetId, verdict, reviewer, f
       (state.reviewEscalationHistory ||= []).push(state.reviewEscalation);
       delete state.reviewEscalation;
     }
-    state.phase = packet.stage === "design" ? "ready-to-build" : "ready-to-commit";
+    state.phase = packet.stage === "design"
+      ? (state.type === "project" ? "active" : "ready-to-build")
+      : (state.type === "project" ? "complete" : "ready-to-commit");
   }
   await saveState(root, state);
   return state;
@@ -378,7 +375,7 @@ function archiveEscalation(state) {
 }
 
 export async function restartDesignReview(root, state, { fromEscalation = false } = {}) {
-  if (!["design-critic", "design-remediation", "design-verifier", "ready-to-build", "implementing", "baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit"].includes(state.phase)) {
+  if (!["design-critic", "design-remediation", "design-verifier", "ready-to-build", "implementing", "active", "integration-testing", "baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit"].includes(state.phase)) {
     throw new Error(`Design review cannot be restarted during ${state.phase}`);
   }
   if (state.phase === "review-escalation" && !fromEscalation) {
@@ -392,10 +389,20 @@ export async function restartDesignReview(root, state, { fromEscalation = false 
   delete state.reviews["quality-verifier"];
   delete state.baseline;
   delete state.commitPlan;
+  if (state.type === "project") delete state.integration;
   archiveEscalation(state);
   delete state.developerApproval;
   delete state.developerReviewTarget;
   delete state.developerReviewFingerprint;
+  if (state.projectSlug && state.milestoneReconciledAt) {
+    const project = await loadState(root, state.projectSlug);
+    const link = project.milestones?.[state.milestone?.number];
+    if (link?.workflow === state.slug) {
+      delete link.reconciledAt;
+      await saveState(root, project);
+    }
+    delete state.milestoneReconciledAt;
+  }
   state.phase = "developer-review";
   await saveState(root, state);
   return state;
@@ -410,7 +417,7 @@ export async function restartQualityReview(root, state, { fromEscalation = false
     throw new Error("Record the restart-quality decision with: agent-toolkit escalation record --decision restart-quality");
   }
   await requireCurrentDesign(root, state);
-  const fingerprint = await projectFingerprint(root);
+  const fingerprint = await candidateFingerprint(root, state);
   const evidenceFingerprint = await executableFingerprint(root);
   if (!hasRequiredCurrentEvidence(state, evidenceFingerprint, fingerprint)) {
     throw new Error("Run all required tests for the current candidate before restarting quality review");

@@ -1,11 +1,11 @@
 ---
 name: build
-description: Use when implementing an agent-toolkit change whose reviewed design is ready to build, including tests, quality review, artifact reconciliation, and commit creation.
+description: Use when implementing a reviewed standalone or project milestone change, or completing final integration for a delivered rolling project.
 ---
 
 # Build
 
-Implement the reviewed design in thin vertical slices. The CLI enforces order and owns `.agent/.state`; call it rather than editing state data.
+Implement reviewed design in vertical slices. The CLI owns order and `.agent/.state`; never edit state data.
 
 ## Project Instructions
 
@@ -13,11 +13,11 @@ Before planning or editing, read every applicable `AGENTS.md` in the project. Tr
 
 ## Preconditions
 
-1. Run `agent-toolkit status` and `agent-toolkit check`.
-2. Require state `ready-to-build` and a reviewed `.agent/changes/<slug>.md`. If either is missing, return to design.
-3. Read `.agent/SYSTEM.md`, the projects AGENTS.md file if exists, the change artifact, affected code, tests, and repository conventions.
+1. Inspect `agent-toolkit status --json` and `workflow list --json`. Resume matching work or safely select an explicit workflow; never restore or mix candidates.
+2. For delivery, require a `ready-to-build` change and reviewed `.agent/changes/<slug>.md`. For final project integration, require an `active` project whose roadmap milestones and completion criteria are complete. Otherwise return to design.
+3. Read `.agent/SYSTEM.md`, applicable project instructions, the change artifact, affected code, tests, and repository conventions. For linked work also read the project frame, source material, requirement coverage, discoveries, and milestone link.
 4. Use `agent-toolkit issue ensure` or `agent-toolkit issue link` when the workflow reports that issue association is required.
-5. Before editing, extract a conformance checklist from the reviewed artifact: required ports, adapters, dependency directions, composition points, transaction boundaries, project module constraints, the expected file/module placement, and slice completion signals. Reviewed architecture and project constraints are mandatory; forecast paths are not an exhaustive manifest.
+5. Before editing, extract a conformance checklist from the reviewed change and project contracts: required ports, adapters, dependency directions, composition points, transaction boundaries, module constraints, expected placement, milestone requirements, and slice completion signals. Forecast paths are not an exhaustive manifest.
 
 ## Implement
 
@@ -26,6 +26,7 @@ Before planning or editing, read every applicable `AGENTS.md` in the project. Tr
 3. Preserve ubiquitous language, rules, boundaries, contracts, errors, and dependency direction from the reviewed design. Implement every reviewed port and outward adapter before placing concrete infrastructure behind it; compose concrete dependencies only at the system edge.
 4. Update the change artifact when implementation evidence changes a decision. Additional support files or path adjustments do not require design review when responsibilities, project module constraints, and dependency direction remain intact; explain meaningful non-material placement deviations in `Implementation Conformance`. For material product, domain, boundary, public-interface, module-constraint, or plan changes, run `agent-toolkit review restart --stage design`; this returns the revision to developer feedback before fresh review.
 5. Update `.agent/SYSTEM.md` only for durable system knowledge discovered or changed by the work.
+6. After linked slices, update project coverage, discoveries, decisions, and roadmap from evidence. Mark the milestone complete and run `project reconcile` before sealing. Binding outcome, constraint, or completion changes require project design review; routine roadmap evolution does not.
 
 Treat reviewed abstractions as acceptance criteria. When implementation reveals a meaningful domain or infrastructure boundary that the design missed, stop and restart design review rather than coupling inward policy to a concrete dependency. Prefer a narrow consumer-owned abstraction over direct coupling when uncertain, but avoid generic CRUD repositories, pass-through wrappers, marker interfaces, and layers with no behavioral contract. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable types and operations; split files that mix unrelated policy, orchestration, and infrastructure without creating file-per-type ceremony.
 
@@ -53,6 +54,8 @@ During `implementing`, do not launch independent critic, audit, or blocker-revie
 6. If warranted, make the smallest focused remediation, without adjacent hardening. Reconcile artifacts, run only evidence invalidated by executable changes, and use `agent-toolkit findings resolve <id>` for completed findings.
 7. Prepare one distinct fresh verifier using `agent-toolkit review prepare --stage quality --role verifier`. Reuse that same verifier context for closure retries. It may only reopen supplied findings, reject inaccurate developer dispositions, or identify a demonstrable high-severity regression introduced by remediation.
 8. After two closure rejections, stop automatic remediation and follow `review-escalation`. Developer continuation requires reasoned dispositions and final approval from the same verifier; it never waives explicit requirements, required acceptance, or verifier approval.
+
+For final integration, run `project finalize`, execute every exact command with `test --kind integration`, and seal the baseline. The fresh quality critic reviews the full repository, reconciled milestones, cross-milestone behavior, outcomes, criteria, and assessment; normal verifier and escalation rules apply. Project approval creates no aggregate commit.
 
 If subagents are unavailable, send the prepared compact packet to a separate session. Critic and verifier must be distinct contexts, and verifier closure packets return to the same verifier session; the implementer cannot self-approve.
 

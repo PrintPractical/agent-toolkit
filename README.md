@@ -4,104 +4,118 @@
   <img src="image.png" width="350" />
 </p>
 
-Adaptive idea-to-delivery skills for greenfield and brownfield software work. The toolkit helps the agent challenge and develop an idea, then carries relevant domain evidence through design, implementation, testing, independent review, and completion. It provides four skills: `ideate`, `design`, `build`, and `fix`.
+Adaptive idea-to-delivery skills for greenfield and brownfield software work. The package exposes exactly four skills: `ideate`, `design`, `build`, and `fix`. Skills provide the conversational experience; the `agent-toolkit` CLI is the deterministic lifecycle and evidence API they operate.
 
 ## Requirements
 
-- Node.js 20 or newer for the `agent-toolkit` CLI.
-- Git is optional. Without it, the lifecycle still runs but commit integration is skipped.
-- `gh` authenticated to GitHub is required only when GitHub issue integration is enabled.
+- Node.js 20 or newer.
+- Git is optional. Without it, review and evidence gates still run but commit integration is skipped.
+- Authenticated `gh` access is required only when optional GitHub issue integration is enabled.
 
 ## Install
-
-Install the CLI, then let it install its bundled skills. Installation is project-scoped by default; use `--global` to make the skills available across projects:
 
 ```bash
 npm install --global github:PrintPractical/agent-toolkit#v2
 agent-toolkit install --global
 ```
 
-`agent-toolkit install` invokes a pinned Node 20-compatible release of the standard [skills.sh](https://skills.sh) installer so it can detect and use the correct paths for supported agents. Use repeatable `--agent <name>` flags for a non-interactive targeted install, project-only `--all` for every agent, or `--copy` to copy instead of symlink:
+Installation is project-scoped unless `--global` is supplied. Repeat `--agent <name>` for targeted non-interactive installation, use project-only `--all` for every detected agent, or `--copy` instead of symlinking:
 
 ```bash
 agent-toolkit install --global --agent opencode --agent claude-code
 agent-toolkit install --all
 ```
 
-The direct skills.sh command remains available: `npx skills@1.4.4 add PrintPractical/agent-toolkit --all`. From a local checkout, the CLI can also be linked globally with `npm install --global .`.
+The CLI invokes a pinned Node 20-compatible [skills.sh](https://skills.sh) installer. The direct command is `npx skills@1.4.4 add PrintPractical/agent-toolkit --all`. A local checkout can be linked with `npm install --global .`.
 
-## Workflow
+## Work Model
 
-Use `ideate` to collaboratively explore a goal and its use cases before choosing a direction, `design` for features and substantial changes, `fix` for defects that can be reproduced, and `build` after a reviewed design is ready. The managed workflow skills adapt their domain modeling and test depth to repository evidence while deliberately protecting meaningful boundaries. Storage, transport, time, identity, messaging, and external-system capabilities normally receive narrow contracts owned inward and concrete adapters outward, even with one implementation; contract-free wrappers and generic layering remain discouraged.
+`ideate` remains conversational and independent of the CLI and `.agent/`. It develops goals and use cases, challenges unsafe or needlessly complex ideas, and hands context to `design` only when the engineer explicitly requests formal project framing or change design.
 
-`ideate` is deliberately outside the managed workflow. It does not invoke the CLI or use `.agent/` assets. It brainstorms with the engineer, develops goals and concrete use cases, inspects repository evidence when useful, and constructively challenges anti-patterns, unnecessary complexity, unsafe behavior, and conflicts with the existing system. Pushback explains the consequence and offers alternatives with tradeoffs rather than rejecting unconventional ideas by default. When the engineer explicitly asks to formalize a direction in the same conversation, `design` carries the established context into its normal artifacts and lifecycle without repeating resolved questions.
+A **change** is one coherent `feature` or `fix` candidate that can share one design contract, quality review, and inspected commit. Artifact depth is proportional to applicability; there is no formal small/medium classification. A one-slice correction and a multi-slice feature use the same mandatory gates.
 
-`agent-toolkit init` creates the local configuration. Starting a change creates the smallest useful artifacts for either a new or existing system:
+A **project** is a rolling container for work needing multiple independently designed, reviewed, and committed milestones. Optional epic concepts may organize the roadmap, but each executable milestone is a normal feature or fix change with the complete change lifecycle. If a milestone cannot fit one coherent contract and review, split it.
 
-- `.agent/SYSTEM.md`: a minimal, relevant system map, bootstrapped once and refined only with durable knowledge.
-- `.agent/changes/<slug>.md`: the active feature design or fix record, including source-requirement traceability, examples, boundary and abstraction decisions, expected file/module placement, risks, tests, vertical slices, and implementation-conformance evidence. Review and status bookkeeping stays in runtime state so it cannot invalidate the candidate it describes.
-- `.agent/.state/`: CLI-owned lifecycle state and recorded evidence; it is added to `.gitignore` and must not be edited manually.
+`agent-toolkit init` creates:
 
-The lifecycle is enforced rather than inferred from prose:
+- `.agent/SYSTEM.md`: compact durable system knowledge, updated only from evidence.
+- `.agent/projects/<slug>.md`: project outcomes, sources, requirements, constraints, decisions, provisional roadmap, coverage, discoveries, completion criteria, and final integration.
+- `.agent/changes/<slug>.md`: feature design or fix diagnosis, contracts, expected placement, vertical slices, tests, and implementation conformance.
+- `.agent/.state/registry.json`: registered workflows and the current selector.
+- `.agent/.state/<slug>.json`: CLI-owned lifecycle, review, evidence, linkage, and commit state.
 
-1. Shape and validate the design, expected file/module placement, implementation plan, and minimal system map in one change artifact.
-2. Pause for developer feedback. Requested changes return to shaping; explicit developer approval advances to independent review.
-3. Send a fresh design packet to a critic for the cycle's one comprehensive discovery pass, remediate material findings when requested, then use one distinct fresh verifier context for closure retries.
-4. Implement the reviewed architecture as runnable vertical slices. Each slice has an executable acceptance command and must be recorded with fresh, one-use evidence through `slice complete` before the next one begins. Before baseline sealing, each distinct command needs current executable-candidate evidence; duplicate commands and artifact-only edits do not force duplicate runs. Independent blocker audits are not part of implementation. A fix must first record an expected-failing regression test.
-5. Map reviewed abstractions, dependency rules, project module constraints, and expected placement to code in `Implementation Conformance`, record passing test evidence for the current project fingerprint, then seal the implementation baseline.
-6. Send the sealed result to a fresh quality critic for one comprehensive discovery pass, including omitted requirements and unimplemented reviewed abstractions. Findings require concrete contract references, candidate evidence, and observable impact. Remediate narrowly, then use one distinct verifier context for closure. Two verifier rejections enter explicit developer escalation rather than a third automatic remediation cycle; dispositions still require final verifier approval.
-7. In Git repositories with commit integration enabled, inspect the commit plan and create one conventional final commit. The toolkit never pushes. In non-Git projects, or when commit integration is off, completion does not require a commit.
+Runtime state is ignored by Git and must never be edited manually. This release intentionally does not migrate the former singleton `active` pointer or old runtime, artifact, evidence, and review packet formats.
 
-Review packets become stale if their reviewed content changes. Reviewer IDs are required, critic and verifier identities must differ, and closure retries reuse the first verifier identity. A critic performs the only discovery pass and reports all demonstrated material findings together; zero findings is valid. A verifier may reopen supplied findings, reject inaccurate dispositions, or report a demonstrable high-severity regression introduced by remediation, but cannot add pre-existing omissions or broaden scope. Protocol 3 findings require `contractReference`, `evidence`, and `observableImpact`; protocol 2 packets from active older workflows remain recordable. New packets provide a runtime-only `findingsPath` under `.agent/.state/`; every response must be JSON matching `outputSchema`, including `{"findings":[]}` for approval. Test attempts, including failures and timeouts, are recorded with bounded output. Tests use an executable-content fingerprint separate from review artifacts, have a configurable timeout, and are rejected if they mutate executable content. Material design drift requires `review restart --stage design`; candidate drift after critic approval or baseline sealing requires a review restart.
+## Project Flow
 
-There is no separate plan artifact or planning ceremony. During shaping, the design skill writes both a required `File and Module Placement Plan` and the `Implementation Plan`. Placement names expected additions, modifications, moves, or deletions and their responsibilities, project constraints, boundaries, and slices. Its paths are reviewed forecasts rather than an exhaustive manifest: build may add support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact, with meaningful differences explained in `Implementation Conformance`. Each required slice subsection crosses every layer needed for one observable outcome; domain-only, persistence-only, transport-only, and wiring-only phases are rejected as plans. New workflows bind each slice to a reviewed JSON-array acceptance command, sequential runtime completion, and a matching individual conformance record; aggregate claims such as “Slices 1-3 baseline” cannot seal a build. Developer feedback reviews that plan and the abstraction decisions together before independent criticism, and reviews the final remediated design again if critic changes altered it. During build, the default organization is a shallow module tree of small cohesive, independently testable concepts rather than layer-wide files or deeply nested ceremony. Logical dependency boundaries apply inside a single crate or package and cannot be replaced by a packaging decision.
+1. Optionally explore with `ideate`, or supply repository-contained PRDs, TRDs, and related sources directly to `design`.
+2. `design` runs `project start`, reads every source and the repository, fingerprints rather than copies sources, resolves ambiguity with the engineer, and completes the project frame.
+3. The frame receives explicit developer approval, one fresh comprehensive design critic, remediation when needed, and one distinct verifier. Approval makes the project `active`.
+4. `design` selects an explicitly named milestone, a matching current milestone, or the next unblocked `active` roadmap milestone. It creates a linked normal change artifact and completes the usual design gates.
+5. `build` or `fix` delivers ordered vertical slices with exact acceptance evidence. It updates `.agent/SYSTEM.md` and project coverage, discoveries, decisions, and future roadmap from delivered evidence, marks the milestone complete, and runs `project reconcile` before quality review.
+6. The milestone receives a fresh quality critic and distinct verifier, then one inspected conventional commit when Git integration is active. The toolkit never pushes.
+7. After all required milestones are reconciled, quality-verified, and delivered, `project finalize` freezes exact final integration commands. Current integration evidence, a project-wide quality critic, and a distinct verifier are mandatory. Project approval completes the container without creating a redundant aggregate commit.
 
-Commit preparation stages and exposes the exact reviewed tree, parent, files, and message. Creation runs standard commit hooks against an isolated index and temporary worktree, rejects hook changes to the inspected tree or message, and atomically updates `HEAD` only while the inspected parent is still current.
+Project framing is not predictive architecture. Concrete APIs, schemas, boundaries, and module placement emerge during milestone design. Binding project outcomes, constraints, source material, quality attributes, or completion criteria require renewed project design review when changed. Roadmap ordering, coverage, discoveries, hypotheses, and final integration records evolve as milestones deliver evidence.
 
-GitHub issues are optional. Set the policy to `off` (default), `create`, or `existing`. `create` requires `agent-toolkit issue ensure`; `existing` requires `agent-toolkit issue link <number>`. GitHub-enabled modes require a Git repository and authenticated `gh` access.
+## Standalone Flow
+
+1. `design` shapes a feature, or `fix` diagnoses a defect and records an expected-failing automated regression before production changes.
+2. The engineer explicitly reviews the complete artifact. A fresh design critic performs the cycle's one discovery pass; a distinct verifier performs closure.
+3. `build` or `fix` implements only the next reviewed vertical slice. Every slice has one exact JSON-array acceptance command and one matching conformance record.
+4. Current final-candidate evidence seals the baseline. A fresh quality critic reviews the candidate and one distinct verifier closes supplied findings.
+5. Git completion creates only the inspected conventional commit. Non-Git and commit-off workflows complete without a commit. No command pushes.
+
+## Workflows And Switching
+
+Multiple unfinished workflows remain registered and listable. Starting work makes it current; `workflow select <slug>` changes only the selector. It never stashes, checks out, restores, overwrites, or otherwise manipulates project files or Git.
+
+Selection is deliberately strict:
+
+- Selecting the already current workflow is an idempotent no-op.
+- Git selection requires a clean worktree and the exact workflow base or completion `HEAD`.
+- Non-Git selection requires the executable candidate fingerprint recorded for the target workflow.
+- Starting another non-Git workflow is blocked while an unfinished executable candidate differs from its parked baseline.
+
+One checkout is therefore sequential. Use isolated worktrees or checkouts for truly concurrent implementation. The toolkit never creates or switches those environments itself. Resume by inspecting `status --json` and `workflow list --json`; skills select automatically only when intent and candidate safety are unambiguous.
+
+In a Git repository, rolling projects require `completion.commit.policy: "if-git"` because every delivered milestone is anchored by its inspected commit. Commit integration may remain off for standalone changes and is naturally absent in non-Git repositories.
+
+## Gates And Evidence
+
+Review packets use protocol 3 JSON only. Every response, including approval, is written to the packet's exact runtime-only `findingsPath` as `{"findings":[]}` or structured high/medium findings with `contractReference`, `evidence`, and `observableImpact`. Critic and verifier identities must differ; closure retries reuse the verifier identity. A verifier can only reopen supplied findings, reject inaccurate dispositions, or report a demonstrated high-severity regression introduced by remediation. Two closure rejections require explicit developer escalation, and dispositions still require verifier approval.
+
+Tests record bounded output, timeout and mutation status, exact command, and executable fingerprint. A newer failure invalidates an older pass for that command. Commands that mutate executable or reviewed candidate content are rejected. Artifact-only reconciliation preserves executable evidence, while executable changes require current reruns. Baselines and reviews fingerprint the appropriate complete candidate; material contract drift requires design restart.
+
+Commit preparation exposes the exact reviewed tree, parent, files, and message. Commit hooks run against an isolated index and temporary worktree. Tree, message, worktree, or parent drift is rejected before `HEAD` is atomically updated.
 
 ## Configuration
 
-`.agent/config.json` is created by `agent-toolkit init`:
+`.agent/config.json` controls required issue integration, evidence timeout, bounded verifier closure, and optional commit creation. Safeguards cannot be disabled. Defaults are Git-conditional commits and no GitHub issue:
 
 ```json
 {
   "version": 1,
-  "review": {
-    "maxClosureRejections": 2,
-    "requireFindingEvidence": true,
-    "reuseVerifierContext": true
-  },
-  "evidence": {
-    "deduplicateCommands": true,
-    "timeoutMs": 1200000
-  },
-  "completion": {
-    "commit": {
-      "policy": "if-git",
-      "conventional": true,
-      "dirtyWorktree": "block"
-    }
-  },
-  "github": {
-    "issues": {
-      "policy": "off",
-      "repository": "auto",
-      "commitLink": "closes",
-      "labels": []
-    }
-  }
+  "review": { "maxClosureRejections": 2, "requireFindingEvidence": true, "reuseVerifierContext": true },
+  "evidence": { "deduplicateCommands": true, "timeoutMs": 1200000 },
+  "completion": { "commit": { "policy": "if-git", "conventional": true, "dirtyWorktree": "block" } },
+  "github": { "issues": { "policy": "off", "repository": "auto", "commitLink": "closes", "labels": [] } }
 }
 ```
 
-Missing `review` and `evidence` sections in existing version 1 configs receive these defaults. Closure rejection limits and evidence timeouts must be positive integers; finding evidence, verifier-context reuse, and command deduplication remain required safeguards. `completion.commit.policy` accepts `if-git` or `off`. `github.issues.policy` accepts `off`, `create`, or `existing`; `repository` may be `auto` or a GitHub repository understood by `gh`; `commitLink` accepts `closes` or `references`.
+GitHub issue policy accepts `off`, `create`, or `existing`. `create` uses `issue ensure`; `existing` uses `issue link <number>`. Commit policy accepts `if-git` or `off`.
 
 ## CLI
 
 ```text
 agent-toolkit install [--global] [--agent <name>...] [--all] [--copy]
 agent-toolkit init
-agent-toolkit start --kind feature|fix --title "..." [--issue <number>]
+agent-toolkit project start --title "..." [--source <path>...]
+agent-toolkit project reconcile
+agent-toolkit project finalize
+agent-toolkit start --kind feature|fix --title "..." [--project <slug> --milestone <number>] [--issue <number>]
+agent-toolkit workflow list [--json]
+agent-toolkit workflow select <slug>
 agent-toolkit status [--json]
 agent-toolkit check
 agent-toolkit advance
@@ -109,15 +123,13 @@ agent-toolkit feedback record --verdict approved|changes-requested [--note "..."
 agent-toolkit test --kind regression|unit|integration|acceptance [--expect-fail] -- <command>
 agent-toolkit slice complete --number <n>
 agent-toolkit review prepare --stage design|quality --role critic|verifier
-agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <packet-findingsPath>
+agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <findingsPath>
 agent-toolkit review restart --stage design|quality
 agent-toolkit findings resolve <id>
 agent-toolkit findings disposition <id> --outcome not-applicable|outside-contract|not-material|duplicate|deferred --reason "..."
 agent-toolkit escalation record --decision continue|retry|require-proof|restart-quality|restart-design|split|stop [--reason "..."]
-agent-toolkit issue ensure
-agent-toolkit issue link <number>
-agent-toolkit commit prepare
-agent-toolkit commit create
+agent-toolkit issue ensure|link
+agent-toolkit commit prepare|create
 ```
 
-Run `status` after each gate and follow its reported next action. `check` validates requirements traceability, boundary and abstraction decisions, vertical plan structure, implementation conformance when due, and the active system map; lifecycle transitions, reviews, evidence, issue association, and commits remain explicit commands.
+Run `status` after each gate and follow its exact next action.

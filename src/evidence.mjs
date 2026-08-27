@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { executableFingerprint } from "./fingerprints.mjs";
+import { executableFingerprint, projectFingerprint } from "./fingerprints.mjs";
 import { saveState } from "./state-machine.mjs";
 
 function execute(command, args, cwd, timeoutMs) {
@@ -44,8 +44,10 @@ export async function recordTest(root, state, { kind, expectFail, command, args 
   if (!command) throw new Error("Test command required after --");
   const timeoutMs = config?.evidence?.timeoutMs || 1200000;
   const before = await executableFingerprint(root);
+  const beforeCandidate = await projectFingerprint(root);
   const result = await execute(command, args, root, timeoutMs);
   const after = await executableFingerprint(root);
+  const afterCandidate = await projectFingerprint(root);
   const evidence = {
     id: randomUUID(),
     kind,
@@ -55,14 +57,15 @@ export async function recordTest(root, state, { kind, expectFail, command, args 
     ...(result.signal ? { signal: result.signal } : {}),
     ...(result.error ? { error: result.error } : {}),
     timedOut: result.timedOut,
-    candidateChanged: before !== after,
+    executableChanged: before !== after,
+    candidateChanged: beforeCandidate !== afterCandidate,
     output: result.output,
     fingerprint: after,
     recordedAt: new Date().toISOString()
   };
   state.evidence.push(evidence);
   await saveState(root, state);
-  if (before !== after) throw new Error("Test command changed the project candidate's executable content; discard its changes and run it again");
+  if (beforeCandidate !== afterCandidate) throw new Error("Test command changed the project candidate; discard its changes and run it again");
   if (result.timedOut) throw new Error(`Test command timed out after ${timeoutMs}ms\n${result.output}`);
   if (result.error) throw new Error(`Test command could not start: ${result.error}`);
   if (expectFail && result.code === 0) throw new Error("Expected-failing test passed; regression is not reproduced");

@@ -6,9 +6,11 @@ Usage: agent-toolkit <command> [options]
 Commands:
   install    Install the bundled ideate, design, build, and fix skills
   init       Initialize .agent configuration in the current project
-  start      Start a feature or fix workflow
-  status     Show the active phase and exact next action
-  check      Validate the active design and system map
+  project    Start, reconcile, or finalize a rolling project
+  start      Start a standalone or project milestone change
+  workflow   List or safely select registered workflows
+  status     Show the current phase and exact next action
+  check      Validate the current project or change artifacts
   advance    Move through the next objective lifecycle gate
   feedback   Record developer approval or requested design changes
   test       Run a command and record fingerprinted test evidence
@@ -31,15 +33,28 @@ Installs bundled skills through skills.sh. The default is an interactive project
   init: `Usage: agent-toolkit init
 
 Creates .agent/config.json, artifact directories, runtime state, and the .gitignore entry.`,
-  start: `Usage: agent-toolkit start --kind feature|fix --title "..." [--issue <number>]
+  project: `Usage:
+  agent-toolkit project start --title "..." [--source <path>...]
+  agent-toolkit project reconcile
+  agent-toolkit project finalize
 
-Starts one active change and creates its design artifact and minimum system map.
+Starts reviewed project framing, reconciles a completed implementation into its project before quality review, or begins final project integration after every milestone is delivered. Source files must be inside the repository and are fingerprinted rather than copied.`,
+  start: `Usage: agent-toolkit start --kind feature|fix --title "..." [--project <slug> --milestone <number>] [--issue <number>]
+
+Starts a standalone change or one active roadmap milestone and creates its design artifact and minimum system map.
   --kind   Required workflow kind
   --title  Required human-readable change title
+  --project Reviewed project slug for milestone work
+  --milestone Active roadmap milestone number; requires --project
   --issue  Existing issue number; requires GitHub policy create or existing`,
+  workflow: `Usage:
+  agent-toolkit workflow list [--json]
+  agent-toolkit workflow select <slug>
+
+Lists registered workflows or changes only the current selector after candidate-safety checks. Selection never checks out, stashes, restores, or otherwise manipulates project files or Git.`,
   status: `Usage: agent-toolkit status [--json]
 
-Shows the active change, lifecycle phase, artifacts, review state, and next command.`,
+Shows the current project or change, lifecycle phase, artifacts, review state, and next command. With no current workflow, reports how to start one.`,
   check: `Usage: agent-toolkit check
 
 Validates artifact presence, requirements traceability, boundary and abstraction decisions, vertical implementation slices, implementation conformance when due, the system map, and closed questions.`,

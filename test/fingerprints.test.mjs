@@ -5,7 +5,7 @@ import test from "node:test";
 import { renderChange, renderSystem } from "../src/artifacts.mjs";
 import { prepareCommit } from "../src/commit.mjs";
 import { DEFAULT_CONFIG } from "../src/config.mjs";
-import { designContractFingerprint, projectFingerprint, projectSnapshot } from "../src/fingerprints.mjs";
+import { candidateSnapshot, designContractFingerprint, executableFingerprint, projectFingerprint, projectSnapshot } from "../src/fingerprints.mjs";
 import { statusPaths } from "../src/git.mjs";
 import { execute, initializeGit, temporaryDirectory } from "./helpers.mjs";
 
@@ -13,7 +13,7 @@ test("file and module placement remains part of the reviewed design contract", a
   const root = await temporaryDirectory();
   const design = await renderChange(root, { kind: "feature", title: "Place Modules", slug: "place-modules" });
   await renderSystem(root);
-  const state = { designPath: ".agent/changes/place-modules.md" };
+  const state = { type: "change", designPath: ".agent/changes/place-modules.md" };
   const initial = await designContractFingerprint(root, state);
   const content = await readFile(design, "utf8");
   await writeFile(design, content.replace(
@@ -85,6 +85,17 @@ test("Git candidates include changed submodule revisions", async () => {
   assert.equal(change.mode, "160000");
   assert.equal(change.type, "commit");
   assert.notEqual(change.oid, change.before.oid);
+  const full = await candidateSnapshot(root, { type: "project" });
+  const fullSubmodule = full.files.find(item => item.path === "vendor/child");
+  assert.equal(fullSubmodule.status, "present");
+  assert.equal(fullSubmodule.mode, "160000");
+  assert.equal(fullSubmodule.oid, change.oid);
+  await execute("git", ["submodule", "deinit", "-q", "-f", "--", "vendor/child"], root);
+  const deinitialized = await candidateSnapshot(root, { type: "project" });
+  const indexedSubmodule = deinitialized.files.find(item => item.path === "vendor/child");
+  assert.equal(indexedSubmodule.status, "present");
+  assert.equal(indexedSubmodule.mode, "160000");
+  assert.match(indexedSubmodule.oid, /^[0-9a-f]{40}$/);
 });
 
 test("Git candidates include dirty submodule worktrees", async () => {
@@ -100,6 +111,8 @@ test("Git candidates include dirty submodule worktrees", async () => {
   assert.notEqual(await projectFingerprint(root), before);
   const change = snapshot.changes.find(item => item.path === "vendor/child");
   assert(change.worktree.changes.some(item => item.path === "README.md"));
+  const full = await candidateSnapshot(root, { type: "project" });
+  assert(full.files.find(item => item.path === "vendor/child").worktree.changes.some(item => item.path === "README.md"));
 });
 
 test("commit preparation rejects dirty submodule contents", async () => {
@@ -113,6 +126,9 @@ test("commit preparation rejects dirty submodule contents", async () => {
   await renderChange(root, { kind: "feature", title: "Inspect Submodule", slug: "inspect-submodule" });
   await renderSystem(root);
   const state = {
+    version: 2,
+    type: "change",
+    slug: "inspect-submodule",
     phase: "ready-to-commit",
     git: true,
     kind: "feature",
@@ -122,10 +138,11 @@ test("commit preparation rejects dirty submodule contents", async () => {
     evidence: [],
     reviews: {}
   };
+  state.baseHead = (await execute("git", ["rev-parse", "HEAD"], root)).stdout.trim();
   state.developerApproval = {};
   state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
   const fingerprint = await projectFingerprint(root);
-  state.evidence.push({ expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ expectFail: false, code: 0, fingerprint: await executableFingerprint(root) });
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
   await assert.rejects(prepareCommit(root, state, DEFAULT_CONFIG), /Dirty submodule contents/);
 });
@@ -137,6 +154,9 @@ test("commit preparation clears a deleted embedded repository from the index", a
   await renderSystem(root);
   await writeFile(path.join(root, "app.js"), "export const value = 1;\n");
   const state = {
+    version: 2,
+    type: "change",
+    slug: "prepare-candidate",
     phase: "ready-to-commit",
     git: true,
     kind: "feature",
@@ -146,10 +166,11 @@ test("commit preparation clears a deleted embedded repository from the index", a
     evidence: [],
     reviews: {}
   };
+  state.baseHead = (await execute("git", ["rev-parse", "HEAD"], root)).stdout.trim();
   state.developerApproval = {};
   state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
   const fingerprint = await projectFingerprint(root);
-  state.evidence.push({ expectFail: false, code: 0, fingerprint });
+  state.evidence.push({ expectFail: false, code: 0, fingerprint: await executableFingerprint(root) });
   state.reviews["quality-verifier"] = { verdict: "approved", fingerprint };
 
   const embedded = path.join(root, "generated");

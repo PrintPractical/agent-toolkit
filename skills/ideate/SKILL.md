@@ -37,6 +37,6 @@ Do not reject an idea merely because it is unconventional. Calibrate pushback to
 
 ## Handoff
 
-Enter the design skill only when the engineer explicitly asks to formalize or proceed with a direction. In the same conversation, carry forward the established goal, use cases, decisions, rejected alternatives, constraints, and unresolved questions without asking the engineer to repeat them. Let the design skill create and govern its own artifacts and lifecycle.
+Enter the design skill only when the engineer explicitly asks to formalize or proceed with a direction, frame a project, or design a milestone. In the same conversation, carry forward the established goal, use cases, decisions, rejected alternatives, constraints, and unresolved questions without asking the engineer to repeat them. Let the design skill create and govern its own artifacts and lifecycle.
 
 If the engineer asks for a summary, keep it conversational and compact. Do not create a file solely to bridge ideation into design.

@@ -3,17 +3,18 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { renderChange, renderSystem, slugify, validateArtifacts } from "../src/artifacts.mjs";
+import { projectMilestones, renderChange, renderProject, renderSystem, slugify, sourceRecords, validateArtifacts } from "../src/artifacts.mjs";
 import { createCommit, prepareCommit } from "../src/commit.mjs";
 import { readConfig, writeDefaultConfig } from "../src/config.mjs";
 import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
+import { executableFingerprint } from "../src/fingerprints.mjs";
 import { checkGitHub, ensureIssue, linkIssue } from "../src/github.mjs";
-import { isGitRepository, statusPaths } from "../src/git.mjs";
+import { currentHead, isGitRepository, requireCleanWorktree, statusPaths } from "../src/git.mjs";
 import { helpText } from "../src/help.mjs";
 import { dispositionFinding, prepareReview, recordEscalation, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
-import { advance, completeSlice, createState, findingBlocksCompletion, findingStatus, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState, finalizeProject, findingBlocksCompletion, findingStatus, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, registerMilestone, requireCurrentDesign, selectState, withStateLock } from "../src/state-machine.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -68,6 +69,7 @@ async function initialize() {
   }
   const created = await writeDefaultConfig(root);
   await mkdir(path.join(root, ".agent", "changes"), { recursive: true });
+  await mkdir(path.join(root, ".agent", "projects"), { recursive: true });
   await mkdir(path.join(root, ".agent", ".state"), { recursive: true });
   await ensureGitignore();
   console.log(created ? "Initialized .agent/config.json" : "Toolkit already initialized");
@@ -82,23 +84,53 @@ async function start() {
   if (issue && config.github.issues.policy === "off") {
     throw new Error("--issue requires github.issues.policy to be create or existing");
   }
-  try {
-    const active = await loadState(root);
-    if (active.phase !== "complete") throw new Error(`Active change ${active.slug} is not complete`);
-  } catch (error) {
-    if (!error.message.startsWith("No active change")) throw error;
+  const projectSlug = option("--project");
+  const milestoneRaw = option("--milestone");
+  if (Boolean(projectSlug) !== Boolean(milestoneRaw)) throw new Error("--project and --milestone must be used together");
+  const milestoneNumber = milestoneRaw && Number(milestoneRaw);
+  if (milestoneRaw && (!Number.isInteger(milestoneNumber) || milestoneNumber < 1)) throw new Error("--milestone must be a positive integer");
+  const registry = await loadRegistry(root);
+  const slug = slugify(title);
+  if (registry.workflows.includes(slug)) throw new Error(`Workflow already exists: ${slug}`);
+  const project = projectSlug ? await loadState(root, projectSlug) : null;
+  if (project) {
+    if (project.type !== "project" || project.phase !== "active") throw new Error("--project must identify an active reviewed project");
+    const problems = await validateArtifacts(root, project, { requireSystem: true });
+    if (problems.length) throw new Error(problems.join("\n"));
+    await requireCurrentDesign(root, project);
+    const content = await readFile(path.join(root, project.projectPath), "utf8");
+    const milestone = projectMilestones(content).find(item => item.number === milestoneNumber);
+    if (!milestone) throw new Error(`Unknown project milestone: ${milestoneNumber}`);
+    if (milestone.kind !== kind) throw new Error(`Milestone ${milestoneNumber} requires kind ${milestone.kind}`);
+    if (milestone.status !== "active") throw new Error(`Mark Milestone ${milestoneNumber} active in ${project.projectPath} before starting it`);
+    const incomplete = [];
+    for (const number of milestone.dependencies) if (!await milestoneDeliveryComplete(root, project, number)) incomplete.push(number);
+    if (incomplete.length) throw new Error(`Milestone ${milestoneNumber} is blocked by incomplete milestones: ${incomplete.join(", ")}`);
+    const existing = project.milestones?.[milestoneNumber];
+    if (existing) throw new Error(`Milestone ${milestoneNumber} is already linked to ${existing.workflow}`);
   }
   const git = await isGitRepository(root);
-  if (git && config.completion.commit.policy === "if-git") {
-    const allowed = new Set([".agent/config.json", ".gitignore"]);
-    const unexpected = (await statusPaths(root)).filter(file => !allowed.has(file));
-    if (unexpected.length) throw new Error(`Change startup requires a clean worktree; unexpected changes:\n${unexpected.join("\n")}`);
+  if (git) {
+    if (project && config.completion.commit.policy === "off") {
+      throw new Error("Git project milestones require completion.commit.policy to be if-git so each delivered milestone has an inspected commit");
+    }
+    if (project && await currentHead(root) !== project.baseHead) {
+      throw new Error(`Restore the project checkout at ${project.baseHead || "an unborn HEAD"} before starting Milestone ${milestoneNumber}`);
+    }
+    const allow = [".agent/config.json", ".gitignore"];
+    if (project) allow.push(project.projectPath, ".agent/SYSTEM.md", ...(project.sources || []).map(source => source.path));
+    await requireCleanWorktree(root, { allow, operation: "Change startup" });
+  } else if (registry.current && registry.current !== project?.slug) {
+    const current = await loadState(root, registry.current);
+    const candidate = await executableFingerprint(root);
+    if (current.phase !== "complete" && candidate !== current.baseExecutableFingerprint) {
+      throw new Error(`Finish or restore the executable candidate for ${current.slug} before starting another workflow`);
+    }
   }
   if (config.github.issues.policy !== "off") {
     if (!git) throw new Error("GitHub issue integration requires a Git repository");
     await checkGitHub(root, config);
   }
-  const slug = slugify(title);
   const design = await renderChange(root, { kind, title, slug });
   await renderSystem(root);
   const state = await createState(root, {
@@ -106,20 +138,88 @@ async function start() {
     kind,
     title,
     designPath: path.relative(root, design),
-    git
+    git,
+    baseHead: git ? await currentHead(root) : null,
+    baseExecutableFingerprint: await executableFingerprint(root)
   });
+  if (project) await registerMilestone(root, project, state, milestoneNumber);
   if (issue) await linkIssue(root, state, config, Number(issue));
-  console.log(`Started ${kind} change ${slug}\nDesign: ${state.designPath}\nNext: ${nextAction(state, config)}`);
+  console.log(`Started ${kind} change ${slug}${project ? ` for ${project.slug} Milestone ${milestoneNumber}` : ""}\nDesign: ${state.designPath}\nNext: ${nextAction(state, config)}`);
+}
+
+async function project() {
+  const action = args[1];
+  if (action === "start") {
+    const config = await readConfig(root);
+    const title = option("--title", { required: true });
+    const slug = slugify(title);
+    const registry = await loadRegistry(root);
+    if (registry.workflows.includes(slug)) throw new Error(`Workflow already exists: ${slug}`);
+    const sources = await sourceRecords(root, optionValues("--source"));
+    const git = await isGitRepository(root);
+    if (git && config.completion.commit.policy === "off") {
+      throw new Error("Git rolling projects require completion.commit.policy to be if-git so each delivered milestone has an inspected commit");
+    }
+    if (git) await requireCleanWorktree(root, { allow: [".agent/config.json", ".gitignore", ...sources.map(source => source.path)], operation: "Project startup" });
+    else if (registry.current) {
+      const current = await loadState(root, registry.current);
+      const candidate = await executableFingerprint(root);
+      if (current.phase !== "complete" && candidate !== current.baseExecutableFingerprint) {
+        throw new Error(`Finish or restore the executable candidate for ${current.slug} before starting another workflow`);
+      }
+    }
+    const artifact = await renderProject(root, { title, slug, sources });
+    await renderSystem(root);
+    const state = await createState(root, {
+      type: "project",
+      kind: "project",
+      slug,
+      title,
+      projectPath: path.relative(root, artifact),
+      designPath: path.relative(root, artifact),
+      sources,
+      milestones: {},
+      git,
+      baseHead: git ? await currentHead(root) : null,
+      baseExecutableFingerprint: await executableFingerprint(root)
+    });
+    console.log(`Started project ${slug}\nProject: ${state.projectPath}\nNext: ${nextAction(state, config)}`);
+    return;
+  }
+  if (action === "reconcile") {
+    const state = await loadState(root);
+    const updated = await reconcileMilestone(root, state);
+    console.log(`Reconciled Milestone ${state.milestone.number} into ${updated.slug}`);
+    return;
+  }
+  if (action === "finalize") {
+    const state = await finalizeProject(root, await loadState(root));
+    console.log(`Phase: ${state.phase}\nNext: ${nextAction(state, await readConfig(root))}`);
+    return;
+  }
+  throw new Error("Usage: agent-toolkit project start --title \"...\" [--source <path>...] | project reconcile | project finalize");
 }
 
 async function status() {
   const config = await readConfig(root);
+  const registry = await loadRegistry(root);
+  if (!registry.current) {
+    const empty = { current: null, workflows: [], next: "Start a project or change" };
+    console.log(has("--json") ? JSON.stringify(empty, null, 2) : "No current workflow\nNext: Start a project or change");
+    return;
+  }
   const state = await loadState(root);
   const summary = {
+    current: state.slug,
+    type: state.type,
     change: state.slug,
     kind: state.kind,
     phase: state.phase,
     design: state.designPath,
+    project: state.type === "project" ? state.slug : state.projectSlug || null,
+    projectPath: state.projectPath || null,
+    milestone: state.milestone || null,
+    linkedMilestones: state.type === "project" ? state.milestones : null,
     issue: state.issue || null,
     commit: state.commitSha || null,
     findings: Object.fromEntries(["open", "resolved", "disposition-pending", "disposition-verified", "retired"]
@@ -135,6 +235,51 @@ async function status() {
     next: nextAction(state, config)
   };
   console.log(has("--json") ? JSON.stringify(summary, null, 2) : Object.entries(summary).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join("\n"));
+}
+
+async function workflow() {
+  const action = args[1];
+  if (action === "list") {
+    const registry = await loadRegistry(root);
+    const states = await listStates(root);
+    const workflows = states.map(state => ({
+      slug: state.slug,
+      current: state.slug === registry.current,
+      type: state.type,
+      kind: state.kind,
+      title: state.title,
+      project: state.projectSlug || null,
+      milestone: state.milestone || null,
+      phase: state.phase,
+      commit: state.commitSha || null,
+      createdAt: state.createdAt
+    }));
+    if (has("--json")) console.log(JSON.stringify({ current: registry.current, workflows }, null, 2));
+    else console.log(workflows.map(item => `${item.current ? "*" : " "} ${item.slug} ${item.type}/${item.kind} ${item.phase}`).join("\n") || "No workflows");
+    return;
+  }
+  if (action === "select" && args[2]) {
+    const registry = await loadRegistry(root);
+    const target = await loadState(root, args[2]);
+    if (registry.current === target.slug) {
+      console.log(`Selected ${target.slug}`);
+      return;
+    }
+    if (target.git) {
+      await requireCleanWorktree(root, { operation: "Workflow selection" });
+      const expected = target.type === "change" && target.phase === "complete" && target.commitSha
+        ? target.commitSha
+        : target.baseHead;
+      if (await currentHead(root) !== expected) throw new Error(`Restore the checkout for ${target.slug} at ${expected || "an unborn HEAD"} before selecting it`);
+    } else {
+      const expected = [...target.evidence].reverse().find(item => !item.candidateChanged)?.fingerprint || target.baseExecutableFingerprint;
+      if (expected && await executableFingerprint(root) !== expected) throw new Error(`Restore the executable candidate for ${target.slug} before selecting it`);
+    }
+    await selectState(root, target.slug);
+    console.log(`Selected ${target.slug}\nPhase: ${target.phase}\nNext: ${nextAction(target, await readConfig(root))}`);
+    return;
+  }
+  throw new Error("Usage: agent-toolkit workflow list [--json] | workflow select <slug>");
 }
 
 async function check() {
@@ -194,6 +339,9 @@ async function review() {
   if (action === "prepare") {
     const packet = await prepareReview(root, state, { stage: option("--stage", { required: true }), role: option("--role", { required: true }) }, config);
     const design = await readFile(path.join(root, state.designPath), "utf8");
+    const projectArtifact = state.projectPath && state.projectPath !== state.designPath
+      ? await readFile(path.join(root, state.projectPath), "utf8")
+      : state.type === "project" ? design : "";
     let system = "";
     try { system = await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8"); } catch {}
     const current = state.evidence.filter(item => [packet.evidenceFingerprint, packet.fingerprint].includes(item.fingerprint));
@@ -219,9 +367,13 @@ async function review() {
       fingerprint: item.fingerprint,
       recordedAt: item.recordedAt
     }));
-    const criticInstructions = packet.stage === "design"
-      ? "Perform the cycle's one comprehensive discovery pass. Check every explicit requirement, example, applicable project instruction, support-envelope decision, boundary, abstraction, dependency direction, composition point, file/module placement plan, and planned observable slice. Catch omitted requirements, abstractions that are reviewed but not planned through implementation and tests, and unsupported claims. Report all demonstrated material defects now. Zero findings is valid: do not optimize for finding count, speculative hardening, or exhaustive reversible detail."
-      : "Perform the cycle's one comprehensive discovery pass. Compare the canonical candidate and Implementation Conformance to every explicit reviewed requirement, support-envelope decision, boundary, abstraction, dependency direction, composition point, transaction rule, project module constraint, placement responsibility, and vertical slice. Specifically catch omitted requirements, declared abstractions or implementations that remain scaffolding or unused, concrete infrastructure leaking into inward policy, violated AGENTS.md module constraints, regressions, and slices that do not build and run. Report all demonstrated material defects now. Zero findings is valid; do not optimize for findings or request production changes for hypothetical behavior outside the reviewed contract.";
+    const criticInstructions = state.type === "project"
+      ? packet.stage === "design"
+        ? "Perform the cycle's one comprehensive project-framing pass. Check outcomes, users, non-goals, source traceability, constraints, quality attributes, requirement observability and coverage, risks, decisions, milestone coherence and dependencies, and binding completion criteria. Reject predictive architecture presented as fact and unsupported claims. Report all demonstrated material defects now. Zero findings is valid; do not optimize for finding count or exhaustive reversible detail."
+        : "Perform the cycle's one comprehensive project-integration pass. Check every required outcome, completion criterion, reconciled milestone, project-wide interaction, final integration command and assessment against the complete repository candidate. Catch missing delivery, cross-milestone regressions, stale claims, and incomplete operational behavior. Report all demonstrated material defects now. Zero findings is valid; do not optimize for findings or request work outside the reviewed project contract."
+      : packet.stage === "design"
+        ? "Perform the cycle's one comprehensive discovery pass. Check every explicit requirement, example, applicable project instruction, support-envelope decision, boundary, abstraction, dependency direction, composition point, file/module placement plan, and planned observable slice. Catch omitted requirements, abstractions that are reviewed but not planned through implementation and tests, and unsupported claims. Report all demonstrated material defects now. Zero findings is valid: do not optimize for finding count, speculative hardening, or exhaustive reversible detail."
+        : "Perform the cycle's one comprehensive discovery pass. Compare the canonical candidate and Implementation Conformance to every explicit reviewed requirement, support-envelope decision, boundary, abstraction, dependency direction, composition point, transaction rule, project module constraint, placement responsibility, and vertical slice. Specifically catch omitted requirements, declared abstractions or implementations that remain scaffolding or unused, concrete infrastructure leaking into inward policy, violated AGENTS.md module constraints, regressions, and slices that do not build and run. Report all demonstrated material defects now. Zero findings is valid; do not optimize for findings or request production changes for hypothetical behavior outside the reviewed contract.";
     const verifierInstructions = "Perform closure review, not a second critic pass, in the same verifier context used for this cycle. Check supplied findings and developer dispositions against the remediated candidate and reviewed contract. Reopen a supplied finding when it remains unresolved, a disposition is inaccurate, or a disposition would waive an explicit reviewed requirement or required acceptance. You may report only a demonstrable high-severity regression introduced by remediation. Do not add pre-existing omissions, broaden scope, or demand adjacent hardening. Zero findings is a successful closure result.";
     const commonProperties = {
       severity: { enum: ["high", "medium"] },
@@ -256,13 +408,14 @@ async function review() {
     const verifierFinding = verifierFindingForms.length ? { oneOf: verifierFindingForms } : false;
     console.log(JSON.stringify({
       ...packet,
-      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings. Use one fresh critic context and one distinct verifier context per cycle; reuse that verifier context for closure retries. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Every finding needs a concrete reviewed contract reference, candidate evidence, and observable impact. Write JSON matching the supplied schema directly to findingsPath, including {"findings":[]} for approval. Do not create review output anywhere else in the project.`,
+      instructions: `Review only the supplied project framing, change design when present, system map, canonical candidate, test evidence, and findings. Use one fresh critic context and one distinct verifier context per cycle; reuse that verifier context for closure retries. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Every finding needs a concrete reviewed contract reference, candidate evidence, and observable impact. Write JSON matching the supplied schema directly to findingsPath, including {"findings":[]} for approval. Do not create review output anywhere else in the project.`,
       outputSchema: {
         type: "object",
         additionalProperties: false,
         required: ["findings"],
         properties: { findings: { type: "array", items: packet.role === "critic" ? criticFinding : verifierFinding } }
       },
+      project: projectArtifact,
       design,
       system,
       candidate: packet.candidate,
@@ -355,6 +508,8 @@ async function main() {
     case "install": return install();
     case "init": return initialize();
     case "start": return start();
+    case "project": return project();
+    case "workflow": return workflow();
     case "status": return status();
     case "check": return check();
     case "advance": return runAdvance();
