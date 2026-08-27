@@ -208,8 +208,12 @@ test("workflow registry retains multiple states and changes only the current sel
   assert.equal((await loadState(root, second.slug)).phase, "shaping");
 });
 
-test("reopening a reconciled milestone invalidates its project reconciliation", async () => {
+test("reconciles multiline requirement coverage and invalidates it when reopened", async () => {
   const { root, state: parent, artifact } = await rollingProject();
+  await writeFile(artifact, (await readFile(artifact, "utf8"))
+    .replace("- Acceptance: Its quality verifier approves the integrated candidate.", "- Acceptance: Its quality verifier approves the integrated candidate.\n\n### Requirement REQ-2: Preserve delivery evidence\n- Outcome: Delivery evidence remains linked to the milestone.\n- Acceptance: Reconciliation records the completed requirement.\n\n### Requirement REQ-3: Expose delivery status\n- Outcome: The project records the milestone as delivered.\n- Acceptance: Reconciliation recognizes its completed coverage.")
+    .replace('- Requirements: ["REQ-1"]', '- Requirements: ["REQ-1", "REQ-2", "REQ-3"]')
+    .replace("- REQ-1: Milestone 1 planned.", "- REQ-1: Milestone 1 planned.\n- REQ-2: Milestone 1 planned.\n- REQ-3: Milestone 1 planned."));
   parent.phase = "active";
   await markDesignApproved(root, parent);
   const childArtifact = path.join(root, ".agent", "changes", "milestone-one.md");
@@ -227,7 +231,9 @@ test("reopening a reconciled milestone invalidates its project reconciliation", 
   linked.implementation = { slices: [{ number: 1, completedAt: new Date().toISOString() }] };
   await writeFile(artifact, (await readFile(artifact, "utf8"))
     .replace("- Status: active", "- Status: complete")
-    .replace("- REQ-1: Milestone 1 planned.", "- REQ-1: Milestone 1 complete."));
+    .replace("- REQ-1: Milestone 1 planned.", "- REQ-1: Milestone 1 complete.")
+    .replace("- REQ-2: Milestone 1 planned.", "- REQ-2: Milestone 1 complete with linked evidence.")
+    .replace("- REQ-3: Milestone 1 planned.", "- REQ-3: Milestone 1 complete."));
   await reconcileMilestone(root, linked);
   assert((await loadState(root, parent.slug)).milestones[1].reconciledAt);
   await restartDesignReview(root, linked);

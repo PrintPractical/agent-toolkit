@@ -248,7 +248,7 @@ export async function reconcileMilestone(root, change) {
   const content = await readFile(path.join(root, project.projectPath), "utf8");
   const milestone = projectMilestones(content).find(item => item.number === change.milestone.number);
   if (!milestone || milestone.status !== "complete") throw new Error(`Mark Milestone ${change.milestone.number} complete in ${project.projectPath}`);
-  const coverage = content.match(/^## Requirement Coverage\s*\n([\s\S]*?)(?=\n## |$)/m)?.[1] || "";
+  const coverage = content.match(/^## Requirement Coverage\s*\n([\s\S]*?)(?=\n## |(?![\s\S]))/m)?.[1] || "";
   const missing = change.milestone.requirements.filter(id => !new RegExp(`(^|\\n)[-*]\\s+${id}:.*Milestone ${change.milestone.number}.*complete`, "i").test(coverage));
   if (missing.length) throw new Error(`Record completed requirement coverage for Milestone ${change.milestone.number}: ${missing.join(", ")}`);
   const reconciledAt = new Date().toISOString();
