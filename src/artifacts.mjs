@@ -148,7 +148,7 @@ async function validateProject(root, state, { requireProjectCompletion = false }
     ["Known Constraints", "Record binding product, technical, operational, security, regulatory, compatibility, time, and budget constraints."],
     ["Quality Attributes", "State measurable reliability, performance, security, accessibility, operability, and maintainability expectations that apply."],
     ["Roadmap", "Use `### Milestone N: <independently deliverable outcome>` subsections. Each requires `Kind`, `Outcome`, `Requirements`, `Dependencies`, and `Status`. `Requirements` is a JSON string array of requirement IDs, `Dependencies` is a JSON integer array, and `Status` is `provisional`, `active`, `complete`, `blocked`, or `removed`."],
-    ["Requirement Coverage", "Map every requirement ID to planned or completed milestones and current evidence."],
+    ["Requirement Coverage", "Use one `- REQ-N:` record per requirement. Map planned milestones and record each delivery as `Milestone N ... complete` with current evidence, preserving future milestone assignments."],
     ["Completion Criteria", "State the binding project-wide conditions for declaring the intended outcome complete."]
   ]);
   for (const [name, placeholder] of placeholders) {
