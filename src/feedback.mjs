@@ -47,7 +47,7 @@ export async function recordDeveloperFeedback(root, state, { verdict, notesFile,
   } else {
     const retiredAt = new Date().toISOString();
     for (const finding of state.findings) {
-      if (finding.stage === "design" && !finding.retired) Object.assign(finding, { retired: true, retiredAt });
+      if (finding.stage === "design" && !finding.retired) Object.assign(finding, { status: "retired", retired: true, retiredAt });
     }
     for (const packet of state.packets) {
       if (packet.stage === "design" && !packet.recordedAt && !packet.obsoleteAt) packet.obsoleteAt = retiredAt;

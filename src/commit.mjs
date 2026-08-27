@@ -2,7 +2,7 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { constants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { projectFingerprint, projectSnapshot } from "./fingerprints.mjs";
+import { executableFingerprint, projectFingerprint, projectSnapshot } from "./fingerprints.mjs";
 import { conventionalMessage, run, runGit, statusPaths } from "./git.mjs";
 import { hasRequiredCurrentEvidence, requireCurrentDesign, saveState } from "./state-machine.mjs";
 
@@ -17,12 +17,14 @@ export async function prepareCommit(root, state, config) {
   if (!verified || verified.verdict !== "approved" || verified.fingerprint !== fingerprint) {
     throw new Error("Current change does not match an approved quality-verifier fingerprint");
   }
-  if (!hasRequiredCurrentEvidence(state, fingerprint)) {
+  if (!hasRequiredCurrentEvidence(state, await executableFingerprint(root), fingerprint)) {
     throw new Error(state.kind === "fix"
       ? "Current passing regression evidence is required before commit preparation"
       : "Current passing test evidence is required before commit preparation");
   }
-  if (state.findings.some(item => !item.retired && !item.resolved)) throw new Error("Resolve all findings before commit preparation");
+  if (state.findings.some(item => !["resolved", "disposition-verified", "retired"].includes(item.status || (item.retired ? "retired" : item.resolved ? "resolved" : "open")))) {
+    throw new Error("Resolve or verify a disposition for all findings before commit preparation");
+  }
   const candidate = await projectSnapshot(root);
   const dirtySubmodules = candidate.changes.filter(item => item.mode === "160000" && item.worktree);
   if (dirtySubmodules.length) {

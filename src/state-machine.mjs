@@ -1,14 +1,14 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { artifactFingerprint, designContractFingerprint, projectFingerprint } from "./fingerprints.mjs";
+import { artifactFingerprint, designContractFingerprint, executableFingerprint, projectFingerprint } from "./fingerprints.mjs";
 import { implementationSlices, validateArtifacts } from "./artifacts.mjs";
 import { withDirectoryLock } from "./locks.mjs";
 
 export const PHASES = [
   "shaping", "developer-review", "design-critic", "design-remediation", "design-verifier",
   "ready-to-build", "implementing", "baseline-sealed", "quality-critic",
-  "quality-remediation", "quality-verifier", "ready-to-commit", "complete"
+  "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit", "complete"
 ];
 
 const stateDirectory = root => path.join(root, ".agent", ".state");
@@ -61,34 +61,68 @@ export async function withStateLock(root, operation) {
   return withDirectoryLock(lock, "Another toolkit command is running; retry after it completes", operation);
 }
 
-export function currentEvidence(state, fingerprint, predicate = () => true) {
-  return state.evidence.some(item => item.fingerprint === fingerprint && predicate(item));
+function evidenceFingerprints(fingerprint, legacyFingerprint) {
+  return new Set([fingerprint, legacyFingerprint].filter(Boolean));
 }
 
-export function hasCurrentPassingEvidence(state, fingerprint) {
-  return currentEvidence(state, fingerprint, item => !item.expectFail && item.code === 0);
+function evidenceEligible(item) {
+  return !item.candidateChanged && !item.timedOut && !item.error && !item.signal && Number.isInteger(item.code);
+}
+
+function latestEvidenceByCommand(state, predicate) {
+  const latest = new Map();
+  for (const item of state.evidence) {
+    if (predicate(item)) latest.set(commandKey(item), item);
+  }
+  return [...latest.values()];
+}
+
+export function currentEvidence(state, fingerprint, predicate = () => true, legacyFingerprint) {
+  const fingerprints = evidenceFingerprints(fingerprint, legacyFingerprint);
+  return latestEvidenceByCommand(state, item => fingerprints.has(item.fingerprint))
+    .some(item => evidenceEligible(item) && predicate(item));
+}
+
+export function hasCurrentPassingEvidence(state, fingerprint, legacyFingerprint) {
+  return currentEvidence(state, fingerprint, item => !item.expectFail && item.code === 0, legacyFingerprint);
+}
+
+export function findingStatus(finding) {
+  if (finding.status) return finding.status;
+  if (finding.retired) return "retired";
+  return finding.resolved ? "resolved" : "open";
+}
+
+export function findingNeedsClosure(finding) {
+  return !["resolved", "disposition-pending", "disposition-verified", "retired"].includes(findingStatus(finding));
+}
+
+export function findingBlocksCompletion(finding) {
+  return !["resolved", "disposition-verified", "retired"].includes(findingStatus(finding));
 }
 
 function commandKey(item) {
   return JSON.stringify(item.command);
 }
 
-function missingSliceAcceptance(state, fingerprint) {
-  const available = state.evidence.filter(item => item.kind === "acceptance"
-    && !item.expectFail && item.code === 0 && item.fingerprint === fingerprint);
-  const used = new Set();
+function missingSliceAcceptance(state, fingerprint, legacyFingerprint) {
+  const fingerprints = evidenceFingerprints(fingerprint, legacyFingerprint);
+  const available = latestEvidenceByCommand(state, item => item.kind === "acceptance"
+    && fingerprints.has(item.fingerprint));
+  const requiredCommands = new Set();
   const missing = [];
   for (const slice of state.implementation?.slices || []) {
-    const evidence = available.find(item => !used.has(item.id)
-      && commandKey(item) === JSON.stringify(slice.acceptanceCommand));
-    if (!evidence) missing.push(slice);
-    else used.add(evidence.id);
+    const key = JSON.stringify(slice.acceptanceCommand);
+    if (requiredCommands.has(key)) continue;
+    requiredCommands.add(key);
+    const evidence = available.find(item => commandKey(item) === key);
+    if (!evidence || !evidenceEligible(evidence) || evidence.expectFail || evidence.code !== 0) missing.push(slice);
   }
   return missing;
 }
 
-function currentSliceAcceptance(state, fingerprint) {
-  return missingSliceAcceptance(state, fingerprint).length === 0;
+function currentSliceAcceptance(state, fingerprint, legacyFingerprint) {
+  return missingSliceAcceptance(state, fingerprint, legacyFingerprint).length === 0;
 }
 
 function remediationEvidenceError(state, fingerprint) {
@@ -100,31 +134,33 @@ function remediationEvidenceError(state, fingerprint) {
   return "Run relevant tests for the remediated candidate";
 }
 
-function hasPassingRegression(state, fingerprint) {
+function hasPassingRegression(state, fingerprint, legacyFingerprint) {
+  const fingerprints = evidenceFingerprints(fingerprint, legacyFingerprint);
   const failure = state.evidence.find(item => item.id === state.regression?.evidenceId
-    && item.kind === "regression" && item.expectFail && item.code !== 0);
+    && evidenceEligible(item) && item.kind === "regression" && item.expectFail && item.code !== 0);
   if (!failure || commandKey(failure) !== JSON.stringify(state.regression.command)) return false;
-  return state.evidence.some(item => item.kind === "regression" && !item.expectFail && item.code === 0
-    && item.fingerprint === fingerprint && commandKey(item) === commandKey(failure));
+  const latest = latestEvidenceByCommand(state, item => item.kind === "regression"
+    && fingerprints.has(item.fingerprint)).find(item => commandKey(item) === commandKey(failure));
+  return Boolean(latest && evidenceEligible(latest) && !latest.expectFail && latest.code === 0);
 }
 
-export function hasRequiredCurrentEvidence(state, fingerprint) {
-  return hasCurrentPassingEvidence(state, fingerprint)
-    && (state.kind !== "fix" || hasPassingRegression(state, fingerprint))
-    && (!(state.artifactFormat >= 2) || !state.implementation || currentSliceAcceptance(state, fingerprint));
+export function hasRequiredCurrentEvidence(state, fingerprint, legacyFingerprint) {
+  return hasCurrentPassingEvidence(state, fingerprint, legacyFingerprint)
+    && (state.kind !== "fix" || hasPassingRegression(state, fingerprint, legacyFingerprint))
+    && (!(state.artifactFormat >= 2) || !state.implementation || currentSliceAcceptance(state, fingerprint, legacyFingerprint));
 }
 
-function requireVerifiedCandidate(state, fingerprint) {
+function requireVerifiedCandidate(state, fingerprint, evidenceFingerprint) {
   const verified = state.reviews["quality-verifier"];
   if (!verified || verified.verdict !== "approved" || verified.fingerprint !== fingerprint) {
     throw new Error("Current change does not match the approved quality-verifier candidate");
   }
-  if (!hasRequiredCurrentEvidence(state, fingerprint)) {
+  if (!hasRequiredCurrentEvidence(state, evidenceFingerprint, fingerprint)) {
     throw new Error(state.kind === "fix"
       ? "Current passing evidence for the recorded regression command is required for the verified fix"
       : "Current passing test evidence is required for the verified candidate");
   }
-  if (state.findings.some(item => !item.retired && !item.resolved)) throw new Error("Resolve all findings before completion");
+  if (state.findings.some(findingBlocksCompletion)) throw new Error("Resolve or verify a disposition for all findings before completion");
 }
 
 export async function requireCurrentDesign(root, state) {
@@ -152,17 +188,17 @@ export async function completeSlice(root, state, number) {
     conformanceSliceNumbers: required
   });
   if (problems.length) throw new Error(problems.join("\n"));
-  const fingerprint = await projectFingerprint(root);
+  const fingerprint = await executableFingerprint(root);
+  const legacyFingerprint = await projectFingerprint(root);
   const priorEvidenceIds = new Set(slices.map(slice => slice.evidenceId).filter(Boolean));
   const previousEvidenceId = slices.filter(slice => slice.completedAt).at(-1)?.evidenceId;
   const previousEvidenceIndex = previousEvidenceId
     ? state.evidence.findIndex(item => item.id === previousEvidenceId)
     : state.implementation.evidenceStartIndex - 1;
-  const evidence = state.evidence.slice(previousEvidenceIndex + 1).reverse().find(item => item.kind === "acceptance"
-    && !item.expectFail && item.code === 0 && item.fingerprint === fingerprint
-    && commandKey(item) === JSON.stringify(next.acceptanceCommand)
-    && !priorEvidenceIds.has(item.id));
-  if (!evidence) {
+  const evidence = [...state.evidence.slice(previousEvidenceIndex + 1)].reverse().find(item => item.kind === "acceptance"
+    && [fingerprint, legacyFingerprint].includes(item.fingerprint)
+    && commandKey(item) === JSON.stringify(next.acceptanceCommand) && !priorEvidenceIds.has(item.id));
+  if (!evidence || !evidenceEligible(evidence) || evidence.expectFail || evidence.code !== 0) {
     throw new Error(`Run Slice ${number}'s reviewed acceptance command through: agent-toolkit test --kind acceptance -- ${next.acceptanceCommand.join(" ")}`);
   }
   next.completedAt = new Date().toISOString();
@@ -174,7 +210,8 @@ export async function completeSlice(root, state, number) {
 
 export async function advance(root, state, config) {
   const artifactHash = await artifactFingerprint(root, state);
-  const codeHash = await projectFingerprint(root);
+  const reviewHash = await projectFingerprint(root);
+  const evidenceHash = await executableFingerprint(root);
   switch (state.phase) {
     case "shaping": {
       const problems = await validateArtifacts(root, state, { requireSystem: true });
@@ -183,7 +220,7 @@ export async function advance(root, state, config) {
       break;
     }
     case "design-remediation":
-      if (state.findings.some(item => !item.retired && item.stage === "design" && !item.resolved)) {
+      if (state.findings.some(item => item.stage === "design" && findingNeedsClosure(item))) {
         throw new Error("Resolve all design findings before verification");
       }
       if (state.developerApproval?.fingerprint !== artifactHash) {
@@ -209,8 +246,8 @@ export async function advance(root, state, config) {
         throw new Error("Existing GitHub issue required. Run: agent-toolkit issue link <number>");
       }
       if (state.kind === "fix" && !state.regression) {
-        const failure = [...state.evidence].reverse().find(item => item.fingerprint === codeHash
-          && item.kind === "regression" && item.expectFail && item.code !== 0);
+        const failure = latestEvidenceByCommand(state, item => [evidenceHash, reviewHash].includes(item.fingerprint)
+          && item.kind === "regression").find(item => evidenceEligible(item) && item.expectFail && item.code !== 0);
         if (!failure) throw new Error("Record an expected-failing regression test before implementation");
         state.regression = { evidenceId: failure.id, command: failure.command };
       }
@@ -233,46 +270,46 @@ export async function advance(root, state, config) {
       if (state.artifactFormat >= 2) {
         const incomplete = state.implementation?.slices?.find(slice => !slice.completedAt);
         if (incomplete) throw new Error(`Complete Slice ${incomplete.number} before sealing the implementation`);
-        if (!currentSliceAcceptance(state, codeHash)) {
+        if (!currentSliceAcceptance(state, evidenceHash, reviewHash)) {
           throw new Error("Run each reviewed slice acceptance command against the final candidate before sealing the implementation");
         }
       }
       const problems = await validateArtifacts(root, state, { requireSystem: true, requireConformance: true });
       if (problems.length) throw new Error(problems.join("\n"));
-      const passing = hasCurrentPassingEvidence(state, codeHash);
+      const passing = hasCurrentPassingEvidence(state, evidenceHash, reviewHash);
       if (!passing) throw new Error("Current passing test evidence required before sealing the implementation");
       if (state.kind === "fix") {
-        if (!hasPassingRegression(state, codeHash)) {
+        if (!hasPassingRegression(state, evidenceHash, reviewHash)) {
           throw new Error("Run the recorded regression command successfully before sealing the fix");
         }
       }
-      state.baseline = { fingerprint: codeHash, designFingerprint: artifactHash, sealedAt: new Date().toISOString() };
+      state.baseline = { fingerprint: reviewHash, evidenceFingerprint: evidenceHash, designFingerprint: artifactHash, sealedAt: new Date().toISOString() };
       state.phase = "baseline-sealed";
       break;
     }
     case "baseline-sealed":
-      if (codeHash !== state.baseline.fingerprint) {
+      if (reviewHash !== state.baseline.fingerprint) {
         throw new Error("Candidate changed after baseline sealing; run: agent-toolkit review restart --stage quality");
       }
-      if (!hasRequiredCurrentEvidence(state, codeHash)) {
+      if (!hasRequiredCurrentEvidence(state, evidenceHash, reviewHash)) {
         throw new Error("Current required test evidence no longer matches the sealed baseline");
       }
       state.phase = "quality-critic";
       break;
     case "quality-remediation":
-      if (state.findings.some(item => !item.retired && item.stage === "quality" && !item.resolved)) {
+      if (state.findings.some(item => item.stage === "quality" && findingNeedsClosure(item))) {
         throw new Error("Resolve all quality findings before verification");
       }
-      if (!hasRequiredCurrentEvidence(state, codeHash)) {
+      if (!hasRequiredCurrentEvidence(state, evidenceHash, reviewHash)) {
         throw new Error(state.kind === "fix"
           ? "Run the recorded regression command successfully for the remediated fix"
-          : remediationEvidenceError(state, codeHash));
+          : remediationEvidenceError(state, evidenceHash));
       }
       state.phase = "quality-verifier";
       break;
     case "ready-to-commit":
       await requireCurrentDesign(root, state);
-      requireVerifiedCandidate(state, codeHash);
+      requireVerifiedCandidate(state, reviewHash, evidenceHash);
       if (config.completion.commit.policy === "off" || !state.git) state.phase = "complete";
       else throw new Error("Commit required. Run: agent-toolkit commit prepare");
       break;
@@ -283,6 +320,8 @@ export async function advance(root, state, config) {
       throw new Error(`Review required. Run: agent-toolkit review prepare --stage ${state.phase.startsWith("design") ? "design" : "quality"} --role ${state.phase.endsWith("critic") ? "critic" : "verifier"}`);
     case "developer-review":
       throw new Error("Developer feedback required. Run: agent-toolkit feedback record --verdict approved|changes-requested");
+    case "review-escalation":
+      throw new Error("Developer decision required. Run: agent-toolkit escalation record --decision <decision>");
     case "complete":
       throw new Error("Change is already complete");
     default:
@@ -308,6 +347,7 @@ export function nextAction(state, config) {
     "quality-critic": "agent-toolkit review prepare --stage quality --role critic",
     "quality-remediation": "Resolve quality findings, rerun tests, then run: agent-toolkit advance",
     "quality-verifier": "agent-toolkit review prepare --stage quality --role verifier",
+    "review-escalation": "Disposition remaining findings or record a developer escalation decision",
     "ready-to-commit": state.git && config.completion.commit.policy !== "off" ? "agent-toolkit commit prepare" : "agent-toolkit advance",
     complete: "No action; the change is complete"
   };

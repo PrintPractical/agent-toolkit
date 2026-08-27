@@ -14,7 +14,8 @@ Commands:
   test       Run a command and record fingerprinted test evidence
   slice      Record sequential completion of a reviewed implementation slice
   review     Prepare, record, or restart independent reviews
-  findings   Resolve a remediated review finding
+  findings   Resolve or disposition a review finding
+  escalation Record a developer decision after bounded closure review
   issue      Create or link an optional GitHub issue
   commit     Prepare or create the exact reviewed commit
   help       Show this help or help for one command
@@ -64,10 +65,15 @@ Records one reviewed slice as complete. Slices must be completed in order, their
   agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <packet-findingsPath>
   agent-toolkit review restart --stage design|quality
 
-Critic and verifier must be fresh, distinct reviewers. The critic performs one comprehensive discovery pass. The verifier only checks supplied findings and high-severity regressions introduced by remediation; it is not a second critic. Every response, including approval, must be JSON matching outputSchema saved to the packet's exact runtime-only findingsPath.`,
-  findings: `Usage: agent-toolkit findings resolve <id>
+The critic performs one comprehensive discovery pass in a fresh context. One distinct verifier context checks only supplied findings, developer dispositions, and high-severity regressions introduced by remediation, and that verifier context is reused for closure retries. After the configured rejection limit, the workflow requires explicit developer escalation. Every response, including zero-finding approval, must be JSON matching outputSchema saved to the packet's exact runtime-only findingsPath.`,
+  findings: `Usage:
+  agent-toolkit findings resolve <id>
+  agent-toolkit findings disposition <id> --outcome not-applicable|outside-contract|not-material|duplicate|deferred --reason "..." [--duplicate-of <id>] [--follow-up <reference>]
 
-Marks one review finding resolved after its remediation is complete.`,
+Marks a remediated finding resolved, or records a reasoned developer disposition during review escalation. Dispositions remain pending until the cycle's verifier confirms them.`,
+  escalation: `Usage: agent-toolkit escalation record --decision continue|retry|require-proof|restart-quality|restart-design|split|stop [--reason "..."]
+
+Records the developer's explicit decision after bounded verifier closure. Continue requires every finding resolved or dispositioned and still requires final verifier approval. Retry authorizes one additional focused remediation attempt; it does not start another critic.`,
   issue: `Usage:
   agent-toolkit issue ensure
   agent-toolkit issue link <number>

@@ -39,6 +39,9 @@ Name each responsibility and dependency direction. For storage, transport, clock
 ## Public Interfaces and Errors
 Specify changed commands, APIs, events, schemas, compatibility, idempotency, and error semantics. If none, say why.
 
+## Applicable Support Envelope
+For risky behavior, state the supported inputs and limits, identity semantics, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees that apply. Mark irrelevant dimensions as not applicable and keep unsupported horizons out of the implementation contract.
+
 ## Abstraction and Extension Pressure
 List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.
 

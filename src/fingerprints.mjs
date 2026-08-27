@@ -160,6 +160,23 @@ export async function projectFingerprint(root) {
   return snapshotFingerprint(await projectSnapshot(root));
 }
 
+function isWorkflowArtifact(record) {
+  const value = record.path;
+  if (typeof value !== "string") return false;
+  return value === ".agent" || value.startsWith(".agent/");
+}
+
+export async function executableSnapshot(root) {
+  const snapshot = await projectSnapshot(root);
+  return snapshot.repository === "git"
+    ? { ...snapshot, changes: snapshot.changes.filter(record => !isWorkflowArtifact(record)) }
+    : { ...snapshot, files: snapshot.files.filter(record => !isWorkflowArtifact(record)) };
+}
+
+export async function executableFingerprint(root) {
+  return snapshotFingerprint(await executableSnapshot(root));
+}
+
 export async function artifactSnapshot(root, state) {
   const designPath = state.designPath.split(path.sep).join("/");
   const systemPath = ".agent/SYSTEM.md";

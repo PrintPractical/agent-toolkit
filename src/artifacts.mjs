@@ -136,7 +136,7 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     if (!body || untouched.includes(body)) problems.push(`Complete the ${names.split("|")[0]} section before developer review`);
   }
   const conformance = section("Implementation Conformance");
-  if (requireConformance || ["baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "ready-to-commit", "complete"].includes(state.phase)) {
+  if (requireConformance || ["baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit", "complete"].includes(state.phase)) {
     const part = name => conformance?.match(new RegExp(`^### ${name}\\s*\\n([\\s\\S]*?)(?=\\n### |(?![\\s\\S]))`, "m"))?.[1] || "";
     const architecture = part("Architecture Decisions");
     const sliceEvidence = part("Slice Completion");

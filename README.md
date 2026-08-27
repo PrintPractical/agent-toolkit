@@ -46,13 +46,13 @@ The lifecycle is enforced rather than inferred from prose:
 
 1. Shape and validate the design, expected file/module placement, implementation plan, and minimal system map in one change artifact.
 2. Pause for developer feedback. Requested changes return to shaping; explicit developer approval advances to independent review.
-3. Send a fresh design packet to a critic for one comprehensive discovery pass, remediate material findings when requested, then use a distinct fresh verifier for closure.
-4. Implement the reviewed architecture as runnable vertical slices. Each slice has an executable acceptance command and must be recorded with fresh, one-use evidence through `slice complete` before the next one begins. Before baseline sealing, every slice command must pass again against the final candidate. A fix must first record an expected-failing regression test.
+3. Send a fresh design packet to a critic for the cycle's one comprehensive discovery pass, remediate material findings when requested, then use one distinct fresh verifier context for closure retries.
+4. Implement the reviewed architecture as runnable vertical slices. Each slice has an executable acceptance command and must be recorded with fresh, one-use evidence through `slice complete` before the next one begins. Before baseline sealing, each distinct command needs current executable-candidate evidence; duplicate commands and artifact-only edits do not force duplicate runs. Independent blocker audits are not part of implementation. A fix must first record an expected-failing regression test.
 5. Map reviewed abstractions, dependency rules, project module constraints, and expected placement to code in `Implementation Conformance`, record passing test evidence for the current project fingerprint, then seal the implementation baseline.
-6. Send the sealed result to a fresh quality critic for one comprehensive discovery pass, remediate and retest when needed, then use a distinct fresh verifier for closure.
+6. Send the sealed result to a fresh quality critic for one comprehensive discovery pass, including omitted requirements and unimplemented reviewed abstractions. Findings require concrete contract references, candidate evidence, and observable impact. Remediate narrowly, then use one distinct verifier context for closure. Two verifier rejections enter explicit developer escalation rather than a third automatic remediation cycle; dispositions still require final verifier approval.
 7. In Git repositories with commit integration enabled, inspect the commit plan and create one conventional final commit. The toolkit never pushes. In non-Git projects, or when commit integration is off, completion does not require a commit.
 
-Review packets become stale if their reviewed content changes. Reviewer IDs are required, and critic and verifier identities must differ; the skills require separate fresh contexts rather than self-approval. A critic performs the only discovery pass and must complete its packet's applicable risk checklist before reporting all material findings together. A verifier is limited to reopening supplied findings or reporting a high-severity regression introduced by remediation, preventing repeated scope expansion. New packets provide a runtime-only `findingsPath` under `.agent/.state/`; every response must be written directly to that exact path as JSON matching the packet's `outputSchema`, including `{"findings":[]}` for approval. Review scratch files must not be created elsewhere in the project, and Markdown is rejected. Test evidence records the command, kind (`regression`, `unit`, `integration`, or `acceptance`), result, bounded output, timestamp, and project fingerprint; commands that mutate the candidate are rejected. Material design drift requires `review restart --stage design`. Candidate drift after critic approval or baseline sealing requires `review restart --stage design|quality` so a fresh critic sees the replacement candidate.
+Review packets become stale if their reviewed content changes. Reviewer IDs are required, critic and verifier identities must differ, and closure retries reuse the first verifier identity. A critic performs the only discovery pass and reports all demonstrated material findings together; zero findings is valid. A verifier may reopen supplied findings, reject inaccurate dispositions, or report a demonstrable high-severity regression introduced by remediation, but cannot add pre-existing omissions or broaden scope. Protocol 3 findings require `contractReference`, `evidence`, and `observableImpact`; protocol 2 packets from active older workflows remain recordable. New packets provide a runtime-only `findingsPath` under `.agent/.state/`; every response must be JSON matching `outputSchema`, including `{"findings":[]}` for approval. Test attempts, including failures and timeouts, are recorded with bounded output. Tests use an executable-content fingerprint separate from review artifacts, have a configurable timeout, and are rejected if they mutate executable content. Material design drift requires `review restart --stage design`; candidate drift after critic approval or baseline sealing requires a review restart.
 
 There is no separate plan artifact or planning ceremony. During shaping, the design skill writes both a required `File and Module Placement Plan` and the `Implementation Plan`. Placement names expected additions, modifications, moves, or deletions and their responsibilities, project constraints, boundaries, and slices. Its paths are reviewed forecasts rather than an exhaustive manifest: build may add support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact, with meaningful differences explained in `Implementation Conformance`. Each required slice subsection crosses every layer needed for one observable outcome; domain-only, persistence-only, transport-only, and wiring-only phases are rejected as plans. New workflows bind each slice to a reviewed JSON-array acceptance command, sequential runtime completion, and a matching individual conformance record; aggregate claims such as “Slices 1-3 baseline” cannot seal a build. Developer feedback reviews that plan and the abstraction decisions together before independent criticism, and reviews the final remediated design again if critic changes altered it. During build, the default organization is a shallow module tree of small cohesive, independently testable concepts rather than layer-wide files or deeply nested ceremony. Logical dependency boundaries apply inside a single crate or package and cannot be replaced by a packaging decision.
 
@@ -67,6 +67,15 @@ GitHub issues are optional. Set the policy to `off` (default), `create`, or `exi
 ```json
 {
   "version": 1,
+  "review": {
+    "maxClosureRejections": 2,
+    "requireFindingEvidence": true,
+    "reuseVerifierContext": true
+  },
+  "evidence": {
+    "deduplicateCommands": true,
+    "timeoutMs": 1200000
+  },
   "completion": {
     "commit": {
       "policy": "if-git",
@@ -85,7 +94,7 @@ GitHub issues are optional. Set the policy to `off` (default), `create`, or `exi
 }
 ```
 
-`completion.commit.policy` accepts `if-git` or `off`. `github.issues.policy` accepts `off`, `create`, or `existing`; `repository` may be `auto` or a GitHub repository understood by `gh`; `commitLink` accepts `closes` or `references`.
+Missing `review` and `evidence` sections in existing version 1 configs receive these defaults. Closure rejection limits and evidence timeouts must be positive integers; finding evidence, verifier-context reuse, and command deduplication remain required safeguards. `completion.commit.policy` accepts `if-git` or `off`. `github.issues.policy` accepts `off`, `create`, or `existing`; `repository` may be `auto` or a GitHub repository understood by `gh`; `commitLink` accepts `closes` or `references`.
 
 ## CLI
 
@@ -103,6 +112,8 @@ agent-toolkit review prepare --stage design|quality --role critic|verifier
 agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <packet-findingsPath>
 agent-toolkit review restart --stage design|quality
 agent-toolkit findings resolve <id>
+agent-toolkit findings disposition <id> --outcome not-applicable|outside-contract|not-material|duplicate|deferred --reason "..."
+agent-toolkit escalation record --decision continue|retry|require-proof|restart-quality|restart-design|split|stop [--reason "..."]
 agent-toolkit issue ensure
 agent-toolkit issue link <number>
 agent-toolkit commit prepare

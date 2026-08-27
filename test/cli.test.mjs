@@ -82,6 +82,19 @@ test("status excludes findings retired by an abandoned review cycle", async () =
   assert.equal(JSON.parse(result.stdout).unresolvedFindings, 0);
 });
 
+test("status keeps pending dispositions unresolved until verifier approval", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Pending Disposition"]);
+  const stateFile = path.join(root, ".agent", ".state", "pending-disposition.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.findings.push({ id: "pending", stage: "design", status: "disposition-pending", resolved: false });
+  await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  const status = JSON.parse((await runCli(root, ["status", "--json"])).stdout);
+  assert.equal(status.unresolvedFindings, 1);
+  assert.equal(status.findings["disposition-pending"], 1);
+});
+
 test("review packets distinguish critic discovery from verifier closure", async () => {
   const root = await temporaryDirectory();
   await runCli(root, ["init"]);
@@ -93,11 +106,11 @@ test("review packets distinguish critic discovery from verifier closure", async 
   const criticResult = await runCli(root, ["review", "prepare", "--stage", "design", "--role", "critic"]);
   assert.equal(criticResult.code, 0, criticResult.stderr);
   const critic = JSON.parse(criticResult.stdout);
-  assert.equal(critic.protocol, 2);
+  assert.equal(critic.protocol, 3);
   assert.match(critic.instructions, /one comprehensive discovery pass/i);
   assert.match(critic.instructions, /file\/module placement plan/);
   assert.equal(critic.outputSchema.type, "object");
-  assert.deepEqual(critic.outputSchema.properties.findings.items.required, ["severity", "description"]);
+  assert.deepEqual(critic.outputSchema.properties.findings.items.required, ["severity", "description", "contractReference", "evidence", "observableImpact"]);
   assert.deepEqual(critic.outputSchema.properties.findings.items.properties.severity.enum, ["high", "medium"]);
   const criticFindings = path.join(root, critic.findingsPath);
   await writeFile(criticFindings, JSON.stringify({ findings: [] }));
@@ -152,7 +165,7 @@ test("review packets include bounded test output", async () => {
   assert(output.length <= 1000);
 });
 
-test("bounded fix packets retain the historical regression failure", async () => {
+test("fix packets retain distinct evidence summaries and bound detailed output", async () => {
   const root = await temporaryDirectory();
   await runCli(root, ["init"]);
   await runCli(root, ["start", "--kind", "fix", "--title", "Repair Search"]);
@@ -173,14 +186,21 @@ test("bounded fix packets retain the historical regression failure", async () =>
   const prepared = await runCli(root, ["review", "prepare", "--stage", "quality", "--role", "critic"]);
   assert.equal(prepared.code, 0, prepared.stderr);
   const packet = JSON.parse(prepared.stdout);
-  assert.match(packet.instructions, /Concrete infrastructure leaking into inward policy/);
+  assert.match(packet.instructions, /concrete infrastructure leaking into inward policy/);
   assert.match(packet.instructions, /AGENTS\.md module constraint/);
   const tests = packet.tests;
-  assert.equal(tests.length, 8);
+  assert.equal(tests.length, 10);
+  assert.equal(tests.filter(item => !item.outputOmitted).length, 8);
   assert(tests.some(item => item.kind === "regression" && item.expectFail));
   assert(tests.some(item => item.kind === "regression" && !item.expectFail));
   const findingsPath = path.join(root, packet.findingsPath);
-  await writeFile(findingsPath, JSON.stringify({ findings: [{ severity: "medium", description: "Concrete storage leaked into application policy" }] }));
+  await writeFile(findingsPath, JSON.stringify({ findings: [{
+    severity: "medium",
+    description: "Concrete storage leaked into application policy",
+    contractReference: "Reviewed dependency direction",
+    evidence: "The candidate imports the storage adapter from application policy",
+    observableImpact: "Application policy is coupled to concrete storage"
+  }] }));
   const recorded = await runCli(root, ["review", "record", "--packet", packet.id, "--verdict", "changes-requested", "--reviewer", "quality-critic", "--findings", findingsPath]);
   assert.equal(recorded.code, 0, recorded.stderr);
 });

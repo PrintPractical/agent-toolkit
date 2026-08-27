@@ -11,9 +11,9 @@ import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { checkGitHub, ensureIssue, linkIssue } from "../src/github.mjs";
 import { isGitRepository, statusPaths } from "../src/git.mjs";
 import { helpText } from "../src/help.mjs";
-import { prepareReview, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
+import { dispositionFinding, prepareReview, recordEscalation, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
-import { advance, completeSlice, createState, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
+import { advance, completeSlice, createState, findingBlocksCompletion, findingStatus, loadState, nextAction, withStateLock } from "../src/state-machine.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -122,7 +122,10 @@ async function status() {
     design: state.designPath,
     issue: state.issue || null,
     commit: state.commitSha || null,
-    unresolvedFindings: state.findings.filter(item => !item.retired && !item.resolved).length,
+    findings: Object.fromEntries(["open", "resolved", "disposition-pending", "disposition-verified", "retired"]
+      .map(status => [status, state.findings.filter(item => findingStatus(item) === status).length])),
+    unresolvedFindings: state.findings.filter(findingBlocksCompletion).length,
+    reviewEscalation: state.reviewEscalation || null,
     developerFeedback: state.developerFeedback?.at(-1) || null,
     slices: state.implementation?.slices?.map(slice => ({
       number: slice.number,
@@ -169,7 +172,7 @@ async function test() {
     expectFail: has("--expect-fail"),
     command,
     args: commandArgs
-  });
+  }, await readConfig(root));
   console.log(`Recorded ${evidence.kind} evidence (${evidence.expectFail ? "expected failure" : "passed"})`);
 }
 
@@ -187,57 +190,73 @@ async function slice() {
 async function review() {
   const action = args[1];
   const state = await loadState(root);
+  const config = await readConfig(root);
   if (action === "prepare") {
-    const packet = await prepareReview(root, state, { stage: option("--stage", { required: true }), role: option("--role", { required: true }) });
+    const packet = await prepareReview(root, state, { stage: option("--stage", { required: true }), role: option("--role", { required: true }) }, config);
     const design = await readFile(path.join(root, state.designPath), "utf8");
     let system = "";
     try { system = await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8"); } catch {}
-    const current = state.evidence.filter(item => item.fingerprint === packet.fingerprint);
+    const current = state.evidence.filter(item => [packet.evidenceFingerprint, packet.fingerprint].includes(item.fingerprint));
     const regression = state.regression
       ? state.evidence.find(item => item.id === state.regression.evidenceId)
       : [...state.evidence].reverse().find(item => item.kind === "regression" && item.expectFail);
     const regressionPass = regression && [...current].reverse().find(item => item.kind === "regression" && !item.expectFail
       && JSON.stringify(item.command) === JSON.stringify(regression.command));
-    const required = [regression, regressionPass].filter(Boolean);
-    const remaining = current.filter(item => !required.includes(item));
-    const selected = required.length ? [...required, ...remaining.slice(-(8 - required.length))] : current.slice(-8);
-    const tests = selected.map(item => ({ kind: item.kind, expectFail: item.expectFail, command: item.command, code: item.code, output: item.output.slice(-1000), fingerprint: item.fingerprint, recordedAt: item.recordedAt }));
+    const latestByCommand = new Map();
+    for (const item of current) latestByCommand.set(JSON.stringify([item.kind, item.expectFail, item.command]), item);
+    for (const item of [regression, regressionPass].filter(Boolean)) latestByCommand.set(item.id, item);
+    const selected = [...new Set(latestByCommand.values())];
+    const outputRecords = new Set(selected.slice(-8));
+    const tests = selected.map(item => ({
+      kind: item.kind,
+      expectFail: item.expectFail,
+      command: item.command,
+      code: item.code,
+      timedOut: item.timedOut || false,
+      candidateChanged: item.candidateChanged || false,
+      output: outputRecords.has(item) ? item.output.slice(-1000) : "",
+      outputOmitted: !outputRecords.has(item),
+      fingerprint: item.fingerprint,
+      recordedAt: item.recordedAt
+    }));
     const criticInstructions = packet.stage === "design"
-      ? "Perform one comprehensive discovery pass. Check that every stated source requirement and applicable project instruction is traced, meaningful domain and infrastructure boundaries have inward-owned contracts, dependency direction and composition are explicit, direct coupling is justified, and the file/module placement plan assigns cohesive responsibilities without treating forecast paths as an exhaustive manifest. Confirm each implementation slice delivers runnable vertical behavior. Report all material correctness, domain, contract, architecture, organization, risk, and test defects now. Do not demand exhaustive specification of reversible local details."
-      : "Perform one comprehensive discovery pass. Compare the canonical candidate and Implementation Conformance section to every reviewed requirement, boundary, abstraction, dependency direction, composition point, transaction rule, project module constraint, expected placement, and vertical slice. Distinguish harmless forecast-path differences from violated responsibilities or organization rules. Concrete infrastructure leaking into inward policy, an omitted reviewed abstraction, a violated AGENTS.md module constraint, horizontal incomplete scaffolding, or a claimed slice that does not build and run is a material finding. Then inspect correctness, cohesion, test quality, regressions, and design drift. Report all material defects now; omit preference-only comments.";
-    const verifierInstructions = "Perform a closure review, not a second critic pass. Check the supplied findings against the remediated candidate. Request changes only when a supplied finding remains unresolved or remediation introduced a new high-severity regression. Do not add pre-existing omissions, broaden scope, or demand greater specification completeness.";
+      ? "Perform the cycle's one comprehensive discovery pass. Check every explicit requirement, example, applicable project instruction, support-envelope decision, boundary, abstraction, dependency direction, composition point, file/module placement plan, and planned observable slice. Catch omitted requirements, abstractions that are reviewed but not planned through implementation and tests, and unsupported claims. Report all demonstrated material defects now. Zero findings is valid: do not optimize for finding count, speculative hardening, or exhaustive reversible detail."
+      : "Perform the cycle's one comprehensive discovery pass. Compare the canonical candidate and Implementation Conformance to every explicit reviewed requirement, support-envelope decision, boundary, abstraction, dependency direction, composition point, transaction rule, project module constraint, placement responsibility, and vertical slice. Specifically catch omitted requirements, declared abstractions or implementations that remain scaffolding or unused, concrete infrastructure leaking into inward policy, violated AGENTS.md module constraints, regressions, and slices that do not build and run. Report all demonstrated material defects now. Zero findings is valid; do not optimize for findings or request production changes for hypothetical behavior outside the reviewed contract.";
+    const verifierInstructions = "Perform closure review, not a second critic pass, in the same verifier context used for this cycle. Check supplied findings and developer dispositions against the remediated candidate and reviewed contract. Reopen a supplied finding when it remains unresolved, a disposition is inaccurate, or a disposition would waive an explicit reviewed requirement or required acceptance. You may report only a demonstrable high-severity regression introduced by remediation. Do not add pre-existing omissions, broaden scope, or demand adjacent hardening. Zero findings is a successful closure result.";
     const commonProperties = {
       severity: { enum: ["high", "medium"] },
-      description: { type: "string", minLength: 1, pattern: "\\S" }
+      description: { type: "string", minLength: 1, pattern: "\\S" },
+      contractReference: { type: "string", minLength: 1, pattern: "\\S" },
+      evidence: { type: "string", minLength: 1, pattern: "\\S" },
+      observableImpact: { type: "string", minLength: 1, pattern: "\\S" }
     };
     const criticFinding = {
       type: "object",
       additionalProperties: false,
-      required: ["severity", "description"],
+      required: ["severity", "description", "contractReference", "evidence", "observableImpact"],
       properties: commonProperties
     };
     const verifierFindingForms = [];
     if (packet.findingIds.length) verifierFindingForms.push({
       type: "object",
       additionalProperties: false,
-      required: ["severity", "description", "sourceFindingId"],
+      required: ["severity", "description", "contractReference", "evidence", "observableImpact", "sourceFindingId"],
       properties: { ...commonProperties, sourceFindingId: { type: "string", enum: packet.findingIds } }
     });
     if (state.reviews[`${packet.stage}-critic`]?.verdict === "changes-requested") verifierFindingForms.push({
       type: "object",
       additionalProperties: false,
-      required: ["severity", "description", "introducedByRemediation", "evidence"],
+      required: ["severity", "description", "contractReference", "evidence", "observableImpact", "introducedByRemediation"],
       properties: {
+        ...commonProperties,
         severity: { const: "high" },
-        description: commonProperties.description,
         introducedByRemediation: { const: true },
-        evidence: { type: "string", minLength: 1, pattern: "\\S" }
       }
     });
     const verifierFinding = verifierFindingForms.length ? { oneOf: verifierFindingForms } : false;
     console.log(JSON.stringify({
       ...packet,
-      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings in a fresh context. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Write JSON matching the supplied schema directly to findingsPath, including {"findings":[]} for approval. Do not create review output anywhere else in the project.`,
+      instructions: `Review only the supplied design, system map, canonical candidate, test evidence, and findings. Use one fresh critic context and one distinct verifier context per cycle; reuse that verifier context for closure retries. ${packet.role === "critic" ? criticInstructions : verifierInstructions} Every finding needs a concrete reviewed contract reference, candidate evidence, and observable impact. Write JSON matching the supplied schema directly to findingsPath, including {"findings":[]} for approval. Do not create review output anywhere else in the project.`,
       outputSchema: {
         type: "object",
         additionalProperties: false,
@@ -257,8 +276,7 @@ async function review() {
       verdict: option("--verdict", { required: true }),
       reviewer: option("--reviewer"),
       findingsFile: option("--findings")
-    });
-    const config = await readConfig(root);
+    }, config);
     console.log(`Phase: ${updated.phase}\nNext: ${nextAction(updated, config)}`);
     return;
   }
@@ -266,7 +284,6 @@ async function review() {
     const stage = option("--stage", { required: true });
     if (!["design", "quality"].includes(stage)) throw new Error("Review restart stage must be design or quality");
     const updated = stage === "design" ? await restartDesignReview(root, state) : await restartQualityReview(root, state);
-    const config = await readConfig(root);
     console.log(`Phase: ${updated.phase}\nNext: ${nextAction(updated, config)}`);
     return;
   }
@@ -274,9 +291,27 @@ async function review() {
 }
 
 async function findings() {
-  if (args[1] !== "resolve" || !args[2]) throw new Error("Usage: agent-toolkit findings resolve <id>");
-  const finding = await resolveFinding(root, await loadState(root), args[2]);
-  console.log(`Resolved: ${finding.description}`);
+  const action = args[1];
+  if (!args[2]) throw new Error("Usage: agent-toolkit findings resolve|disposition <id> ...");
+  const finding = action === "resolve"
+    ? await resolveFinding(root, await loadState(root), args[2])
+    : action === "disposition"
+      ? await dispositionFinding(root, await loadState(root), args[2], {
+        outcome: option("--outcome", { required: true }),
+        reason: option("--reason", { required: true }),
+        duplicateOf: option("--duplicate-of"),
+        followUp: option("--follow-up")
+      })
+      : null;
+  if (!finding) throw new Error("Usage: agent-toolkit findings resolve|disposition <id> ...");
+  console.log(`${action === "resolve" ? "Resolved" : "Disposition pending verification"}: ${finding.description}`);
+}
+
+async function escalation() {
+  if (args[1] !== "record") throw new Error("Usage: agent-toolkit escalation record --decision <decision> [--reason <text>]");
+  const updated = await recordEscalation(root, await loadState(root), option("--decision", { required: true }), option("--reason"));
+  const config = await readConfig(root);
+  console.log(`Phase: ${updated.phase}\nNext: ${nextAction(updated, config)}`);
 }
 
 async function issue() {
@@ -328,6 +363,7 @@ async function main() {
     case "slice": return slice();
     case "review": return review();
     case "findings": return findings();
+    case "escalation": return escalation();
     case "issue": return issue();
     case "commit": return commit();
     default:
