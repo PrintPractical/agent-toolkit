@@ -10,12 +10,12 @@ async function completePlan(root, slug) {
   const content = await readFile(file, "utf8");
   await writeFile(file, content
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Search behavior -> use case, interface, and tests.\n")
-    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns a SearchIndex port; the storage adapter implements it outward and composition occurs at startup.\n")
-    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. SearchIndex has a query contract owned by its application consumer and a real storage implementation.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Search uses the storage integration and handles unavailable storage.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. SearchIndex provides the query behavior used by search.\n")
     .replace(/(## Existing Capabilities and Reuse\n)[\s\S]*?(?=\n## )/, "$11. Inspected SearchIndex; extend it because it owns search query behavior.\n")
-    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/search.js | Modify | Search application behavior | Preserve the SearchIndex boundary | 1 |\n")
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the SearchIndex port through its storage adapter.\n- Tests: Ranking unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and both tests pass.\n`)
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: SearchIndex is application-owned.\n- Implementation: The storage adapter implements SearchIndex outward.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/search.js | Modify | Search behavior | Use the existing SearchIndex | 1 |\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the existing search index.\n- Tests: Ranking unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and both tests pass.\n`)
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Search uses the existing index.\n- Implementation: The search command queries storage.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
 }
 
 async function completeProject(root, slug, { complete = false } = {}) {
@@ -311,7 +311,7 @@ test("fix packets retain distinct evidence summaries and bound detailed output",
   const prepared = await runCli(root, ["review", "prepare", "--stage", "quality", "--role", "critic"]);
   assert.equal(prepared.code, 0, prepared.stderr);
   const packet = JSON.parse(prepared.stdout);
-  assert.match(packet.instructions, /concrete infrastructure leaking into inward policy/);
+  assert.match(packet.instructions, /violated AGENTS\.md module constraints/);
   assert.match(packet.instructions, /AGENTS\.md module constraint/);
   const tests = packet.tests;
   assert.equal(tests.length, 10);
@@ -321,10 +321,10 @@ test("fix packets retain distinct evidence summaries and bound detailed output",
   const findingsPath = path.join(root, packet.findingsPath);
   await writeFile(findingsPath, JSON.stringify({ findings: [{
     severity: "medium",
-    description: "Concrete storage leaked into application policy",
-    contractReference: "Reviewed dependency direction",
-    evidence: "The candidate imports the storage adapter from application policy",
-    observableImpact: "Application policy is coupled to concrete storage"
+    description: "Storage integration violates the reviewed module constraint",
+    contractReference: "Reviewed module constraint",
+    evidence: "The candidate imports storage from a prohibited module",
+    observableImpact: "The module layout no longer follows the project instruction"
   }] }));
   const recorded = await runCli(root, ["review", "record", "--packet", packet.id, "--verdict", "changes-requested", "--reviewer", "quality-critic", "--findings", findingsPath]);
   assert.equal(recorded.code, 0, recorded.stderr);

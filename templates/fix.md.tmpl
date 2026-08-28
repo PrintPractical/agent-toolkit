@@ -27,11 +27,11 @@ Identify the test, why its level is reliable, the command, and its expected beha
 ## Concrete Examples
 Give the failing example plus adjacent happy, edge, and failure cases.
 
-## Domain Concepts, Rules, and Invariants
-Define relevant language and the rules the correction must restore. If none, say why.
+## Key Concepts and Rules
+Define relevant terms and the rules the correction must restore. If none, say why.
 
 ## Boundaries and Dependencies
-Name affected responsibilities and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency.
+Name affected responsibilities, dependency direction, integration points, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints.
 
 ## Public Interfaces and Errors
 Record compatibility, schemas, commands, APIs, events, and error semantics. If unchanged, say why.
@@ -40,7 +40,7 @@ Record compatibility, schemas, commands, APIs, events, and error semantics. If u
 For the corrected path, state the supported inputs and limits, identity semantics, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees that apply. Mark irrelevant dimensions as not applicable; do not broaden the fix for unsupported hypothetical behavior.
 
 ## Correction and Extension Pressure
-Describe the correction at the rule-owning level. List affected abstractions and contracts; prefer a narrow inward-owned port where the defect exposes an infrastructure or domain boundary. Record related extension pressure without generic layering.
+Describe the correction at the rule-owning location. List affected abstractions and contracts, and record related extension pressure without generic layering.
 
 ## Existing Capabilities and Reuse
 Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether the correction extends it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.

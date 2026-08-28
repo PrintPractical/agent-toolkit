@@ -1,7 +1,7 @@
 {
   "name": "agent-toolkit",
   "version": "2.4.0",
-  "description": "Adaptive domain-to-delivery skills with objective workflow gates",
+  "description": "Adaptive delivery skills with objective workflow gates",
   "type": "module",
   "bin": {
     "agent-toolkit": "./bin/agent-toolkit.mjs"

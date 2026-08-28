@@ -18,7 +18,7 @@ test("repository exposes exactly the four public skills within budgets", async (
   for (const name of ["build", "design", "fix"]) {
     const content = await readFile(path.join(directory, name, "SKILL.md"), "utf8");
     assert.match(content, /## Project Instructions\n\nBefore planning or editing, read every applicable `AGENTS\.md` in the project\. Treat its instructions as binding requirements for all subsequent work\. If this skill's general guidance conflicts with an `AGENTS\.md` requirement, the `AGENTS\.md` takes precedence; do not simplify, reinterpret, or override that requirement\./);
-    assert.match(content, /Where project instructions do not prescribe module layout,/);
+    assert.doesNotMatch(content, /(?i:domain-driven|\bDDD\b|ubiquitous language|bounded context|value object|domain service)/);
   }
   const design = await readFile(path.join(directory, "design", "SKILL.md"), "utf8");
   const build = await readFile(path.join(directory, "build", "SKILL.md"), "utf8");

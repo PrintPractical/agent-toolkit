@@ -38,34 +38,22 @@ Shape `.agent/changes/<slug>.md`. For a milestone, read its project frame, sourc
 
 1. State the observable outcome and explicit non-goals.
 2. Enumerate every explicit source requirement, including applicable project instructions, and trace it to a use case, rule, interface, test, placement constraint, or non-goal. Then identify actors and desired outcomes across now, next, and later horizons without designing speculative features.
-3. Establish ubiquitous language and use it consistently in prose, interfaces, and tests.
+3. Clarify any terms and distinctions needed to make the change unambiguous.
 4. Write concrete happy, edge, and failure examples with inputs, context, and observable results.
 5. Extract rules and invariants from examples. Resolve contradictions explicitly.
-6. Locate domain, application, infrastructure, and external responsibilities. Name dependency direction, ownership, composition, and transaction boundaries wherever behavior crosses them.
+6. Identify relevant responsibilities, dependencies, ownership, integration points, and failure behavior. Follow applicable project instructions for architecture and module layout.
 7. Translate responsibilities and `AGENTS.md` organization rules into a compact placement plan. Name expected file/module actions, responsibilities, and slices; use globs when premature. Paths are forecasts, while constraints, ownership, and dependency direction bind.
-8. Specify public interfaces and inward-owned boundary contracts, including errors, idempotency, consistency, and outward adapters.
+8. Specify changed public interfaces, errors, idempotency, consistency, and external integrations.
 9. Define the applicable support envelope for risky behavior: supported inputs and limits, identity, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees. Mark irrelevant dimensions as not applicable rather than inventing guarantees.
 10. Record the closest existing capability and reuse decision. Extend its owner when the contract fits; parallel code needs a concrete semantic or ownership distinction.
 11. Trace risk-based tests to rules, contracts, and failure modes.
 12. Plan ordered thin vertical slices using every template field. Each produces runnable behavior from entry point through policy to a real boundary; layer-only phases are invalid. Give each one a JSON-array acceptance command for its observable path.
 
-Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
-
-Create an abstraction only when at least one is true:
-
-- A domain or application capability crosses into storage, transport, time, identity, messaging, or another external system.
-- Shared variation exists across two or more known use cases.
-- It has an independent behavioral contract.
-- It forms a meaningful boundary.
-- Retrofitting it later would be unusually costly.
-
-At meaningful boundaries, prefer a narrow inward-owned contract and outward adapter even with one implementation. Shape ports around behavior and consistency, not CRUD. Allow direct coupling only for private mechanism without policy; justify it. Avoid contract-free layers. Explain every inapplicable template section in one line.
-
-Logical dependency boundaries are independent of packaging. A single crate, package, or deployable may still require domain, application, port, adapter, and composition responsibilities; never treat package count as a substitute for dependency direction.
+Choose architecture, module layout, and abstractions from the project's existing patterns and applicable project instructions. Add abstractions only for a clear behavioral purpose or known variation; avoid generic layers, pass-through wrappers, and parallel code without a concrete distinction. Explain every inapplicable template section in one line.
 
 ## Questions and Decisions
 
-Own local, reversible implementation choices. Ask at most five material questions at once, and only when answers change outcomes, domain meaning, a system boundary, a public interface, or a consequential irreversible choice. Project framing may use multiple rounds. Record decisions and blockers in the applicable artifact; do not turn preferences into user questions.
+Own local, reversible implementation choices. Ask at most five material questions at once, and only when answers change outcomes, project terminology, an integration boundary, a public interface, or a consequential irreversible choice. Project framing may use multiple rounds. Record decisions and blockers in the applicable artifact; do not turn preferences into user questions.
 
 ## Design Review
 

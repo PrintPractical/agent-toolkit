@@ -8,18 +8,18 @@ import { temporaryDirectory } from "./helpers.mjs";
 function completeArtifact(content) {
   return content
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Payment requirement -> reproduction, rule, and tests.\n")
-    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns PaymentStore; the database adapter is composed at startup.\n")
-    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. PaymentStore owns the persistence contract and transaction behavior.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Payments use the database integration and preserve transaction failure behavior.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. PaymentStore provides the persistence behavior needed by payments.\n")
     .replace(/(## Existing Capabilities and Reuse\n)[\s\S]*?(?=\n## )/, "$11. Inspected PaymentStore; extend it because it already owns payment persistence behavior.\n")
     .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/payment.js | Modify | Apply payment rules | Keep policy separate from storage | 1 |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Payment behavior is restored\n- Outcome: A payment succeeds.\n- Entry point: Payment command.\n- Core behavior: Enforce payment rules.\n- Boundary integration: Persist atomically through PaymentStore.\n- Tests: Regression and database integration tests.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: The command builds and tests pass.\n")
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: PaymentStore is application-owned.\n- Implementation: The database adapter implements PaymentStore outward.\n- Verification: Unit dependency test and database integration test.\n\n### Slice Completion\n#### Slice 1: Payment behavior is restored\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and regression tests pass.\n");
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Payments use PaymentStore for persistence.\n- Implementation: The payment command uses the existing store.\n- Verification: Unit and database integration tests.\n\n### Slice Completion\n#### Slice 1: Payment behavior is restored\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and persistence are integrated.\n- Verification: The command builds and regression tests pass.\n");
 }
 
 function completeProject(content, { complete = false } = {}) {
   return content
     .replace(/(## Outcome\n)[\s\S]*?(?=\n## )/, "$1Teams can safely deliver reviewed milestones and recognize completion from recorded integration evidence.\n")
-    .replace(/(## Non-goals\n)[\s\S]*?(?=\n## )/, "$1Automated worktree management and predictive application architecture are excluded.\n")
+    .replace(/(## Non-goals\n)[\s\S]*?(?=\n## )/, "$1Automated worktree management and predictive architecture are excluded.\n")
     .replace(/(## Required Outcomes\n)[\s\S]*?(?=\n## )/, "$1### Requirement REQ-1: Milestones remain independently deliverable\n- Outcome: Each milestone uses the complete change lifecycle.\n- Acceptance: The linked workflow reaches completion with its own review and commit.\n")
     .replace(/(## Known Constraints\n)[\s\S]*?(?=\n## )/, "$1The CLI remains deterministic, non-Git operation works, and no command pushes.\n")
     .replace(/(## Quality Attributes\n)[\s\S]*?(?=\n## )/, "$1State updates are atomic and every independent review is candidate-fingerprinted.\n")
@@ -82,7 +82,7 @@ test("artifact validation requires architecture evidence and real vertical slice
   const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
   await renderSystem(root);
   const content = completeArtifact(await readFile(design, "utf8"))
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Export request is accepted\n- Outcome: A request starts an export.\n- Entry point: Export command.\n- Core behavior: Validate export rules.\n- Boundary integration: Save through ExportStore.\n- Tests: Rule and adapter tests.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: The command builds and tests pass.\n\n### Phase 2: Persistence\nAdd storage details.\n\n### Slice 3: Export downloads\n- Outcome: The export downloads.\n- Entry point: Download command.\n- Core behavior: Select export data.\n- Boundary integration: Read through ExportStore.\n- Tests: Download integration test.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: Download passes.\n");
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Export request is accepted\n- Outcome: A request starts an export.\n- Entry point: Export command.\n- Core behavior: Validate export rules.\n- Boundary integration: Save through ExportStore.\n- Tests: Rule and integration tests.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: The command builds and tests pass.\n\n### Phase 2: Persistence\nAdd storage details.\n\n### Slice 3: Export downloads\n- Outcome: The export downloads.\n- Entry point: Download command.\n- Core behavior: Select export data.\n- Boundary integration: Read through ExportStore.\n- Tests: Download integration test.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: Download passes.\n");
   await writeFile(design, content);
   const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md", phase: "shaping" }, { requireSystem: true });
   assert.match(problems.join("\n"), /non-slice headings: Phase 2: Persistence/);
@@ -99,7 +99,7 @@ test("quality review requires completed architecture conformance", async () => {
   assert.match(problems.join("\n"), /Complete Implementation Conformance/);
 });
 
-test("new artifacts reject aggregate slice claims and non-executable acceptance", async () => {
+test("new artifacts reject combined slice claims and non-executable acceptance", async () => {
   const root = await temporaryDirectory();
   const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
   await renderSystem(root);
@@ -132,13 +132,13 @@ test("current artifacts require exact slice conformance", async () => {
 
 test("artifact validation does not impose arbitrary document size limits", async () => {
   const root = await temporaryDirectory();
-  const design = await renderChange(root, { kind: "feature", title: "Model Complex Domain", slug: "model-complex-domain" });
+  const design = await renderChange(root, { kind: "feature", title: "Model Complex Behavior", slug: "model-complex-behavior" });
   await renderSystem(root);
   const content = completeArtifact(await readFile(design, "utf8"));
   await writeFile(design, `${content}\n${"Detailed design evidence.\n".repeat(800)}`);
   const system = path.join(root, ".agent", "SYSTEM.md");
   await writeFile(system, `${await readFile(system, "utf8")}\n${"Durable system evidence.\n".repeat(800)}`);
-  assert.deepEqual(await validateArtifacts(root, { designPath: ".agent/changes/model-complex-domain.md" }, { requireSystem: true }), []);
+  assert.deepEqual(await validateArtifacts(root, { designPath: ".agent/changes/model-complex-behavior.md" }, { requireSystem: true }), []);
 });
 
 test("project artifacts require completed framing and objective roadmap records", async () => {

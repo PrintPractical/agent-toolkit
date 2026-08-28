@@ -18,7 +18,7 @@ test("file and module placement remains part of the reviewed design contract", a
   const content = await readFile(design, "utf8");
   await writeFile(design, content.replace(
     /(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/,
-    "$1- `src/domain/result.js`: own result rules.\n"
+    "$1- `src/results.js`: own result rules.\n"
   ));
   const placementChanged = await designContractFingerprint(root, state);
   assert.notEqual(placementChanged, initial);

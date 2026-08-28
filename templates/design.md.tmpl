@@ -27,14 +27,14 @@ List plausible horizon use cases without designing them prematurely.
 ## Concrete Examples
 Give happy, edge, and failure examples with inputs, context, and observable results.
 
-## Domain Concepts
-Define the ubiquitous language and concept ownership used by this change.
+## Key Concepts and Rules
+Define the terms, distinctions, and rules relevant to this change.
 
 ## Rules and Invariants
 State enforceable rules, invariants, consistency needs, and where each is owned.
 
 ## Boundaries and Dependencies
-Name each responsibility and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency.
+Name each relevant responsibility, dependency direction, integration point, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints.
 
 ## Public Interfaces and Errors
 Specify changed commands, APIs, events, schemas, compatibility, idempotency, and error semantics. If none, say why.
@@ -43,7 +43,7 @@ Specify changed commands, APIs, events, schemas, compatibility, idempotency, and
 For risky behavior, state the supported inputs and limits, identity semantics, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees that apply. Mark irrelevant dimensions as not applicable and keep unsupported horizons out of the implementation contract.
 
 ## Abstraction and Extension Pressure
-List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.
+List each needed abstraction, its purpose, consumers, implementations, and test strategy. Record why a concrete dependency is appropriate when it constrains future change.
 
 ## Existing Capabilities and Reuse
 Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether this change extends or composes it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.
@@ -55,7 +55,7 @@ Map each important rule, contract, edge, and failure risk to a unit, integration
 List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: build may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.
 
 ## Implementation Plan
-Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the slice's observable path, for example `["npm", "test", "--", "checkout"]`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.
+Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the slice's observable path, for example `["npm", "test", "--", "checkout"]`. A slice includes all work needed for runnable behavior; phase-only work is not a vertical slice.
 
 ## Implementation Conformance
 Complete during build. Record non-material placement deviations with rationale; restart design review for material architecture or plan deviations.

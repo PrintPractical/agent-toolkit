@@ -17,12 +17,12 @@ async function project(kind = "feature") {
   const content = await readFile(design, "utf8");
   await writeFile(design, content
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Requested result -> use case, contract, and tests.\n")
-    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Application owns the ResultStore port; its real adapter is composed at the entry point.\n")
-    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore isolates the persistence contract and supports deterministic application tests.\n")
+    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Results use storage and preserve failure behavior.\n")
+    .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore provides the persistence behavior needed by results.\n")
     .replace(/(## Existing Capabilities and Reuse\n)[\s\S]*?(?=\n## )/, "$11. Inspected ResultStore; extend it because it owns result persistence behavior.\n")
-    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/result.js | Modify | Result application behavior | Preserve the ResultStore boundary | 1 |\n")
+    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/result.js | Modify | Result behavior | Use the existing ResultStore | 1 |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and tests pass.\n`)
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: ResultStore is application-owned.\n- Implementation: Its adapter is outward and composed at the entry point.\n- Verification: Dependency unit test and adapter integration test.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and adapter are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Results use the existing ResultStore.\n- Implementation: The result command stores results.\n- Verification: Unit and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
   assert.equal(state.artifactFormat, 4);
@@ -393,7 +393,7 @@ test("closure packets retain evidence for regressions introduced by remediation"
   const regressionFile = await writePacketFindings(root, verifier, JSON.stringify({ findings: [finding("The remediation inverted dependency direction", {
     severity: "high",
     introducedByRemediation: true,
-    evidence: "The revised boundary now imports its concrete adapter"
+    evidence: "The revised integration now violates its reviewed constraint"
   })] }));
   await recordReview(root, state, {
     packetId: verifier.id,
@@ -407,14 +407,14 @@ test("closure packets retain evidence for regressions introduced by remediation"
   const closure = await prepareReview(root, state, { stage: "design", role: "verifier" });
   const supplied = closure.findings.find(finding => finding.id === regression.id);
   assert.equal(supplied.introducedByRemediation, true);
-  assert.match(supplied.evidence, /imports its concrete adapter/);
+  assert.match(supplied.evidence, /violates its reviewed constraint/);
 });
 
 test("critic remediation changes return to developer approval before verification", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const critic = await prepareReview(root, state, { stage: "design", role: "critic" });
-  const findingsFile = await writePacketFindings(root, critic, JSON.stringify({ findings: [finding("Clarify adapter ownership")] }));
+  const findingsFile = await writePacketFindings(root, critic, JSON.stringify({ findings: [finding("Clarify storage ownership")] }));
   await recordReview(root, state, {
     packetId: critic.id,
     verdict: "changes-requested",
@@ -422,7 +422,7 @@ test("critic remediation changes return to developer approval before verificatio
     findingsFile
   });
   const design = path.join(root, state.designPath);
-  await writeFile(design, (await readFile(design, "utf8")).replace("Application owns the ResultStore port", "Application exclusively owns the ResultStore port"));
+  await writeFile(design, (await readFile(design, "utf8")).replace("Results use storage", "Results exclusively use storage"));
   await resolveFinding(root, state, state.findings.at(-1).id);
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "developer-review");
@@ -545,7 +545,7 @@ test("new workflows require exact sequential slice acceptance before baseline", 
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8"))
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: First outcome\n- Outcome: The first result is observable.\n- Entry point: First command.\n- Core behavior: Apply first rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: First acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The first command passes.\n\n### Slice 2: Second outcome\n- Outcome: The second result is observable.\n- Entry point: Second command.\n- Core behavior: Apply second rules.\n- Boundary integration: Read through ResultStore.\n- Tests: Second acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The second command passes.\n`)
-    .replace(/(### Slice Completion\n)[\s\S]*?(?=\n## )/, "$1#### Slice 1: First outcome\n- Implementation: First command, rules, and adapter are integrated.\n- Verification: First acceptance command passes.\n"));
+    .replace(/(### Slice Completion\n)[\s\S]*?(?=\n## )/, "$1#### Slice 1: First outcome\n- Implementation: First command, rules, and storage are integrated.\n- Verification: First acceptance command passes.\n"));
   state.phase = "ready-to-build";
   await markDesignApproved(root, state);
   await advance(root, state, DEFAULT_CONFIG);
@@ -557,7 +557,7 @@ test("new workflows require exact sequential slice acceptance before baseline", 
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Complete Slice 2/);
   await writeFile(design, (await readFile(design, "utf8")).replace(
     "- Verification: First acceptance command passes.",
-    "- Verification: First acceptance command passes.\n\n#### Slice 2: Second outcome\n- Implementation: Second command, rules, and adapter are integrated.\n- Verification: Second acceptance command passes."
+    "- Verification: First acceptance command passes.\n\n#### Slice 2: Second outcome\n- Implementation: Second command, rules, and storage are integrated.\n- Verification: Second acceptance command passes."
   ));
   await assert.rejects(completeSlice(root, state, 2), /reviewed acceptance command/);
   await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });

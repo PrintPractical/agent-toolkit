@@ -228,7 +228,7 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     "Order diagnosis lock-in, correction, boundary updates, and verification as observable slices.",
     "Order thin vertical slices by observable behavior. For each slice, name its outcome, likely code areas, boundary or data changes, tests, dependencies, and completion signal.",
     "Order diagnosis lock-in, correction, boundary updates, and verification as observable slices. For each slice, name likely code areas, tests, dependencies, and completion signal.",
-    "Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. A slice crosses all layers needed for runnable behavior; domain-only, persistence-only, transport-only, and wiring-only phases are not vertical slices.",
+    "Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. A slice includes all work needed for runnable behavior; phase-only work is not a vertical slice.",
     "Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, and `Complete when`. Keep the regression lock-in observable and make correction slices runnable across every affected layer."
   ]);
   if (!plan) problems.push("Missing Implementation Plan section");
@@ -261,12 +261,12 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
       "List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction."
     ]],
     ["Boundaries and Dependencies", [
-      "Name each responsibility and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency.",
-      "Name affected responsibilities and dependency direction. For storage, transport, clocks, identity, messaging, and external services, state the inward-owned contract, outward adapter, composition point, transaction/data ownership, and failure behavior. Justify any direct infrastructure dependency."
+      "Name each relevant responsibility, dependency direction, integration point, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints.",
+      "Name affected responsibilities, dependency direction, integration points, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints."
     ]],
     ["Abstraction and Extension Pressure|Correction and Extension Pressure", [
-      "List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.",
-      "Describe the correction at the rule-owning level. List affected abstractions and contracts; prefer a narrow inward-owned port where the defect exposes an infrastructure or domain boundary. Record related extension pressure without generic layering."
+      "List each needed abstraction, its purpose, consumers, implementations, and test strategy. Record why a concrete dependency is appropriate when it constrains future change.",
+      "Describe the correction at the rule-owning location. List affected abstractions and contracts, and record related extension pressure without generic layering."
     ]],
     ["Existing Capabilities and Reuse", [
       "Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether this change extends or composes it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.",
