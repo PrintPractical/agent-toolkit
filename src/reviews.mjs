@@ -32,6 +32,7 @@ function criticChecklist(stage, state) {
     return [
       "Trace every requirement and example to an observable outcome, contract, and test.",
       "Inspect domain rules, boundary ownership, dependency direction, and applicable project instructions.",
+      "Compare the plan with the closest existing behavior and reject duplicated policy or parallel abstractions without a concrete semantic or ownership distinction.",
       "Check placement responsibilities, risks, and that each planned slice is independently vertical.",
       "Identify applicable edge cases, invalid inputs, state freshness, concurrency, and failure handling before reporting findings.",
       "Finish this complete sweep before writing findings; do not stop after the first defect."
@@ -40,6 +41,7 @@ function criticChecklist(stage, state) {
   return [
     "Trace every requirement and reviewed architecture decision to the candidate and its tests.",
     "Inspect all changed paths and relevant callers for observable behavior, errors, invalid inputs, and regressions.",
+    "Check whether the candidate duplicates an existing rule, utility, or boundary instead of extending its established owner; accept parallel code only for a demonstrated semantic or ownership distinction.",
     "Assess applicable state freshness, concurrency and locking, persistence consistency, resource lifecycle, and failure handling.",
     "Check conformance with reviewed boundaries, dependency direction, placement responsibilities, and project instructions.",
     "Finish this complete sweep before writing findings; do not stop after the first defect."

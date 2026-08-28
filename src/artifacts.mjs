@@ -267,6 +267,10 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     ["Abstraction and Extension Pressure|Correction and Extension Pressure", [
       "List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.",
       "Describe the correction at the rule-owning level. List affected abstractions and contracts; prefer a narrow inward-owned port where the defect exposes an infrastructure or domain boundary. Record related extension pressure without generic layering."
+    ]],
+    ["Existing Capabilities and Reuse", [
+      "Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether this change extends or composes it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.",
+      "Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether the correction extends it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient."
     ]]
   ];
   requiredSections.push(["File and Module Placement Plan", [

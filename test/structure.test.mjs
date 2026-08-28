@@ -20,6 +20,12 @@ test("repository exposes exactly the four public skills within budgets", async (
     assert.match(content, /## Project Instructions\n\nBefore planning or editing, read every applicable `AGENTS\.md` in the project\. Treat its instructions as binding requirements for all subsequent work\. If this skill's general guidance conflicts with an `AGENTS\.md` requirement, the `AGENTS\.md` takes precedence; do not simplify, reinterpret, or override that requirement\./);
     assert.match(content, /Where project instructions do not prescribe module layout,/);
   }
+  const design = await readFile(path.join(directory, "design", "SKILL.md"), "utf8");
+  const build = await readFile(path.join(directory, "build", "SKILL.md"), "utf8");
+  const fix = await readFile(path.join(directory, "fix", "SKILL.md"), "utf8");
+  assert.match(design, /closest existing owner/);
+  assert.match(build, /instead of copying behavior/);
+  assert.match(fix, /parallel code unless a concrete semantic or ownership distinction prevents reuse/);
 });
 
 test("ideate stays conversational, independent, and constructively challenging", async () => {

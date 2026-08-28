@@ -45,6 +45,9 @@ For risky behavior, state the supported inputs and limits, identity semantics, o
 ## Abstraction and Extension Pressure
 List each abstraction, its owner, behavioral contract, consumers, implementations, and test strategy. Prefer a narrow inward-owned port at meaningful infrastructure or domain boundaries even with one implementation. Record why any such boundary stays concrete.
 
+## Existing Capabilities and Reuse
+Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether this change extends or composes it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.
+
 ## Test Traceability
 Map each important rule, contract, edge, and failure risk to a unit, integration, or regression test. Explain any gap.
 

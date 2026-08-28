@@ -56,7 +56,7 @@ Runtime state is ignored by Git and must never be edited manually. This release 
 6. The milestone receives a fresh quality critic and distinct verifier, then one inspected conventional commit when Git integration is active. The toolkit never pushes.
 7. After all required milestones are reconciled, quality-verified, and delivered, `project finalize` freezes exact final integration commands. Current integration evidence, a project-wide quality critic, and a distinct verifier are mandatory. Project approval completes the container without creating a redundant aggregate commit.
 
-Project framing is not predictive architecture. Concrete APIs, schemas, boundaries, and module placement emerge during milestone design. Binding project outcomes, constraints, source material, quality attributes, or completion criteria require renewed project design review when changed. Roadmap ordering, coverage, discoveries, hypotheses, and final integration records evolve as milestones deliver evidence.
+Project framing is not predictive architecture. Concrete APIs, schemas, boundaries, and module placement emerge during milestone design. Every change identifies the closest existing capability and records whether it extends that owner or why a concrete semantic or ownership distinction requires parallel code. Binding project outcomes, constraints, source material, quality attributes, or completion criteria require renewed project design review when changed. Roadmap ordering, coverage, discoveries, hypotheses, and final integration records evolve as milestones deliver evidence.
 
 ## Standalone Flow
 

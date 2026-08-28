@@ -20,7 +20,7 @@ When the engineer arrives from ideation in the same conversation, treat its esta
 3. Start a rolling project with `agent-toolkit project start --title "<title>"`; repeat `--source <path>` for supplied authoritative documents.
 4. For a milestone, prefer an explicit name, matching current work, then the next unblocked `active` roadmap entry. Ask only on material ambiguity. Run `agent-toolkit start --kind feature --title "<title>" --project <slug> --milestone <number>`.
 5. Start one coherent standalone feature with `agent-toolkit start --kind feature --title "<title>"`. Work needing multiple reviewed commits is a project; defects belong to fix.
-6. Read the repository, tests, nearby contracts, applicable project instructions, and existing `.agent/SYSTEM.md` before proposing structure.
+6. Read repository, tests, contracts, instructions, and `.agent/SYSTEM.md`. Identify the closest existing owner; do not add parallel behavior without a concrete semantic or ownership distinction.
 
 ## Frame a Project
 
@@ -45,8 +45,9 @@ Shape `.agent/changes/<slug>.md`. For a milestone, read its project frame, sourc
 7. Translate responsibilities and `AGENTS.md` organization rules into a compact placement plan. Name expected file/module actions, responsibilities, and slices; use globs when premature. Paths are forecasts, while constraints, ownership, and dependency direction bind.
 8. Specify public interfaces and inward-owned boundary contracts, including errors, idempotency, consistency, and outward adapters.
 9. Define the applicable support envelope for risky behavior: supported inputs and limits, identity, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees. Mark irrelevant dimensions as not applicable rather than inventing guarantees.
-10. Trace risk-based tests to rules, contracts, and failure modes.
-11. Plan ordered thin vertical slices using every template field. Each produces runnable behavior from entry point through policy to a real boundary; layer-only phases are invalid. Give each one JSON-array acceptance command for its observable path, not just compilation or isolated units.
+10. Record the closest existing capability and reuse decision. Extend its owner when the contract fits; parallel code needs a concrete semantic or ownership distinction.
+11. Trace risk-based tests to rules, contracts, and failure modes.
+12. Plan ordered thin vertical slices using every template field. Each produces runnable behavior from entry point through policy to a real boundary; layer-only phases are invalid. Give each one a JSON-array acceptance command for its observable path.
 
 Apply DDD tactically, not ceremonially. Introduce entities, value objects, aggregates, repositories, domain services, events, or bounded contexts when behavior, language, or a meaningful boundary justifies them. Where project instructions do not prescribe module layout, prefer a shallow module tree of small cohesive, independently testable concepts over layer-wide files or deeply nested ceremony.
 
