@@ -321,7 +321,9 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
   const requiredSections = [
     ["Requirements Traceability", [
       "List each explicit source requirement and point to the use case, rule, interface, test, or non-goal that addresses it. Do not silently drop requirements during refinement.",
-      "List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction."
+      "List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction.",
+      "Classify each explicit source requirement as `SUPPORTED`, `DEFERRED`, or `NON-GOAL`, then point to the use case, rule, interface, test, or rationale that addresses it. Only `SUPPORTED` requirements bind this implementation.",
+      "Classify each explicit source requirement as `SUPPORTED`, `DEFERRED`, or `NON-GOAL`, then point to the reproduction, rule, interface, regression test, or rationale that addresses it. Only `SUPPORTED` requirements bind this correction."
     ]],
     ["Abstraction and Extension Pressure|Correction and Extension Pressure", [
       "List each needed abstraction, its purpose, consumers, implementations, and test strategy. Record why a concrete dependency is appropriate when it constrains future change.",
@@ -331,6 +333,11 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
   for (const [names, untouched] of requiredSections) {
     const body = section(...names.split("|"));
     if (!body || untouched.includes(body)) problems.push(`Complete the ${names.split("|")[0]} section before developer review`);
+  }
+  const budget = section("Simplicity and Change Budget") || "";
+  const budgetFields = ["Smallest viable approach", "Expected production code change", "Expected files and owners affected", "Largest source file impact", "New dependencies or abstractions", "Reassessment trigger"];
+  if (!completeFields(budget, budgetFields)) {
+    problems.push(`Complete the Simplicity and Change Budget with: ${budgetFields.join(", ")}`);
   }
   const responsibilities = responsibilityDecomposition(content);
   const responsibilityBody = section("Responsibility Decomposition");
@@ -387,10 +394,14 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
   if (requireConformance || ["baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit", "complete"].includes(state.phase)) {
     const part = name => conformance?.match(new RegExp(`^### ${name}\\s*\\n([\\s\\S]*?)(?=\\n### |(?![\\s\\S]))`, "m"))?.[1] || "";
     const architecture = part("Architecture Decisions");
+    const complexity = part("Complexity Reconciliation");
     const sliceEvidence = part("Slice Completion");
     const completeFields = (body, fields) => fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
     if (!completeFields(architecture, ["Decision", "Owners", "Implementation", "Verification"])) {
       problems.push("Complete Implementation Conformance Architecture Decisions with non-empty Decision, Owners, Implementation, and Verification fields");
+    }
+    if (!completeFields(complexity, ["Production code changed", "Largest source file", "Dependencies or abstractions added", "Budget outcome"])) {
+      problems.push("Complete Implementation Conformance Complexity Reconciliation with production-code, largest-file, dependency or abstraction, and budget evidence");
     }
     const conformanceOwners = jsonField(architecture, "Owners");
     if (!Array.isArray(conformanceOwners) || new Set(conformanceOwners).size !== conformanceOwners.length

@@ -30,24 +30,25 @@ function criticChecklist(stage, state) {
   }
   if (stage === "design") {
     return [
-      "Trace every requirement and example to an observable outcome, contract, and test.",
-      "Check that every significant rule, workflow, mapping, capability, and integration has one independently describable authoritative owner with clear dependencies and consumers.",
+      "Trace each supported-now requirement and example to an observable outcome, contract, and test; confirm deferred and non-goal behavior stays outside implementation and acceptance.",
+      "Check that each significant supported rule, workflow, mapping, capability, and integration has one independently describable authoritative owner with clear dependencies and consumers.",
       "Apply every applicable AGENTS.md architecture and organization rule; reject prohibited boundary leakage and unclear composition or dependency direction.",
       "Verify every REUSE, EXTEND, REFACTOR, or NEW decision against semantically equivalent existing behavior; require consolidation when equivalent behavior is already duplicated.",
       "Reject unrelated owners collapsed into generic components, generic dumping grounds, abstractions that only mirror one concrete implementation without purpose, and placement too vague for build.",
       "Check that placement follows decomposition and each slice is vertical through reviewed shared owners without inventing or privately duplicating architecture.",
-      "Ask whether the planned ownership and dependency direction would remain coherent if infrastructure technology changed.",
-      "Identify applicable edge cases, invalid inputs, state freshness, concurrency, and failure handling before reporting findings.",
-      "Finish this complete sweep before writing findings; do not stop after the first defect."
+      "Verify the smallest viable approach and production-code, source-file, dependency, and abstraction budget are concrete and proportionate to supported scope.",
+      "Assess only demonstrated edge, state, concurrency, lifecycle, and failure risks within the supported envelope.",
+      "Finish one bounded pass over the supported contract and affected responsibilities before writing blocker findings; do not expand into deferred behavior."
     ];
   }
   return [
-    "Trace every requirement and reviewed design decision to the candidate and its tests.",
-    "Inspect all changed paths and relevant callers for observable behavior, errors, invalid inputs, and regressions.",
+    "Trace each supported-now requirement and reviewed design decision to the candidate and its tests.",
+    "Inspect changed paths and causally affected callers for observable behavior, errors, invalid inputs, and regressions.",
     "Check whether the candidate moved, collapsed, or duplicated reviewed ownership instead of following the authoritative reuse decision.",
-    "Assess applicable state freshness, concurrency and locking, persistence consistency, resource lifecycle, and failure handling.",
+    "Assess demonstrated state, concurrency, persistence, resource-lifecycle, and failure risks within the supported envelope.",
     "Check conformance with reviewed owners, architectural roles, dependency direction, approved abstractions, placement, slices, and project instructions; flag new cross-boundary dependencies or major abstractions.",
-    "Finish this complete sweep before writing findings; do not stop after the first defect."
+    "Compare actual production-code growth, largest-file impact, and added dependencies or abstractions with the reviewed budget; reject unexplained or disproportionate complexity.",
+    "Finish one bounded pass over the sealed change and causally affected behavior before writing blocker findings; do not expand into deferred behavior."
   ];
 }
 

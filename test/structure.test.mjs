@@ -26,11 +26,18 @@ test("repository exposes exactly the four public skills within budgets", async (
   assert.match(design, /closest existing owner/);
   assert.match(design, /decompose the change into independently meaningful responsibility owners/);
   assert.match(design, /Architecture is decomposed by responsibility; implementation proceeds by vertical slices through the reviewed owners/);
+  assert.match(design, /supported now, deferred, or a non-goal/);
+  assert.match(design, /smallest viable implementation and a reviewed change budget/);
+  assert.match(design, /Packet findings are blockers/);
   assert.match(build, /instead of copying behavior/);
   assert.match(build, /Treat them as implementation constraints, not prompts to re-derive architecture/);
   assert.match(build, /review restart --stage design/);
+  assert.match(build, /Track production-code growth and the largest touched source files/);
+  assert.match(build, /stay advisory and out of the packet/);
   assert.match(fix, /parallel code unless a concrete semantic or ownership distinction prevents reuse/);
-  assert.match(fix, /correction proceeds in vertical slices through shared owners without local copies/);
+  assert.match(fix, /runnable vertical slices/);
+  assert.match(fix, /supported, deferred, or non-goal/);
+  assert.match(fix, /production-code and source-file growth/);
 });
 
 test("ideate stays conversational, independent, and constructively challenging", async () => {
@@ -43,8 +50,8 @@ test("ideate stays conversational, independent, and constructively challenging",
 
 test("design stops at the reviewed build handoff", async () => {
   const content = await readFile(path.join(repositoryRoot, "skills", "design", "SKILL.md"), "utf8");
-  assert.match(content, /When the engineer arrives from ideation in the same conversation/);
-  assert.match(content, /Do not ask them to repeat resolved information/);
+  assert.match(content, /When arriving from ideation in the same conversation/);
+  assert.match(content, /Do not ask the engineer to repeat resolved information/);
   assert.match(content, /fewest independently useful milestones/);
   assert.match(content, /never create milestones for layers, modules, setup, or small tasks/);
   assert.match(content, /Do not run `agent-toolkit advance` from `ready-to-build`; the build skill owns the transition to `implementing`\./);
@@ -58,6 +65,9 @@ test("templates stay compact and skills metadata names only public skills", asyn
       assert.match(content, /Owners` must be a JSON string array containing every reviewed responsibility owner exactly once/);
       assert.match(content, /After implementing each active slice, update this section before recording that slice as complete/);
       assert.match(content, /Before `agent-toolkit slice complete --number N`, add `#### Slice N: <exact reviewed title>`/);
+      assert.match(content, /`SUPPORTED`, `DEFERRED`, or `NON-GOAL`/);
+      assert.match(content, /## Simplicity and Change Budget/);
+      assert.match(content, /### Complexity Reconciliation/);
       assert.doesNotMatch(content, /per completed slice/);
     }
   }

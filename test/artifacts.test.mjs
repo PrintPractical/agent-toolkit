@@ -7,12 +7,13 @@ import { temporaryDirectory } from "./helpers.mjs";
 
 function completeArtifact(content) {
   return content
-    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Payment requirement -> reproduction, rule, and tests.\n")
+    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. SUPPORTED: Payment requirement -> reproduction, rule, and tests.\n")
     .replace(/(## Responsibility Decomposition\n)[\s\S]*?(?=\n## )/, "$1| Owner | Responsibility | Rules / Decisions | Architectural Role | Depends On | Used By | Existing/New | Reuse Decision |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| PaymentPolicy | Payment validity rules | Reject invalid payment state | Policy owner required by project instructions | None | Payment command | New | NEW: repository search found no authoritative payment policy; a cohesive owner is required |\n| PaymentStore | Durable payment access | Preserve transaction failure behavior | Storage integration boundary | Database | Payment command | Existing | EXTEND: inspected PaymentStore, which owns payment persistence; extend the authoritative owner instead of copying it |\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. PaymentStore provides the persistence behavior needed by payments.\n")
+    .replace(/(## Simplicity and Change Budget\n)[\s\S]*?(?=\n## )/, "$1- Smallest viable approach: Extend PaymentStore and add one focused policy owner.\n- Expected production code change: About 80 lines; tests and generated files excluded.\n- Expected files and owners affected: Two source files for PaymentPolicy and PaymentStore.\n- Largest source file impact: PaymentStore grows by about 40 lines and remains cohesive.\n- New dependencies or abstractions: PaymentPolicy only; no dependency.\n- Reassessment trigger: Stop if production growth exceeds 120 lines or another owner is needed.\n")
     .replace(/(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/, "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| PaymentPolicy | src/payment-policy.js | Keep policy independent of storage details | [1] |\n| PaymentStore | src/payment-store.js | Existing storage boundary remains authoritative | [1] |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, "$1### Slice 1: Payment behavior is restored\n- Outcome: A payment succeeds.\n- Owners: [\"PaymentPolicy\", \"PaymentStore\"]\n- Entry point: Payment command.\n- Core behavior: Enforce payment rules.\n- Boundary integration: Persist atomically through PaymentStore.\n- Tests: Regression and database integration tests.\n- Acceptance command: [\"node\", \"--test\"]\n- Complete when: The command builds and tests pass.\n")
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Payments use PaymentStore for persistence.\n- Owners: [\"PaymentPolicy\", \"PaymentStore\"]\n- Implementation: The payment command uses the existing store.\n- Verification: Unit and database integration tests.\n\n### Slice Completion\n#### Slice 1: Payment behavior is restored\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and persistence are integrated.\n- Verification: The command builds and regression tests pass.\n");
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Payments use PaymentStore for persistence.\n- Owners: [\"PaymentPolicy\", \"PaymentStore\"]\n- Implementation: The payment command uses the existing store.\n- Verification: Unit and database integration tests.\n\n### Complexity Reconciliation\n- Production code changed: 76 lines across two source files.\n- Largest source file: PaymentStore is 240 lines after growing by 38.\n- Dependencies or abstractions added: PaymentPolicy only; no dependency.\n- Budget outcome: Within the reviewed budget.\n\n### Slice Completion\n#### Slice 1: Payment behavior is restored\n- Slice: Slice 1 restores payment behavior.\n- Implementation: Command, rules, and persistence are integrated.\n- Verification: The command builds and regression tests pass.\n");
 }
 
 function completeProject(content, { complete = false } = {}) {
@@ -137,6 +138,26 @@ test("quality review requires completed architecture conformance", async () => {
   await writeFile(design, completed.replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1Implemented.\n"));
   const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md", phase: "quality-critic" }, { requireSystem: true });
   assert.match(problems.join("\n"), /Complete Implementation Conformance/);
+});
+
+test("current artifacts require a concrete simplicity and change budget", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
+  await renderSystem(root);
+  const completed = completeArtifact(await readFile(design, "utf8"));
+  await writeFile(design, completed.replace("- Reassessment trigger: Stop if production growth exceeds 120 lines or another owner is needed.", "- Reassessment trigger:"));
+  const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md" }, { requireSystem: true });
+  assert.match(problems.join("\n"), /Complete the Simplicity and Change Budget/);
+});
+
+test("quality review requires actual complexity reconciliation", async () => {
+  const root = await temporaryDirectory();
+  const design = await renderChange(root, { kind: "feature", title: "Export Data", slug: "export-data" });
+  await renderSystem(root);
+  const completed = completeArtifact(await readFile(design, "utf8"));
+  await writeFile(design, completed.replace("- Budget outcome: Within the reviewed budget.", "- Budget outcome:"));
+  const problems = await validateArtifacts(root, { designPath: ".agent/changes/export-data.md", phase: "quality-critic" }, { requireSystem: true });
+  assert.match(problems.join("\n"), /Complexity Reconciliation/);
 });
 
 test("quality conformance covers every reviewed responsibility owner", async () => {

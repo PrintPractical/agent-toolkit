@@ -16,12 +16,13 @@ async function project(kind = "feature") {
   const design = await renderChange(root, { kind, title: "Deliver Result", slug: "deliver-result" });
   const content = await readFile(design, "utf8");
   await writeFile(design, content
-    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Requested result -> use case, contract, and tests.\n")
+    .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. SUPPORTED: Requested result -> use case, contract, and tests.\n")
     .replace(/(## Responsibility Decomposition\n)[\s\S]*?(?=\n## )/, "$1| Owner | Responsibility | Rules / Decisions | Architectural Role | Depends On | Used By | Existing/New | Reuse Decision |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| ResultPolicy | Result rules | Preserve result validity | Result policy owner | ResultStore | Result command | New | NEW: repository search found no authoritative result policy; result rules require one cohesive owner |\n| ResultStore | Durable result access | Preserve storage failure behavior | Storage integration boundary | Storage | ResultPolicy | Existing | EXTEND: inspected ResultStore, which owns result persistence; extend it instead of copying persistence |\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore provides the persistence behavior needed by results.\n")
+    .replace(/(## Simplicity and Change Budget\n)[\s\S]*?(?=\n## )/, "$1- Smallest viable approach: Extend ResultStore and add one result policy.\n- Expected production code change: About 80 lines; tests and generated files excluded.\n- Expected files and owners affected: Two source files for ResultPolicy and ResultStore.\n- Largest source file impact: ResultStore grows by about 40 lines and remains cohesive.\n- New dependencies or abstractions: ResultPolicy only; no dependency.\n- Reassessment trigger: Stop if production growth exceeds 120 lines or another owner is needed.\n")
     .replace(/(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/, "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| ResultPolicy | src/result-policy.js | Keep policy independent of storage details | [1] |\n| ResultStore | src/result-store.js | Existing integration remains authoritative | [1] |\n")
     .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Owners: ["ResultPolicy", "ResultStore"]\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and tests pass.\n`)
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Results use the existing ResultStore.\n- Owners: [\"ResultPolicy\", \"ResultStore\"]\n- Implementation: The result command stores results.\n- Verification: Unit and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Results use the existing ResultStore.\n- Owners: [\"ResultPolicy\", \"ResultStore\"]\n- Implementation: The result command stores results.\n- Verification: Unit and storage integration tests.\n\n### Complexity Reconciliation\n- Production code changed: 76 lines across two source files.\n- Largest source file: ResultStore is 240 lines after growing by 38.\n- Dependencies or abstractions added: ResultPolicy only; no dependency.\n- Budget outcome: Within the reviewed budget.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
   assert.equal(state.artifactFormat, 5);
@@ -249,19 +250,22 @@ test("reconciles multiline requirement coverage and invalidates it when reopened
   assert.equal(linked.milestoneReconciledAt, undefined);
 });
 
-test("critic packets require a complete risk sweep before findings", async () => {
+test("change critic packets bound review to supported scope and complexity", async () => {
   const { root, state } = await project();
   await reachDesignCritic(root, state);
   const design = await prepareReview(root, state, { stage: "design", role: "critic" });
-  assert(design.checklist.some(item => item.includes("state freshness")));
-  assert.match(design.checklist.at(-1), /do not stop after the first defect/);
+  assert(design.checklist.some(item => item.includes("supported-now")));
+  assert(design.checklist.some(item => item.includes("source-file")));
+  assert.match(design.checklist.at(-1), /bounded pass/);
+  assert.match(design.checklist.at(-1), /do not expand into deferred behavior/);
 
   state.phase = "quality-critic";
   await markDesignApproved(root, state);
   state.baseline = { fingerprint: await projectFingerprint(root) };
   await recordTest(root, state, { kind: "unit", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
   const quality = await prepareReview(root, state, { stage: "quality", role: "critic" });
-  assert(quality.checklist.some(item => item.includes("concurrency and locking")));
+  assert(quality.checklist.some(item => item.includes("causally affected callers")));
+  assert(quality.checklist.some(item => item.includes("actual production-code growth")));
 });
 
 test("new review packets require structured JSON findings", async () => {

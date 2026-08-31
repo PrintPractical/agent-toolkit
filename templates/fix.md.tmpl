@@ -10,7 +10,7 @@ State the restored behavior and how success is recognized.
 List excluded cleanup, redesign, and unrelated symptoms.
 
 ## Requirements Traceability
-List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction.
+Classify each explicit source requirement as `SUPPORTED`, `DEFERRED`, or `NON-GOAL`, then point to the reproduction, rule, interface, regression test, or rationale that addresses it. Only `SUPPORTED` requirements bind this correction.
 
 ## Failure and Impact
 Describe expected versus actual behavior, affected actors, severity, scope, and environment.
@@ -46,6 +46,15 @@ For the corrected path, state the supported inputs and limits, identity semantic
 ## Correction and Extension Pressure
 Describe the correction at the rule-owning location. List affected abstractions and contracts, and record related extension pressure without generic layering.
 
+## Simplicity and Change Budget
+Choose the smallest correction that restores supported behavior and repository constraints. Estimates cover production code, excluding tests, generated output, vendored code, and workflow artifacts. Complete every field with concrete repository evidence; this is a reassessment trigger, not a productivity target.
+- Smallest viable approach:
+- Expected production code change:
+- Expected files and owners affected:
+- Largest source file impact:
+- New dependencies or abstractions:
+- Reassessment trigger:
+
 ## Test Traceability
 Map root cause, neighboring risks, rules, and boundaries to regression, unit, and integration tests. Explain any gap.
 
@@ -60,7 +69,7 @@ Map every decomposed owner to implementation only after ownership is clear. Appl
 Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Owners`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Owners` is a JSON string array of names from the reviewed map. `Acceptance command` is a JSON string array that runs the corrected observable path. Architecture is decomposed by responsibility; correction proceeds in vertical slices through those shared owners. A slice must not create a private copy of another owner's behavior.
 
 ## Implementation Conformance
-After implementing each active slice, update this section before recording that slice as complete. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing ownership, architectural role, dependency direction, reuse decisions, approved abstractions, or slices.
+After implementing each active slice, update this section before recording that slice as complete. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing supported scope, ownership, architectural role, dependency direction, reuse decisions, approved abstractions, slices, or the reviewed change budget.
 
 ### Architecture Decisions
 Complete all four fields before the first `agent-toolkit slice complete`. `Owners` must be a JSON string array containing every reviewed responsibility owner exactly once.
@@ -68,6 +77,13 @@ Complete all four fields before the first `agent-toolkit slice complete`. `Owner
 - Owners: []
 - Implementation:
 - Verification:
+
+### Complexity Reconciliation
+Complete before quality review using the final candidate rather than the design estimate.
+- Production code changed:
+- Largest source file:
+- Dependencies or abstractions added:
+- Budget outcome:
 
 ### Slice Completion
 Before `agent-toolkit slice complete --number N`, add `#### Slice N: <exact reviewed title>` with both fields below. Keep prior records and do not add records for future slices.

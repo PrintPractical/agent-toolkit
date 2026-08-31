@@ -10,19 +10,16 @@ State the observable user or system outcome and how success is recognized.
 List intentionally excluded behavior, scope, and cleanup.
 
 ## Requirements Traceability
-List each explicit source requirement and point to the use case, rule, interface, test, or non-goal that addresses it. Do not silently drop requirements during refinement.
+Classify each explicit source requirement as `SUPPORTED`, `DEFERRED`, or `NON-GOAL`, then point to the use case, rule, interface, test, or rationale that addresses it. Only `SUPPORTED` requirements bind this implementation.
 
 ## Actors and Use Cases
 Name each actor and desired outcome.
 
-### Now
+### Supported Now
 List use cases this change must deliver.
 
-### Next
-List credible near-term use cases that influence extension pressure but are not implemented now.
-
-### Later
-List plausible horizon use cases without designing them prematurely.
+### Deferred
+List acknowledged use cases that are not implemented or accepted by this change. Record only concrete compatibility pressure; do not design their behavior.
 
 ## Concrete Examples
 Give happy, edge, and failure examples with inputs, context, and observable results.
@@ -44,10 +41,19 @@ Complete this before placement or slicing. Use one row per independently meaning
 Specify changed commands, APIs, events, schemas, compatibility, idempotency, and error semantics. If none, say why.
 
 ## Applicable Support Envelope
-For risky behavior, state the supported inputs and limits, identity semantics, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees that apply. Mark irrelevant dimensions as not applicable and keep unsupported horizons out of the implementation contract.
+For supported-now behavior, state only the inputs and limits, identity semantics, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees needed by the current outcome. Mark irrelevant dimensions not applicable. Deferred and unsupported behavior cannot become implementation or acceptance work.
 
 ## Abstraction and Extension Pressure
 List each needed abstraction, its purpose, consumers, implementations, and test strategy. Record why a concrete dependency is appropriate when it constrains future change.
+
+## Simplicity and Change Budget
+Choose the smallest implementation that delivers supported-now behavior and repository constraints. Estimates cover production code, excluding tests, generated output, vendored code, and workflow artifacts. Complete every field with concrete repository evidence; this is a reassessment trigger, not a productivity target.
+- Smallest viable approach:
+- Expected production code change:
+- Expected files and owners affected:
+- Largest source file impact:
+- New dependencies or abstractions:
+- Reassessment trigger:
 
 ## Test Traceability
 Map each important rule, contract, edge, and failure risk to a unit, integration, or regression test. Explain any gap.
@@ -63,7 +69,7 @@ Map every decomposed owner to implementation only after ownership is clear. Appl
 Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Owners`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Owners` is a JSON string array of names from the reviewed map. `Acceptance command` is a JSON string array that runs the slice's observable path, for example `["npm", "test", "--", "checkout"]`. Architecture is decomposed by responsibility; implementation proceeds in vertical slices through those shared owners. A slice includes all work needed for runnable behavior, but must not create a private copy of another owner's behavior. Phase-only work is not a vertical slice.
 
 ## Implementation Conformance
-After implementing each active slice, update this section before recording that slice as complete. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing ownership, architectural role, dependency direction, reuse decisions, approved abstractions, or slices.
+After implementing each active slice, update this section before recording that slice as complete. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing supported scope, ownership, architectural role, dependency direction, reuse decisions, approved abstractions, slices, or the reviewed change budget.
 
 ### Architecture Decisions
 Complete all four fields before the first `agent-toolkit slice complete`. `Owners` must be a JSON string array containing every reviewed responsibility owner exactly once.
@@ -71,6 +77,13 @@ Complete all four fields before the first `agent-toolkit slice complete`. `Owner
 - Owners: []
 - Implementation:
 - Verification:
+
+### Complexity Reconciliation
+Complete before quality review using the final candidate rather than the design estimate.
+- Production code changed:
+- Largest source file:
+- Dependencies or abstractions added:
+- Budget outcome:
 
 ### Slice Completion
 Before `agent-toolkit slice complete --number N`, add `#### Slice N: <exact reviewed title>` with both fields below. Keep prior records and do not add records for future slices.
