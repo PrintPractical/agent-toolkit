@@ -5,16 +5,19 @@ import test from "node:test";
 import { artifactFingerprint, designContractFingerprint, executableFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
 import { execute, initializeGit, runCli, temporaryDirectory } from "./helpers.mjs";
 
-async function completePlan(root, slug) {
+async function completePlan(root, slug, { includeConformance = true } = {}) {
   const file = path.join(root, ".agent", "changes", `${slug}.md`);
   const content = await readFile(file, "utf8");
-  await writeFile(file, content
+  let completed = content
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Search behavior -> use case, interface, and tests.\n")
     .replace(/(## Responsibility Decomposition\n)[\s\S]*?(?=\n## )/, "$1| Owner | Responsibility | Rules / Decisions | Architectural Role | Depends On | Used By | Existing/New | Reuse Decision |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| SearchPolicy | Ranking and query rules | Preserve ranking decisions | Search policy owner | SearchIndex | Search command | New | NEW: repository search found no authoritative ranking owner; ranking needs one cohesive owner |\n| SearchIndex | Search index queries | Preserve unavailable-storage behavior | Storage integration boundary | Storage | SearchPolicy | Existing | EXTEND: inspected SearchIndex, which owns index queries; extend it instead of adding a parallel index |\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. SearchIndex provides the query behavior used by search.\n")
     .replace(/(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/, "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| SearchPolicy | src/search-policy.js | Keep ranking independent of storage details | [1] |\n| SearchIndex | src/search-index.js | Existing integration remains authoritative | [1] |\n")
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Owners: ["SearchPolicy", "SearchIndex"]\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the existing search index.\n- Tests: Ranking unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and both tests pass.\n`)
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Search uses the existing index.\n- Owners: [\"SearchPolicy\", \"SearchIndex\"]\n- Implementation: The search command queries storage.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Search results are returned\n- Outcome: A query returns ranked results.\n- Owners: ["SearchPolicy", "SearchIndex"]\n- Entry point: Search command.\n- Core behavior: Apply ranking rules.\n- Boundary integration: Query the existing search index.\n- Tests: Ranking unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and both tests pass.\n`);
+  if (includeConformance) {
+    completed = completed.replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Search uses the existing index.\n- Owners: [\"SearchPolicy\", \"SearchIndex\"]\n- Implementation: The search command queries storage.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Slice: Slice 1 returns search results.\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n");
+  }
+  await writeFile(file, completed);
 }
 
 async function completeProject(root, slug, { complete = false } = {}) {
@@ -34,8 +37,9 @@ async function completeProject(root, slug, { complete = false } = {}) {
 }
 
 async function markDesignApproved(root, state) {
-  state.developerApproval = { fingerprint: await artifactFingerprint(root, state) };
-  state.reviews["design-verifier"] = { contractFingerprint: await designContractFingerprint(root, state) };
+  const fingerprint = await artifactFingerprint(root, state);
+  state.developerApproval = { fingerprint };
+  state.reviews["design-verifier"] = { fingerprint, contractFingerprint: await designContractFingerprint(root, state) };
 }
 
 test("CLI initializes and starts in a non-Git brownfield directory", async () => {
@@ -171,6 +175,41 @@ test("CLI provides top-level and command-specific help without project state", a
   const help = await runCli(root, ["help", "--help"]);
   assert.equal(help.code, 0, help.stderr);
   assert.match(help.stdout, /help \[command\]/);
+});
+
+test("implementation check and status expose the active conformance contract", async () => {
+  const root = await temporaryDirectory();
+  await runCli(root, ["init"]);
+  await runCli(root, ["start", "--kind", "feature", "--title", "Add Search"]);
+  await completePlan(root, "add-search", { includeConformance: false });
+  assert.equal((await runCli(root, ["check"])).code, 0);
+  await runCli(root, ["advance"]);
+
+  const stateFile = path.join(root, ".agent", ".state", "add-search.json");
+  const state = JSON.parse(await readFile(stateFile, "utf8"));
+  state.phase = "ready-to-build";
+  await markDesignApproved(root, state);
+  await writeFile(stateFile, `${JSON.stringify(state, null, 2)}\n`);
+  const started = await runCli(root, ["advance"]);
+  assert.equal(started.code, 0, started.stderr);
+
+  const status = JSON.parse((await runCli(root, ["status", "--json"])).stdout);
+  assert.deepEqual(status.slices[0].acceptanceCommand, [process.execPath, "-e", "process.exit(0)"]);
+  assert.match(status.next, /Implement only Slice 1, complete Implementation Conformance for the architecture and active slice/);
+  assert.ok(status.next.includes(`exact argv: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}`));
+
+  const incomplete = await runCli(root, ["check"]);
+  assert.equal(incomplete.code, 1);
+  assert.match(incomplete.stderr, /Architecture Decisions with non-empty Decision, Owners, Implementation, and Verification fields/);
+  assert.match(incomplete.stderr, /Slice 1 before recording its completion/);
+
+  const design = path.join(root, ".agent", "changes", "add-search.md");
+  await writeFile(design, (await readFile(design, "utf8")).replace(
+    /(## Implementation Conformance\n)[\s\S]*?(?=\n## )/,
+    "$1### Architecture Decisions\n- Decision: Search uses the existing index.\n- Owners: [\"SearchPolicy\", \"SearchIndex\"]\n- Implementation: The search command queries storage.\n- Verification: Ranking unit tests and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Search results are returned\n- Implementation: Command, ranking, and storage are integrated.\n- Verification: The command builds and tests pass.\n"
+  ));
+  const complete = await runCli(root, ["check"]);
+  assert.equal(complete.code, 0, complete.stderr);
 });
 
 test("CLI pauses for developer feedback and supports requested revisions", async () => {

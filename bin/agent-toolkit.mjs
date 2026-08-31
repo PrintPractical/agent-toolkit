@@ -232,6 +232,7 @@ async function status() {
       number: slice.number,
       title: slice.title,
       owners: slice.owners,
+      acceptanceCommand: slice.acceptanceCommand,
       complete: Boolean(slice.completedAt)
     })) || null,
     next: nextAction(state, config)
@@ -286,7 +287,16 @@ async function workflow() {
 
 async function check() {
   const state = await loadState(root);
-  const problems = await validateArtifacts(root, state, { requireSystem: true });
+  const options = { requireSystem: true };
+  if (state.phase === "implementing") {
+    const slices = state.implementation?.slices || [];
+    const pending = slices.find(slice => !slice.completedAt);
+    options.requireConformance = true;
+    options.conformanceSliceNumbers = slices
+      .filter(slice => slice.completedAt || slice.number === pending?.number)
+      .map(slice => slice.number);
+  }
+  const problems = await validateArtifacts(root, state, options);
   if (problems.length) throw new Error(problems.join("\n"));
   console.log("Artifacts are valid");
 }

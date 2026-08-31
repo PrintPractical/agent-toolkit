@@ -54,6 +54,12 @@ test("templates stay compact and skills metadata names only public skills", asyn
   for (const file of await readdir(path.join(repositoryRoot, "templates"))) {
     const content = await readFile(path.join(repositoryRoot, "templates", file), "utf8");
     assert.ok(content.split("\n").length <= 120, `${file} exceeds 120 lines`);
+    if (["design.md.tmpl", "fix.md.tmpl"].includes(file)) {
+      assert.match(content, /Owners` must be a JSON string array containing every reviewed responsibility owner exactly once/);
+      assert.match(content, /After implementing each active slice, update this section before recording that slice as complete/);
+      assert.match(content, /Before `agent-toolkit slice complete --number N`, add `#### Slice N: <exact reviewed title>`/);
+      assert.doesNotMatch(content, /per completed slice/);
+    }
   }
   const metadata = JSON.parse(await readFile(path.join(repositoryRoot, "skills.sh.json"), "utf8"));
   assert.deepEqual(metadata.groupings.flatMap(group => group.skills).sort(), ["build", "design", "fix", "ideate"]);

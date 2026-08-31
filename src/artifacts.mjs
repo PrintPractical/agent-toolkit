@@ -390,7 +390,7 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     const sliceEvidence = part("Slice Completion");
     const completeFields = (body, fields) => fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
     if (!completeFields(architecture, ["Decision", "Owners", "Implementation", "Verification"])) {
-      problems.push("Complete Implementation Conformance with architecture-decision and slice-completion evidence before quality review");
+      problems.push("Complete Implementation Conformance Architecture Decisions with non-empty Decision, Owners, Implementation, and Verification fields");
     }
     const conformanceOwners = jsonField(architecture, "Owners");
     if (!Array.isArray(conformanceOwners) || new Set(conformanceOwners).size !== conformanceOwners.length

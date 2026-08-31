@@ -60,16 +60,17 @@ Map every decomposed owner to implementation only after ownership is clear. Appl
 Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Owners`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Owners` is a JSON string array of names from the reviewed map. `Acceptance command` is a JSON string array that runs the corrected observable path. Architecture is decomposed by responsibility; correction proceeds in vertical slices through those shared owners. A slice must not create a private copy of another owner's behavior.
 
 ## Implementation Conformance
-Complete during build. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing ownership, architectural role, dependency direction, reuse decisions, approved abstractions, or slices.
+After implementing each active slice, update this section before recording that slice as complete. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing ownership, architectural role, dependency direction, reuse decisions, approved abstractions, or slices.
 
 ### Architecture Decisions
+Complete all four fields before the first `agent-toolkit slice complete`. `Owners` must be a JSON string array containing every reviewed responsibility owner exactly once.
 - Decision:
 - Owners: []
 - Implementation:
 - Verification:
 
 ### Slice Completion
-- Add one `#### Slice N: <exact reviewed title>` subsection per completed slice.
+Before `agent-toolkit slice complete --number N`, add `#### Slice N: <exact reviewed title>` with both fields below. Keep prior records and do not add records for future slices.
 - Implementation:
 - Verification:
 

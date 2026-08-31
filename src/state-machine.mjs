@@ -534,7 +534,7 @@ export function nextAction(state, config) {
     active: "Design the next unblocked roadmap milestone, or run agent-toolkit project finalize when all completion criteria are met",
     "integration-testing": "Run every Final Integration acceptance command with agent-toolkit test --kind integration, then run: agent-toolkit advance",
     implementing: pendingSlice
-      ? `Implement only Slice ${pendingSlice.number}, run its reviewed acceptance command, then run: agent-toolkit slice complete --number ${pendingSlice.number}`
+      ? `Implement only Slice ${pendingSlice.number}, complete Implementation Conformance for the architecture and active slice, run its reviewed acceptance command through agent-toolkit test --kind acceptance -- (exact argv: ${JSON.stringify(pendingSlice.acceptanceCommand)}), then run: agent-toolkit slice complete --number ${pendingSlice.number}`
       : "All slices are complete; run: agent-toolkit advance",
     "baseline-sealed": "agent-toolkit advance",
     "quality-critic": "agent-toolkit review prepare --stage quality --role critic",
