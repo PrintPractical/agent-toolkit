@@ -24,7 +24,7 @@ function selectedDesignSections(design) {
   const allowed = new Set([
     "Outcome", "Non-goals", "Actors and Use Cases", "Failure and Impact", "Reproduction",
     "Root Cause", "Concrete Examples", "Key Concepts and Rules", "Rules and Invariants",
-    "Boundaries and Dependencies",
+    "Responsibility Decomposition", "Responsibility and Architecture Map",
     "Public Interfaces and Errors", "Abstraction and Extension Pressure",
     "Correction and Extension Pressure", "Test Traceability", "Implementation Plan", "Thin Vertical Slices"
   ]);

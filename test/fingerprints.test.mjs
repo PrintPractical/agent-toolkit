@@ -9,7 +9,7 @@ import { candidateSnapshot, designContractFingerprint, executableFingerprint, pr
 import { statusPaths } from "../src/git.mjs";
 import { execute, initializeGit, temporaryDirectory } from "./helpers.mjs";
 
-test("file and module placement remains part of the reviewed design contract", async () => {
+test("responsibility and architecture placement remains part of the reviewed design contract", async () => {
   const root = await temporaryDirectory();
   const design = await renderChange(root, { kind: "feature", title: "Place Modules", slug: "place-modules" });
   await renderSystem(root);
@@ -17,8 +17,8 @@ test("file and module placement remains part of the reviewed design contract", a
   const initial = await designContractFingerprint(root, state);
   const content = await readFile(design, "utf8");
   await writeFile(design, content.replace(
-    /(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/,
-    "$1- `src/results.js`: own result rules.\n"
+    /(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/,
+    "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| Results | src/results.js | Own result rules | [1] |\n"
   ));
   const placementChanged = await designContractFingerprint(root, state);
   assert.notEqual(placementChanged, initial);
@@ -127,6 +127,7 @@ test("commit preparation rejects dirty submodule contents", async () => {
   await renderSystem(root);
   const state = {
     version: 2,
+    artifactFormat: 5,
     type: "change",
     slug: "inspect-submodule",
     phase: "ready-to-commit",
@@ -155,6 +156,7 @@ test("commit preparation clears a deleted embedded repository from the index", a
   await writeFile(path.join(root, "app.js"), "export const value = 1;\n");
   const state = {
     version: 2,
+    artifactFormat: 5,
     type: "change",
     slug: "prepare-candidate",
     phase: "ready-to-commit",

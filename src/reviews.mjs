@@ -31,9 +31,12 @@ function criticChecklist(stage, state) {
   if (stage === "design") {
     return [
       "Trace every requirement and example to an observable outcome, contract, and test.",
-      "Inspect rules, responsibilities, dependencies, integrations, and applicable project instructions.",
-      "Compare the plan with the closest existing behavior and reject duplicated policy or parallel abstractions without a concrete semantic or ownership distinction.",
-      "Check placement responsibilities, risks, and that each planned slice is independently vertical.",
+      "Check that every significant rule, workflow, mapping, capability, and integration has one independently describable authoritative owner with clear dependencies and consumers.",
+      "Apply every applicable AGENTS.md architecture and organization rule; reject prohibited boundary leakage and unclear composition or dependency direction.",
+      "Verify every REUSE, EXTEND, REFACTOR, or NEW decision against semantically equivalent existing behavior; require consolidation when equivalent behavior is already duplicated.",
+      "Reject unrelated owners collapsed into generic components, generic dumping grounds, abstractions that only mirror one concrete implementation without purpose, and placement too vague for build.",
+      "Check that placement follows decomposition and each slice is vertical through reviewed shared owners without inventing or privately duplicating architecture.",
+      "Ask whether the planned ownership and dependency direction would remain coherent if infrastructure technology changed.",
       "Identify applicable edge cases, invalid inputs, state freshness, concurrency, and failure handling before reporting findings.",
       "Finish this complete sweep before writing findings; do not stop after the first defect."
     ];
@@ -41,9 +44,9 @@ function criticChecklist(stage, state) {
   return [
     "Trace every requirement and reviewed design decision to the candidate and its tests.",
     "Inspect all changed paths and relevant callers for observable behavior, errors, invalid inputs, and regressions.",
-    "Check whether the candidate duplicates an existing rule or utility instead of extending its established owner; accept parallel code only for a demonstrated semantic or ownership distinction.",
+    "Check whether the candidate moved, collapsed, or duplicated reviewed ownership instead of following the authoritative reuse decision.",
     "Assess applicable state freshness, concurrency and locking, persistence consistency, resource lifecycle, and failure handling.",
-    "Check conformance with reviewed dependencies, placement responsibilities, and project instructions.",
+    "Check conformance with reviewed owners, architectural roles, dependency direction, approved abstractions, placement, slices, and project instructions; flag new cross-boundary dependencies or major abstractions.",
     "Finish this complete sweep before writing findings; do not stop after the first defect."
   ];
 }

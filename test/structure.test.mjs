@@ -24,8 +24,13 @@ test("repository exposes exactly the four public skills within budgets", async (
   const build = await readFile(path.join(directory, "build", "SKILL.md"), "utf8");
   const fix = await readFile(path.join(directory, "fix", "SKILL.md"), "utf8");
   assert.match(design, /closest existing owner/);
+  assert.match(design, /decompose the change into independently meaningful responsibility owners/);
+  assert.match(design, /Architecture is decomposed by responsibility; implementation proceeds by vertical slices through the reviewed owners/);
   assert.match(build, /instead of copying behavior/);
+  assert.match(build, /Treat them as implementation constraints, not prompts to re-derive architecture/);
+  assert.match(build, /review restart --stage design/);
   assert.match(fix, /parallel code unless a concrete semantic or ownership distinction prevents reuse/);
+  assert.match(fix, /correction proceeds in vertical slices through shared owners without local copies/);
 });
 
 test("ideate stays conversational, independent, and constructively challenging", async () => {

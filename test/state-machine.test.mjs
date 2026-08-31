@@ -17,15 +17,14 @@ async function project(kind = "feature") {
   const content = await readFile(design, "utf8");
   await writeFile(design, content
     .replace(/(## Requirements Traceability\n)[\s\S]*?(?=\n## )/, "$11. Requested result -> use case, contract, and tests.\n")
-    .replace(/(## Boundaries and Dependencies\n)[\s\S]*?(?=\n## )/, "$11. Results use storage and preserve failure behavior.\n")
+    .replace(/(## Responsibility Decomposition\n)[\s\S]*?(?=\n## )/, "$1| Owner | Responsibility | Rules / Decisions | Architectural Role | Depends On | Used By | Existing/New | Reuse Decision |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| ResultPolicy | Result rules | Preserve result validity | Result policy owner | ResultStore | Result command | New | NEW: repository search found no authoritative result policy; result rules require one cohesive owner |\n| ResultStore | Durable result access | Preserve storage failure behavior | Storage integration boundary | Storage | ResultPolicy | Existing | EXTEND: inspected ResultStore, which owns result persistence; extend it instead of copying persistence |\n")
     .replace(/(## (?:Abstraction and Extension Pressure|Correction and Extension Pressure)\n)[\s\S]*?(?=\n## )/, "$11. ResultStore provides the persistence behavior needed by results.\n")
-    .replace(/(## Existing Capabilities and Reuse\n)[\s\S]*?(?=\n## )/, "$11. Inspected ResultStore; extend it because it owns result persistence behavior.\n")
-    .replace(/(## File and Module Placement Plan\n)[\s\S]*?(?=\n## )/, "$1| Path or module | Action | Responsibility | Constraint | Slice |\n| --- | --- | --- | --- | --- |\n| src/result.js | Modify | Result behavior | Use the existing ResultStore | 1 |\n")
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and tests pass.\n`)
-    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Results use the existing ResultStore.\n- Implementation: The result command stores results.\n- Verification: Unit and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
+    .replace(/(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/, "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| ResultPolicy | src/result-policy.js | Keep policy independent of storage details | [1] |\n| ResultStore | src/result-store.js | Existing integration remains authoritative | [1] |\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: Result is delivered\n- Outcome: The observable result is returned.\n- Owners: ["ResultPolicy", "ResultStore"]\n- Entry point: Result command.\n- Core behavior: Apply result rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: Rule unit test and storage integration test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The command builds and tests pass.\n`)
+    .replace(/(## Implementation Conformance\n)[\s\S]*?(?=\n## )/, "$1### Architecture Decisions\n- Decision: Results use the existing ResultStore.\n- Owners: [\"ResultPolicy\", \"ResultStore\"]\n- Implementation: The result command stores results.\n- Verification: Unit and storage integration tests.\n\n### Slice Completion\n#### Slice 1: Result is delivered\n- Slice: Slice 1 delivers the result.\n- Implementation: Command, rules, and storage are integrated.\n- Verification: The command builds and tests pass.\n"));
   await renderSystem(root);
   const state = await createState(root, { slug: "deliver-result", kind, title: "Deliver Result", designPath: ".agent/changes/deliver-result.md", git: false });
-  assert.equal(state.artifactFormat, 4);
+  assert.equal(state.artifactFormat, 5);
   return { root, state };
 }
 
@@ -124,6 +123,14 @@ test("design requires a fresh critic and distinct verifier", async () => {
   await approveReview(root, state, verifier, "verifier-session");
   assert.equal(state.phase, "ready-to-build");
   assert.match(nextAction(state, DEFAULT_CONFIG), /Stop the design workflow and start the build skill/);
+});
+
+test("runtime state rejects obsolete artifact formats", async () => {
+  const { root, state } = await project();
+  state.artifactFormat = 4;
+  await assert.rejects(saveState(root, state), /unsupported runtime state/);
+  await writeFile(path.join(root, ".agent", ".state", `${state.slug}.json`), `${JSON.stringify(state, null, 2)}\n`);
+  await assert.rejects(loadState(root, state.slug), /unsupported state schema/);
 });
 
 test("project framing requires developer approval, a fresh critic, and a distinct verifier", async () => {
@@ -422,7 +429,7 @@ test("critic remediation changes return to developer approval before verificatio
     findingsFile
   });
   const design = path.join(root, state.designPath);
-  await writeFile(design, (await readFile(design, "utf8")).replace("Results use storage", "Results exclusively use storage"));
+  await writeFile(design, (await readFile(design, "utf8")).replace("ResultStore | Durable result access", "ResultStore | Exclusive durable result access"));
   await resolveFinding(root, state, state.findings.at(-1).id);
   await advance(root, state, DEFAULT_CONFIG);
   assert.equal(state.phase, "developer-review");
@@ -544,12 +551,39 @@ test("new workflows require exact sequential slice acceptance before baseline", 
   const { root, state } = await project();
   const design = path.join(root, state.designPath);
   await writeFile(design, (await readFile(design, "utf8"))
-    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: First outcome\n- Outcome: The first result is observable.\n- Entry point: First command.\n- Core behavior: Apply first rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: First acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The first command passes.\n\n### Slice 2: Second outcome\n- Outcome: The second result is observable.\n- Entry point: Second command.\n- Core behavior: Apply second rules.\n- Boundary integration: Read through ResultStore.\n- Tests: Second acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The second command passes.\n`)
+    .replace(/(## Responsibility and Architecture Map\n)[\s\S]*?(?=\n## )/, "$1| Owner | Expected Placement | Placement Constraints | Slices |\n| --- | --- | --- | --- |\n| ResultPolicy | src/result-policy.js | Keep policy independent of storage details | [1, 2] |\n| ResultStore | src/result-store.js | Existing integration remains authoritative | [1, 2] |\n")
+    .replace(/(## Implementation Plan\n)[\s\S]*?(?=\n## )/, `$1### Slice 1: First outcome\n- Outcome: The first result is observable.\n- Owners: ["ResultPolicy", "ResultStore"]\n- Entry point: First command.\n- Core behavior: Apply first rules.\n- Boundary integration: Persist through ResultStore.\n- Tests: First acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The first command passes.\n\n### Slice 2: Second outcome\n- Outcome: The second result is observable.\n- Owners: ["ResultPolicy", "ResultStore"]\n- Entry point: Second command.\n- Core behavior: Apply second rules.\n- Boundary integration: Read through ResultStore.\n- Tests: Second acceptance test.\n- Acceptance command: ${JSON.stringify([process.execPath, "-e", "process.exit(0)"])}\n- Complete when: The second command passes.\n`)
     .replace(/(### Slice Completion\n)[\s\S]*?(?=\n## )/, "$1#### Slice 1: First outcome\n- Implementation: First command, rules, and storage are integrated.\n- Verification: First acceptance command passes.\n"));
   state.phase = "ready-to-build";
   await markDesignApproved(root, state);
   await advance(root, state, DEFAULT_CONFIG);
+  assert.deepEqual(state.implementation.responsibilities.map(item => ({
+    owner: item.owner,
+    role: item.role,
+    reuseDecision: item.reuseDecision,
+    placement: item.placement,
+    slices: item.slices
+  })), [
+    {
+      owner: "ResultPolicy",
+      role: "Result policy owner",
+      reuseDecision: "NEW: repository search found no authoritative result policy; result rules require one cohesive owner",
+      placement: "src/result-policy.js",
+      slices: [1, 2]
+    },
+    {
+      owner: "ResultStore",
+      role: "Storage integration boundary",
+      reuseDecision: "EXTEND: inspected ResultStore, which owns result persistence; extend it instead of copying persistence",
+      placement: "src/result-store.js",
+      slices: [1, 2]
+    }
+  ]);
   assert.equal(state.implementation.slices.length, 2);
+  assert.deepEqual(state.implementation.slices.map(slice => slice.owners), [
+    ["ResultPolicy", "ResultStore"],
+    ["ResultPolicy", "ResultStore"]
+  ]);
   await assert.rejects(completeSlice(root, state, 2), /next is Slice 1/);
   await assert.rejects(completeSlice(root, state, 1), /reviewed acceptance command/);
   await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });

@@ -30,8 +30,12 @@ Give the failing example plus adjacent happy, edge, and failure cases.
 ## Key Concepts and Rules
 Define relevant terms and the rules the correction must restore. If none, say why.
 
-## Boundaries and Dependencies
-Name affected responsibilities, dependency direction, integration points, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints.
+## Responsibility Decomposition
+Complete this before placement or slicing. Use one row per independently meaningful owner; one row is enough for a simple cohesive correction. `Existing/New` is `Existing` or `New`. `Reuse Decision` is `REUSE`, `EXTEND`, `REFACTOR`, or `NEW`, followed by `: inspected evidence; rationale`. Name rules, workflows, mappings, capabilities, and integrations explicitly; a layer, slice, or nearby generic file is not an owner.
+
+| Owner | Responsibility | Rules / Decisions | Architectural Role | Depends On | Used By | Existing/New | Reuse Decision |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Name | Behavior, state, or integration owned | Invariants and decisions, or None | Role or boundary from project instructions | Owners or external dependencies, or None | Consumers, or None | Existing/New | DECISION: inspected evidence; rationale |
 
 ## Public Interfaces and Errors
 Record compatibility, schemas, commands, APIs, events, and error semantics. If unchanged, say why.
@@ -42,23 +46,25 @@ For the corrected path, state the supported inputs and limits, identity semantic
 ## Correction and Extension Pressure
 Describe the correction at the rule-owning location. List affected abstractions and contracts, and record related extension pressure without generic layering.
 
-## Existing Capabilities and Reuse
-Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether the correction extends it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.
-
 ## Test Traceability
 Map root cause, neighboring risks, rules, and boundaries to regression, unit, and integration tests. Explain any gap.
 
-## File and Module Placement Plan
-List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: correction may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.
+## Responsibility and Architecture Map
+Map every decomposed owner to implementation only after ownership is clear. Apply every relevant `AGENTS.md` organization and dependency rule. Preserve sound authoritative owners, but create or consolidate cohesive modules when required rather than using a generic dumping ground or preserving poor placement for local consistency. Paths are forecasts; use modules, directories, or globs when exact files are premature.
+
+| Owner | Expected Placement | Placement Constraints | Slices |
+| --- | --- | --- | --- |
+| Exact owner from decomposition | New, modified, moved, or existing module/file | Governing organization, boundary, and dependency constraints | [1] |
 
 ## Implementation Plan
-Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Acceptance command` is a JSON string array that runs the corrected observable path. Keep the regression lock-in observable and make correction slices runnable across every affected layer.
+Use `### Slice N: <observable outcome>` subsections. Every slice must include `Outcome`, `Owners`, `Entry point`, `Core behavior`, `Boundary integration`, `Tests`, `Acceptance command`, and `Complete when`. `Owners` is a JSON string array of names from the reviewed map. `Acceptance command` is a JSON string array that runs the corrected observable path. Architecture is decomposed by responsibility; correction proceeds in vertical slices through those shared owners. A slice must not create a private copy of another owner's behavior.
 
 ## Implementation Conformance
-Complete during build. Record non-material placement deviations with rationale; restart design review for material architecture or plan deviations.
+Complete during build. Map reviewed owners and slices to implementation evidence. Record non-material path deviations with rationale; restart design review before changing ownership, architectural role, dependency direction, reuse decisions, approved abstractions, or slices.
 
 ### Architecture Decisions
 - Decision:
+- Owners: []
 - Implementation:
 - Verification:
 

@@ -19,6 +19,63 @@ function completeFields(body, fields) {
   return fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
 }
 
+function table(body, headers) {
+  const lines = (body || "").split("\n").map(line => line.trim());
+  const cells = line => line.startsWith("|") && line.endsWith("|")
+    ? line.slice(1, -1).split("|").map(cell => cell.trim())
+    : null;
+  const headerIndex = lines.findIndex(line => {
+    const row = cells(line);
+    return row?.length === headers.length && row.every((cell, index) => cell === headers[index]);
+  });
+  const separator = cells(lines[headerIndex + 1] || "");
+  if (headerIndex < 0 || separator?.length !== headers.length || !separator.every(cell => /^:?-{3,}:?$/.test(cell))) {
+    return { rows: [], malformed: false };
+  }
+  const records = [];
+  for (const line of lines.slice(headerIndex + 2)) {
+    if (!line) break;
+    records.push(cells(line));
+  }
+  return {
+    rows: records.filter(row => row?.length === headers.length && row.some(cell => cell)),
+    malformed: records.some(row => row?.length !== headers.length)
+  };
+}
+
+function parseJson(value) {
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+const responsibilityHeaders = ["Owner", "Responsibility", "Rules / Decisions", "Architectural Role", "Depends On", "Used By", "Existing/New", "Reuse Decision"];
+const architectureMapHeaders = ["Owner", "Expected Placement", "Placement Constraints", "Slices"];
+const responsibilityPlaceholder = ["Name", "Behavior, state, or integration owned", "Invariants and decisions, or None", "Role or boundary from project instructions", "Owners or external dependencies, or None", "Consumers, or None", "Existing/New", "DECISION: inspected evidence; rationale"];
+const architectureMapPlaceholder = ["Exact owner from decomposition", "New, modified, moved, or existing module/file", "Governing organization, boundary, and dependency constraints", "[1]"];
+
+export function responsibilityDecomposition(content) {
+  const body = sectionBody(content, "Responsibility Decomposition") || "";
+  return table(body, responsibilityHeaders).rows.filter(row => row.some((value, index) => value !== responsibilityPlaceholder[index])).map(row => ({
+    owner: row[0],
+    responsibility: row[1],
+    rules: row[2],
+    role: row[3],
+    dependsOn: row[4],
+    usedBy: row[5],
+    existence: row[6],
+    reuseDecision: row[7]
+  }));
+}
+
+export function responsibilityArchitectureMap(content) {
+  const body = sectionBody(content, "Responsibility and Architecture Map") || "";
+  return table(body, architectureMapHeaders).rows.filter(row => row.some((value, index) => value !== architectureMapPlaceholder[index])).map(row => ({
+    owner: row[0],
+    placement: row[1],
+    constraints: row[2],
+    slices: parseJson(row[3])
+  }));
+}
+
 export function projectRequirements(content) {
   const body = sectionBody(content, "Required Outcomes") || "";
   return [...body.matchAll(/(?:^|\n)### Requirement (REQ-(\d+)): ([^\n]+)\n([\s\S]*?)(?=\n### |$)/g)].map(match => ({
@@ -60,6 +117,7 @@ export function implementationSlices(content) {
       number: Number(match[1]),
       title: match[2].trim(),
       body: match[3],
+      owners: jsonField(match[3], "Owners"),
       acceptanceCommand
     };
   });
@@ -243,12 +301,17 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     }
     const slices = [...plan.matchAll(/(?:^|\n)### Slice \d+: [^\n]+\n([\s\S]*?)(?=\n### Slice \d+: |$)/g)];
     if (!slices.length) problems.push("Implementation Plan must use ### Slice N: <observable outcome> subsections");
-    const fields = ["Outcome", "Entry point", "Core behavior", "Boundary integration", "Tests", "Complete when"];
+    const fields = ["Outcome", "Owners", "Entry point", "Core behavior", "Boundary integration", "Tests", "Complete when"];
     for (const [index, slice] of slices.entries()) {
       const missing = fields.filter(field => !new RegExp(`^- ${field}:\\s*\\S`, "mi").test(slice[1]));
       if (missing.length) problems.push(`Implementation slice ${index + 1} is missing: ${missing.join(", ")}`);
     }
     for (const slice of implementationSlices(content)) {
+      if (!Array.isArray(slice.owners) || !slice.owners.length
+        || slice.owners.some(value => typeof value !== "string" || !value)
+        || new Set(slice.owners).size !== slice.owners.length) {
+        problems.push(`Implementation slice ${slice.number} requires Owners as a non-empty JSON array of unique owner names`);
+      }
       if (!Array.isArray(slice.acceptanceCommand) || !slice.acceptanceCommand.length
         || slice.acceptanceCommand.some(value => typeof value !== "string" || !value)) {
         problems.push(`Implementation slice ${slice.number} requires Acceptance command as a non-empty JSON string array`);
@@ -260,26 +323,65 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
       "List each explicit source requirement and point to the use case, rule, interface, test, or non-goal that addresses it. Do not silently drop requirements during refinement.",
       "List each explicit source requirement and point to the reproduction, rule, interface, regression test, or non-goal that addresses it. Do not silently narrow the requested correction."
     ]],
-    ["Boundaries and Dependencies", [
-      "Name each relevant responsibility, dependency direction, integration point, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints.",
-      "Name affected responsibilities, dependency direction, integration points, data ownership, and failure behavior. Follow applicable project instructions for architectural constraints."
-    ]],
     ["Abstraction and Extension Pressure|Correction and Extension Pressure", [
       "List each needed abstraction, its purpose, consumers, implementations, and test strategy. Record why a concrete dependency is appropriate when it constrains future change.",
       "Describe the correction at the rule-owning location. List affected abstractions and contracts, and record related extension pressure without generic layering."
-    ]],
-    ["Existing Capabilities and Reuse", [
-      "Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether this change extends or composes it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient.",
-      "Identify the closest existing behavior, utility, abstraction, or pattern inspected. State whether the correction extends it; if it adds parallel code, name the concrete semantic or ownership difference that prevents reuse. A superficial name or shape match is not sufficient."
     ]]
   ];
-  requiredSections.push(["File and Module Placement Plan", [
-    "List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: build may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature.",
-    "List expected new, modified, moved, or deleted files/modules and each responsibility, applicable `AGENTS.md` constraint, boundary, and slice. Paths are reviewed forecasts, not an exhaustive manifest: correction may touch support files or adjust paths when responsibilities, module constraints, and dependency direction remain intact. Use directories or globs when exact paths are premature."
-  ]]);
   for (const [names, untouched] of requiredSections) {
     const body = section(...names.split("|"));
     if (!body || untouched.includes(body)) problems.push(`Complete the ${names.split("|")[0]} section before developer review`);
+  }
+  const responsibilities = responsibilityDecomposition(content);
+  const responsibilityBody = section("Responsibility Decomposition");
+  if (table(responsibilityBody, responsibilityHeaders).malformed) problems.push("Responsibility Decomposition contains a malformed table row");
+  if (!responsibilityBody || !responsibilities.length) {
+    problems.push(`Responsibility Decomposition must use: ${responsibilityHeaders.join(" | ")}`);
+  }
+  const ownerNames = responsibilities.map(item => item.owner);
+  if (new Set(ownerNames).size !== ownerNames.length) problems.push("Responsibility Decomposition owner names must be unique");
+  for (const item of responsibilities) {
+    if (Object.values(item).some(value => !value)) problems.push(`Responsibility Decomposition row ${item.owner || "<unnamed>"} has an empty field`);
+    if (!["Existing", "New"].includes(item.existence)) problems.push(`${item.owner || "Responsibility owner"} Existing/New must be Existing or New`);
+    if (!/^(REUSE|EXTEND|REFACTOR|NEW):\s+\S[^;]*;\s+\S/.test(item.reuseDecision)) {
+      problems.push(`${item.owner || "Responsibility owner"} Reuse Decision must be REUSE, EXTEND, REFACTOR, or NEW with inspected evidence and rationale`);
+    }
+  }
+  const architecture = responsibilityArchitectureMap(content);
+  const architectureBody = section("Responsibility and Architecture Map");
+  if (table(architectureBody, architectureMapHeaders).malformed) problems.push("Responsibility and Architecture Map contains a malformed table row");
+  if (!architectureBody || !architecture.length) {
+    problems.push(`Responsibility and Architecture Map must use: ${architectureMapHeaders.join(" | ")}`);
+  }
+  const mappedOwners = architecture.map(item => item.owner);
+  if (new Set(mappedOwners).size !== mappedOwners.length) problems.push("Responsibility and Architecture Map owner names must be unique");
+  for (const owner of ownerNames) if (!mappedOwners.includes(owner)) problems.push(`Responsibility and Architecture Map is missing owner: ${owner}`);
+  for (const owner of mappedOwners) if (!ownerNames.includes(owner)) problems.push(`Responsibility and Architecture Map references unknown owner: ${owner}`);
+  const slices = implementationSlices(content);
+  const sliceNumbers = new Set(slices.map(slice => slice.number));
+  for (const item of architecture) {
+    if (!item.owner || !item.placement || !item.constraints) problems.push(`Responsibility and Architecture Map row ${item.owner || "<unnamed>"} has an empty field`);
+    if (!Array.isArray(item.slices) || !item.slices.length || item.slices.some(number => !Number.isInteger(number) || !sliceNumbers.has(number))) {
+      problems.push(`${item.owner || "Responsibility owner"} Slices must be a non-empty JSON array of known slice numbers`);
+    }
+  }
+  for (const slice of slices) {
+    if (!Array.isArray(slice.owners)) continue;
+    for (const owner of slice.owners) if (!ownerNames.includes(owner)) problems.push(`Implementation slice ${slice.number} references unknown owner: ${owner}`);
+  }
+  for (const owner of ownerNames) {
+    const mapped = architecture.find(item => item.owner === owner)?.slices;
+    if (!Array.isArray(mapped)) continue;
+    const referenced = slices.filter(slice => Array.isArray(slice.owners) && slice.owners.includes(owner)).map(slice => slice.number);
+    if (JSON.stringify([...mapped].sort((a, b) => a - b)) !== JSON.stringify(referenced)) {
+      problems.push(`${owner} slice coverage must match between the responsibility map and Implementation Plan`);
+    }
+  }
+  const decompositionIndex = content.indexOf("## Responsibility Decomposition");
+  const architectureIndex = content.indexOf("## Responsibility and Architecture Map");
+  const planIndex = content.indexOf("## Implementation Plan");
+  if (!(decompositionIndex >= 0 && architectureIndex > decompositionIndex && planIndex > architectureIndex)) {
+    problems.push("Responsibility decomposition must precede architecture placement, which must precede implementation slices");
   }
   const conformance = section("Implementation Conformance");
   if (requireConformance || ["baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit", "complete"].includes(state.phase)) {
@@ -287,8 +389,13 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     const architecture = part("Architecture Decisions");
     const sliceEvidence = part("Slice Completion");
     const completeFields = (body, fields) => fields.every(field => new RegExp(`^- ${field}:\\s*\\S`, "mi").test(body));
-    if (!completeFields(architecture, ["Decision", "Implementation", "Verification"])) {
+    if (!completeFields(architecture, ["Decision", "Owners", "Implementation", "Verification"])) {
       problems.push("Complete Implementation Conformance with architecture-decision and slice-completion evidence before quality review");
+    }
+    const conformanceOwners = jsonField(architecture, "Owners");
+    if (!Array.isArray(conformanceOwners) || new Set(conformanceOwners).size !== conformanceOwners.length
+      || JSON.stringify([...conformanceOwners].sort()) !== JSON.stringify([...ownerNames].sort())) {
+      problems.push("Implementation Conformance Owners must be a JSON array covering every reviewed responsibility owner exactly once");
     }
     {
       const planned = implementationSlices(content);

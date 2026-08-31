@@ -57,7 +57,7 @@ Lists registered workflows or changes only the current selector after candidate-
 Shows the current project or change, lifecycle phase, artifacts, review state, and next command. With no current workflow, reports how to start one.`,
   check: `Usage: agent-toolkit check
 
-Validates artifact presence, requirements traceability, boundary and abstraction decisions, vertical implementation slices, implementation conformance when due, the system map, and closed questions.`,
+Validates artifact presence, requirements traceability, responsibility decomposition, architecture placement and reuse decisions, vertical implementation slices through reviewed owners, implementation conformance when due, the system map, and closed questions.`,
   advance: `Usage: agent-toolkit advance
 
 Advances one lifecycle gate when its objective requirements are satisfied.`,
@@ -74,7 +74,7 @@ Runs the command and records its result against the unchanged project candidate.
   --             Separates toolkit options from the test command`,
   slice: `Usage: agent-toolkit slice complete --number <n>
 
-Records one reviewed slice as complete. Slices must be completed in order, their one-to-one Implementation Conformance record must be present, and the current candidate must have passing acceptance evidence from the exact command reviewed in the plan.`,
+Records one reviewed slice as complete. Slices must be completed in order through their reviewed responsibility owners, their one-to-one Implementation Conformance record must be present, and the current candidate must have passing acceptance evidence from the exact command reviewed in the plan.`,
   review: `Usage:
   agent-toolkit review prepare --stage design|quality --role critic|verifier
   agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <packet-findingsPath>

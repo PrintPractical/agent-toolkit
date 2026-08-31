@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { artifactFingerprint, candidateFingerprint, designContractFingerprint, executableFingerprint } from "./fingerprints.mjs";
-import { implementationSlices, projectIntegrationCommands, projectMilestones, validateArtifacts } from "./artifacts.mjs";
+import { implementationSlices, projectIntegrationCommands, projectMilestones, responsibilityArchitectureMap, responsibilityDecomposition, validateArtifacts } from "./artifacts.mjs";
 import { currentHead } from "./git.mjs";
 import { withDirectoryLock } from "./locks.mjs";
 
@@ -51,7 +51,7 @@ export async function createState(root, data) {
   if (registry.workflows.includes(data.slug)) throw new Error(`Workflow already exists: ${data.slug}`);
   const state = {
     version: 2,
-    artifactFormat: 4,
+    artifactFormat: 5,
     type: "change",
     id: randomUUID(),
     phase: "shaping",
@@ -76,7 +76,7 @@ export async function loadState(root, requestedSlug) {
   if (!registry.workflows.includes(slug)) throw new Error(`Unknown workflow: ${slug}`);
   try {
     const state = JSON.parse(await readFile(path.join(stateDirectory(root), `${slug}.json`), "utf8"));
-    if (state.version !== 2 || state.slug !== slug || !["project", "change"].includes(state.type)) throw new Error("unsupported state schema");
+    if (state.version !== 2 || state.artifactFormat !== 5 || state.slug !== slug || !["project", "change"].includes(state.type)) throw new Error("unsupported state schema");
     return state;
   } catch (error) {
     throw new Error(`Invalid runtime state for ${slug}: ${error.message}`);
@@ -97,7 +97,7 @@ export async function selectState(root, slug) {
 }
 
 export async function saveState(root, state) {
-  if (state.version !== 2 || !validSlug(state.slug)) throw new Error("Cannot save unsupported runtime state");
+  if (state.version !== 2 || state.artifactFormat !== 5 || !validSlug(state.slug)) throw new Error("Cannot save unsupported runtime state");
   await mkdir(stateDirectory(root), { recursive: true });
   const target = path.join(stateDirectory(root), `${state.slug}.json`);
   await writeJsonAtomic(target, state);
@@ -417,12 +417,15 @@ export async function advance(root, state, config) {
         state.regression = { evidenceId: failure.id, command: failure.command };
       }
       const design = await readFile(path.join(root, state.designPath), "utf8");
+      const placementByOwner = new Map(responsibilityArchitectureMap(design).map(item => [item.owner, item]));
       state.implementation = {
         startedAt: new Date().toISOString(),
         evidenceStartIndex: state.evidence.length,
+        responsibilities: responsibilityDecomposition(design).map(item => ({ ...item, ...placementByOwner.get(item.owner) })),
         slices: implementationSlices(design).map(slice => ({
           number: slice.number,
           title: slice.title,
+          owners: slice.owners,
           acceptanceCommand: slice.acceptanceCommand
         }))
       };
@@ -522,8 +525,8 @@ export async function advance(root, state, config) {
 export function nextAction(state, config) {
   const pendingSlice = state.implementation?.slices?.find(slice => !slice.completedAt);
   const map = {
-    shaping: state.type === "project" ? "Complete the project frame and system map, then run: agent-toolkit advance" : "Complete the design, file/module placement plan, implementation plan, and system map, then run: agent-toolkit advance",
-    "developer-review": state.type === "project" ? "Review the project frame, then run: agent-toolkit feedback record --verdict approved|changes-requested" : "Review the design, expected file/module placement, and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
+    shaping: state.type === "project" ? "Complete the project frame and system map, then run: agent-toolkit advance" : "Complete the design, responsibility decomposition and architecture map, implementation plan, and system map, then run: agent-toolkit advance",
+    "developer-review": state.type === "project" ? "Review the project frame, then run: agent-toolkit feedback record --verdict approved|changes-requested" : "Review the design, responsibility ownership and placement, and implementation plan, then run: agent-toolkit feedback record --verdict approved|changes-requested",
     "design-critic": "agent-toolkit review prepare --stage design --role critic",
     "design-remediation": "Resolve design findings, then run: agent-toolkit advance",
     "design-verifier": "agent-toolkit review prepare --stage design --role verifier",

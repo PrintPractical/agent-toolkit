@@ -24,36 +24,37 @@ When the engineer arrives from ideation in the same conversation, treat its esta
 
 ## Frame a Project
 
-Read every supplied source fully and inspect the repository. Normalize requirements into `.agent/projects/<slug>.md` without copying sources: record fingerprints, outcomes, users, non-goals, acceptance, constraints, quality attributes, risks, questions, and completion criteria. Mark decisions `observed`, `committed`, `hypothesis`, or `rejected`; resolve material ambiguity with the engineer.
+Read every supplied source and inspect the repository. Normalize it into `.agent/projects/<slug>.md`: record fingerprints, outcomes, users, non-goals, acceptance, constraints, quality attributes, risks, questions, and completion criteria. Mark decisions `observed`, `committed`, `hypothesis`, or `rejected`; resolve material ambiguity with the engineer.
 
-Create a provisional roadmap with the fewest independently useful milestones. Each is a normal `feature` or `fix` with its own full lifecycle and commit; split only when work cannot share one coherent contract and quality review, or when a separate delivery provides a meaningful user, operational, or risk-reduction checkpoint. Keep related behavior in one milestone and use its ordered vertical slices for incremental implementation; never create milestones for layers, modules, setup, or small tasks. Record dependencies and coverage, not APIs, schemas, or architecture that milestone design should discover. Without sources, frame conversationally over as many rounds as needed.
+Create a provisional roadmap with the fewest independently useful milestones. Each is a normal `feature` or `fix` with its own lifecycle and commit; split only when work cannot share one coherent contract and review, or a separate delivery provides a meaningful user, operational, or risk-reduction checkpoint. Keep related behavior together and use vertical slices for implementation; never create milestones for layers, modules, setup, or small tasks. Record dependencies and coverage, not architecture that milestone design should discover. Without sources, frame conversationally.
 
 ## System Map
 
-If `.agent/SYSTEM.md` is absent or empty, bootstrap only the minimum relevant map using the structure created by the CLI. Record evidence, not aspirations. Update it when discovery changes language, responsibilities, dependencies, contracts, constraints, or known pressure. Keep unrelated areas out.
+If `.agent/SYSTEM.md` is absent or empty, bootstrap the minimum relevant evidence-based map. Update it when discovery changes language, responsibilities, dependencies, contracts, constraints, or known pressure. Keep unrelated areas out.
 
 ## Shape a Change
 
 Shape `.agent/changes/<slug>.md`. For a milestone, read its project frame, sources, coverage, discoveries, system map, and earlier evidence. Milestone design owns concrete APIs, schemas, boundaries, and placement; do not reinterpret sources outside the reviewed project contract.
 
 1. State the observable outcome and explicit non-goals.
-2. Enumerate every explicit source requirement, including applicable project instructions, and trace it to a use case, rule, interface, test, placement constraint, or non-goal. Then identify actors and desired outcomes across now, next, and later horizons without designing speculative features.
+2. Trace every source requirement, including project instructions, to a use case, rule, interface, test, placement constraint, or non-goal. Identify actors and outcomes across now, next, and later without designing speculative features.
 3. Clarify any terms and distinctions needed to make the change unambiguous.
 4. Write concrete happy, edge, and failure examples with inputs, context, and observable results.
 5. Extract rules and invariants from examples. Resolve contradictions explicitly.
-6. Identify relevant responsibilities, dependencies, ownership, integration points, and failure behavior. Follow applicable project instructions for architecture and module layout.
-7. Translate responsibilities and `AGENTS.md` organization rules into a compact placement plan. Name expected file/module actions, responsibilities, and slices; use globs when premature. Paths are forecasts, while constraints, ownership, and dependency direction bind.
-8. Specify changed public interfaces, errors, idempotency, consistency, and external integrations.
-9. Define the applicable support envelope for risky behavior: supported inputs and limits, identity, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees. Mark irrelevant dimensions as not applicable rather than inventing guarantees.
-10. Record the closest existing capability and reuse decision. Extend its owner when the contract fits; parallel code needs a concrete semantic or ownership distinction.
-11. Trace risk-based tests to rules, contracts, and failure modes.
-12. Plan ordered thin vertical slices using every template field. Each produces runnable behavior from entry point through policy to a real boundary; layer-only phases are invalid. Give each one a JSON-array acceptance command for its observable path.
+6. Search for semantically equivalent rules, workflows, mappings, capabilities, and integrations, including duplicates under different names or syntax. Record `REUSE`, `EXTEND`, `REFACTOR`, or `NEW` with evidence; consolidate equivalent implementations.
+7. Before placement or slicing, decompose the change into independently meaningful responsibility owners. Record each owner's behavior/state/rules, decisions, architectural role or boundary, dependencies, consumers, existing/new status, and reuse decision. Assign each significant capability or integration to one authoritative owner. A layer, generic service, nearby file, or slice is not an owner merely because it is convenient.
+8. Map every owner to expected placement and slices. Apply `AGENTS.md` organization and dependency rules, preserve sound owners, create cohesive modules, and consolidate poor placement when required. Paths are forecasts; ownership, roles, dependency direction, and governing constraints bind. Generic components are valid only when cohesive.
+9. Specify changed public interfaces, errors, idempotency, consistency, and external integrations.
+10. Define relevant support limits, identity, ordering, cancellation, re-registration, shutdown, concurrency, and scale guarantees. Mark irrelevant dimensions not applicable.
+11. Record each needed abstraction's behavioral purpose, consumers, expected implementations, and test strategy. Do not introduce an abstraction merely to mirror one concrete implementation.
+12. Trace risk-based tests to rules, contracts, and failure modes.
+13. Plan ordered thin vertical slices using every template field. Architecture is decomposed by responsibility; implementation proceeds by vertical slices through the reviewed owners. Each produces runnable behavior through its named owners to a real boundary. Slices cannot invent architecture or copy shared behavior; layer-only phases are invalid. Give each a JSON-array acceptance command.
 
-Choose architecture, module layout, and abstractions from the project's existing patterns and applicable project instructions. Add abstractions only for a clear behavioral purpose or known variation; avoid generic layers, pass-through wrappers, and parallel code without a concrete distinction. Explain every inapplicable template section in one line.
+Choose architecture, layout, and abstractions from repository evidence and project instructions, not a toolkit style. Do not preserve poor placement for local consistency. Avoid dumping grounds, pass-through wrappers, and parallel code without a concrete distinction. One cohesive owner and slice are valid. Explain inapplicable sections briefly.
 
 ## Questions and Decisions
 
-Own local, reversible implementation choices. Ask at most five material questions at once, and only when answers change outcomes, project terminology, an integration boundary, a public interface, or a consequential irreversible choice. Project framing may use multiple rounds. Record decisions and blockers in the applicable artifact; do not turn preferences into user questions.
+Own reversible choices. Ask at most five material questions at once, only when answers change outcomes, terminology, a boundary, a public interface, or an irreversible choice. Record decisions and blockers; do not turn preferences into questions.
 
 ## Design Review
 
@@ -61,7 +62,7 @@ Own local, reversible implementation choices. Ask at most five material question
 2. Run `agent-toolkit advance` to enter `developer-review`. Present the completed project frame or change design to the developer and explicitly invite corrections, omissions, and alternative decisions. Stop for their response; never infer approval.
 3. For requested changes, record their comments with repeatable `--note "..."` flags or `--notes <file>` using `agent-toolkit feedback record --verdict changes-requested`, revise the artifact, and repeat the developer review. When the developer explicitly accepts it, run `agent-toolkit feedback record --verdict approved`.
 4. Prepare a fresh critic with `agent-toolkit review prepare --stage design --role critic`.
-5. A separate context completes the checklist and one comprehensive pass. For projects, review framing, source traceability, constraints, decisions, coverage, dependencies, and completion criteria without treating hypotheses as fact. For changes, review support envelope, rules, boundaries, abstractions, placement, risks, and slices. Findings need contract references, evidence, and impact; zero is valid.
+5. A separate context completes the checklist and one comprehensive pass. For projects, review framing, source traceability, constraints, decisions, coverage, dependencies, and completion criteria without treating hypotheses as fact. For changes, reject missing owners, unrelated concepts collapsed into a generic component, governing-instruction violations, prohibited boundary leakage, duplicated authoritative behavior, purposeless abstractions, unclear composition or dependency direction, and placement too vague for build. Ask whether ownership still makes sense if infrastructure changes; shared owners across slices are expected, while private copies are not. Do not reject a generic name when it genuinely names one cohesive responsibility. Findings need contract references, evidence, and impact; zero is valid.
 6. Write every response directly to the packet's `findingsPath` using its exact JSON schema, including `{"findings":[]}` for approval. Do not create review scratch files elsewhere in the project. Record it with `agent-toolkit review record --packet <id> --verdict approved|changes-requested --reviewer <id> --findings <findingsPath>`. Markdown findings are invalid.
 7. If changes are requested, remediate each finding, run `agent-toolkit findings resolve <id>`, reconcile the artifacts, and follow `status`/`advance`.
 8. Prepare one distinct fresh verifier with `agent-toolkit review prepare --stage design --role verifier`, then reuse that verifier context for closure retries. It may only reopen supplied findings, reject inaccurate dispositions, or identify a demonstrable high-severity regression introduced by remediation.

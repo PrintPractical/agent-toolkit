@@ -40,7 +40,7 @@ A **project** is a rolling container for work needing multiple independently des
 
 - `.agent/SYSTEM.md`: compact durable system knowledge, updated only from evidence.
 - `.agent/projects/<slug>.md`: project outcomes, sources, requirements, constraints, decisions, provisional roadmap, coverage, discoveries, completion criteria, and final integration.
-- `.agent/changes/<slug>.md`: feature design or fix diagnosis, contracts, expected placement, vertical slices, tests, and implementation conformance.
+- `.agent/changes/<slug>.md`: feature design or fix diagnosis, responsibility decomposition, architecture placement, reuse decisions, vertical slices, tests, and implementation conformance.
 - `.agent/.state/registry.json`: registered workflows and the current selector.
 - `.agent/.state/<slug>.json`: CLI-owned lifecycle, review, evidence, linkage, and commit state.
 
@@ -52,17 +52,17 @@ Runtime state is ignored by Git and must never be edited manually. This release 
 2. `design` runs `project start`, reads every source and the repository, fingerprints rather than copies sources, resolves ambiguity with the engineer, and completes the project frame.
 3. The frame receives explicit developer approval, one fresh comprehensive design critic, remediation when needed, and one distinct verifier. Approval makes the project `active`.
 4. `design` selects an explicitly named milestone, a matching current milestone, or the next unblocked `active` roadmap milestone. It creates a linked normal change artifact and completes the usual design gates.
-5. `build` or `fix` delivers ordered vertical slices with exact acceptance evidence. It updates `.agent/SYSTEM.md` and project coverage, discoveries, decisions, and future roadmap from delivered evidence, marks the milestone complete, and runs `project reconcile` before quality review.
+5. `build` or `fix` treats the reviewed owners, roles, placement, dependency direction, reuse decisions, abstractions, and slices as constraints, then delivers ordered vertical slices with exact acceptance evidence. It updates `.agent/SYSTEM.md` and project coverage, discoveries, decisions, and future roadmap from delivered evidence, marks the milestone complete, and runs `project reconcile` before quality review.
 6. The milestone receives a fresh quality critic and distinct verifier, then one inspected conventional commit when Git integration is active. The toolkit never pushes.
 7. After all required milestones are reconciled, quality-verified, and delivered, `project finalize` freezes exact final integration commands. Current integration evidence, a project-wide quality critic, and a distinct verifier are mandatory. Project approval completes the container without creating a redundant aggregate commit.
 
-Project framing is not predictive architecture. Concrete APIs, schemas, boundaries, and module placement emerge during milestone design. Every change identifies the closest existing capability and records whether it extends that owner or why a concrete semantic or ownership distinction requires parallel code. Binding project outcomes, constraints, source material, quality attributes, or completion criteria require renewed project design review when changed. Roadmap ordering, coverage, discoveries, hypotheses, and final integration records evolve as milestones deliver evidence.
+Project framing is not predictive architecture. Concrete APIs, schemas, boundaries, and module placement emerge during milestone design by applying repository instructions, especially `AGENTS.md`. Every change first decomposes significant behavior into authoritative responsibility owners, records a `REUSE`, `EXTEND`, `REFACTOR`, or `NEW` decision from semantic repository evidence, and then maps each owner to expected placement and permitted dependencies. Architecture is decomposed by responsibility; implementation proceeds in vertical slices through those reviewed, potentially shared owners. A slice cannot privately duplicate owned behavior, and material ownership changes return through design revision. One cohesive owner and one slice remain valid for a simple change. Binding project outcomes, constraints, source material, quality attributes, or completion criteria require renewed project design review when changed. Roadmap ordering, coverage, discoveries, hypotheses, and final integration records evolve as milestones deliver evidence.
 
 ## Standalone Flow
 
 1. `design` shapes a feature, or `fix` diagnoses a defect and records an expected-failing automated regression before production changes.
-2. The engineer explicitly reviews the complete artifact. A fresh design critic performs the cycle's one discovery pass; a distinct verifier performs closure.
-3. `build` or `fix` implements only the next reviewed vertical slice. Every slice has one exact JSON-array acceptance command and one matching conformance record.
+2. The engineer explicitly reviews the complete artifact, including authoritative owners, reuse decisions, dependency direction, placement, and slices. A fresh design critic rejects unclear or contradictory ownership before a distinct verifier performs closure.
+3. `build` or `fix` implements only the next reviewed vertical slice through the responsibility map. Every slice names its owners, has one exact JSON-array acceptance command, and has one matching conformance record.
 4. Current final-candidate evidence seals the baseline. A fresh quality critic reviews the candidate and one distinct verifier closes supplied findings.
 5. Git completion creates only the inspected conventional commit. Non-Git and commit-off workflows complete without a commit. No command pushes.
 
