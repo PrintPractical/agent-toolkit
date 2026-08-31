@@ -26,7 +26,7 @@ When the engineer arrives from ideation in the same conversation, treat its esta
 
 Read every supplied source fully and inspect the repository. Normalize requirements into `.agent/projects/<slug>.md` without copying sources: record fingerprints, outcomes, users, non-goals, acceptance, constraints, quality attributes, risks, questions, and completion criteria. Mark decisions `observed`, `committed`, `hypothesis`, or `rejected`; resolve material ambiguity with the engineer.
 
-Create a provisional roadmap of independent milestones. Each is a normal `feature` or `fix` with its own full lifecycle and commit; split work too broad for one design and quality review. Record dependencies and coverage, not APIs, schemas, or architecture that milestone design should discover. Without sources, frame conversationally over as many rounds as needed.
+Create a provisional roadmap with the fewest independently useful milestones. Each is a normal `feature` or `fix` with its own full lifecycle and commit; split only when work cannot share one coherent contract and quality review, or when a separate delivery provides a meaningful user, operational, or risk-reduction checkpoint. Keep related behavior in one milestone and use its ordered vertical slices for incremental implementation; never create milestones for layers, modules, setup, or small tasks. Record dependencies and coverage, not APIs, schemas, or architecture that milestone design should discover. Without sources, frame conversationally over as many rounds as needed.
 
 ## System Map
 

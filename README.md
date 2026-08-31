@@ -34,7 +34,7 @@ The CLI invokes a pinned Node 20-compatible [skills.sh](https://skills.sh) insta
 
 A **change** is one coherent `feature` or `fix` candidate that can share one design contract, quality review, and inspected commit. Artifact depth is proportional to applicability; there is no formal small/medium classification. A one-slice correction and a multi-slice feature use the same mandatory gates.
 
-A **project** is a rolling container for work needing multiple independently designed, reviewed, and committed milestones. Optional epic concepts may organize the roadmap, but each executable milestone is a normal feature or fix change with the complete change lifecycle. If a milestone cannot fit one coherent contract and review, split it.
+A **project** is a rolling container for work needing multiple independently designed, reviewed, and committed milestones. Optional epic concepts may organize the roadmap, but each executable milestone is a normal feature or fix change with the complete change lifecycle. Use the fewest milestones that provide independently useful user, operational, or risk-reduction checkpoints. Keep related behavior in one milestone and use its vertical slices for incremental implementation; split only when work cannot fit one coherent contract and review, not by layer, module, setup task, or small task.
 
 `agent-toolkit init` creates:
 

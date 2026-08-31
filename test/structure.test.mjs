@@ -40,6 +40,8 @@ test("design stops at the reviewed build handoff", async () => {
   const content = await readFile(path.join(repositoryRoot, "skills", "design", "SKILL.md"), "utf8");
   assert.match(content, /When the engineer arrives from ideation in the same conversation/);
   assert.match(content, /Do not ask them to repeat resolved information/);
+  assert.match(content, /fewest independently useful milestones/);
+  assert.match(content, /never create milestones for layers, modules, setup, or small tasks/);
   assert.match(content, /Do not run `agent-toolkit advance` from `ready-to-build`; the build skill owns the transition to `implementing`\./);
 });
 
