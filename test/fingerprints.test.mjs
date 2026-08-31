@@ -29,6 +29,20 @@ test("responsibility and architecture placement remains part of the reviewed des
   assert.equal(await designContractFingerprint(root, state), placementChanged);
 });
 
+test("the durable system map may be reconciled without changing the reviewed design contract", async () => {
+  const root = await temporaryDirectory();
+  await renderChange(root, { kind: "feature", title: "Map Delivery", slug: "map-delivery" });
+  await renderSystem(root);
+  const state = { type: "change", designPath: ".agent/changes/map-delivery.md" };
+  const initial = await designContractFingerprint(root, state);
+  const system = path.join(root, ".agent", "SYSTEM.md");
+  await writeFile(system, (await readFile(system, "utf8")).replace(
+    "Describe the system's users, core outcomes, and scope in a few sentences.",
+    "The delivered baseline now supports local unary calls."
+  ));
+  assert.equal(await designContractFingerprint(root, state), initial);
+});
+
 test("Git candidates include their base commit and untracked content", async () => {
   const root = await temporaryDirectory();
   await initializeGit(root);

@@ -822,6 +822,36 @@ test("material design drift requires a fresh design review", async () => {
   assert.equal(state.phase, "developer-review");
 });
 
+test("system map reconciliation after implementation does not restart design review", async () => {
+  const { root, state } = await project();
+  await markDesignApproved(root, state);
+  const acceptanceCommand = [process.execPath, "-e", "process.exit(0)"];
+  state.phase = "implementing";
+  state.implementation = {
+    evidenceStartIndex: state.evidence.length,
+    slices: [{
+      number: 1,
+      title: "Result is delivered",
+      acceptanceCommand,
+      completedAt: new Date().toISOString()
+    }]
+  };
+  await recordTest(root, state, {
+    kind: "acceptance",
+    expectFail: false,
+    command: acceptanceCommand[0],
+    args: acceptanceCommand.slice(1)
+  });
+  const system = path.join(root, ".agent", "SYSTEM.md");
+  await writeFile(system, (await readFile(system, "utf8")).replace(
+    "Describe the system's users, core outcomes, and scope in a few sentences.",
+    "The delivered result baseline is available."
+  ));
+
+  await advance(root, state, DEFAULT_CONFIG);
+  assert.equal(state.phase, "baseline-sealed");
+});
+
 test("changed reproduction details require a fresh design review", async () => {
   const { root, state } = await project("fix");
   await markDesignApproved(root, state);

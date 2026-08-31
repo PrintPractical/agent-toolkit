@@ -273,16 +273,15 @@ function stableSections(content, excluded) {
 
 export async function designContractFingerprint(root, state) {
   const design = await readFile(path.join(root, state.designPath), "utf8");
-  const system = await readFile(path.join(root, ".agent", "SYSTEM.md"), "utf8");
   const sources = await Promise.all((state.sources || state.projectSources || []).map(async source => ({
     path: source.path,
     content: (await readFile(path.join(root, source.path))).toString("base64")
   })));
   if (state.type === "project") {
-    return snapshotFingerprint({ format: 2, projectContract: stableSections(design, evolvingProjectSections), sources, system });
+    return snapshotFingerprint({ format: 3, projectContract: stableSections(design, evolvingProjectSections), sources });
   }
   const projectContract = state.projectPath
     ? stableSections(await readFile(path.join(root, state.projectPath), "utf8"), evolvingProjectSections)
     : null;
-  return snapshotFingerprint({ format: 2, projectContract, sources, designContract: stableSections(design, evolvingSections), system });
+  return snapshotFingerprint({ format: 3, projectContract, sources, designContract: stableSections(design, evolvingSections) });
 }
