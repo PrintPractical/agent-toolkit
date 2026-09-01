@@ -14,7 +14,7 @@ Before planning or editing, read every applicable `AGENTS.md` in the project. Tr
 ## Preconditions
 
 1. Inspect `agent-toolkit status --json` and `workflow list --json`. Resume matching work or safely select an explicit workflow; never restore or mix candidates.
-2. For delivery, require a `ready-to-build` change and reviewed `.agent/changes/<slug>.md`. For final project integration, require an `active` project whose roadmap milestones and completion criteria are complete. Otherwise return to design.
+2. For delivery, require a `ready-to-build` change and reviewed `.agent/changes/<slug>.md`. Before starting a provisional project milestone, select its active project and run `agent-toolkit project activate --number N`; it permits only unblocked milestones. For final project integration, require an `active` project whose roadmap milestones and completion criteria are complete. Otherwise return to design.
 3. Read `.agent/SYSTEM.md`, applicable project instructions, the change artifact, affected code, tests, and repository conventions. For linked work also read the project frame, source material, requirement coverage, discoveries, and milestone link.
 4. Use `agent-toolkit issue ensure` or `agent-toolkit issue link` when the workflow reports that issue association is required.
 5. Before editing, extract the supported-now scope, reviewed change budget, responsibility owners, architectural roles and boundaries, expected placement, dependency direction, `REUSE|EXTEND|REFACTOR|NEW` decisions, approved abstractions, shared-owner relationships, and vertical slices. Treat them as implementation constraints, not prompts to re-derive architecture.

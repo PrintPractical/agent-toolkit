@@ -35,10 +35,11 @@ Installs bundled skills through skills.sh. The default is an interactive project
 Creates .agent/config.json, artifact directories, runtime state, and the .gitignore entry.`,
   project: `Usage:
   agent-toolkit project start --title "..." [--source <path>...]
+  agent-toolkit project activate --number <n>
   agent-toolkit project reconcile
   agent-toolkit project finalize
 
-Starts reviewed project framing, reconciles a completed implementation into its project before quality review, or begins final project integration after every milestone is delivered. Source files must be inside the repository and are fingerprinted rather than copied.`,
+Starts reviewed project framing, activates an unblocked provisional milestone, reconciles a completed implementation into its project before quality review, or begins final project integration after every milestone is delivered. Source files must be inside the repository and are fingerprinted rather than copied.`,
   start: `Usage: agent-toolkit start --kind feature|fix --title "..." [--project <slug> --milestone <number>] [--issue <number>]
 
 Starts a standalone change or one active roadmap milestone and creates its design artifact and minimum system map.

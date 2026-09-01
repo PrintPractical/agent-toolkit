@@ -111,6 +111,7 @@ GitHub issue policy accepts `off`, `create`, or `existing`. `create` uses `issue
 agent-toolkit install [--global] [--agent <name>...] [--all] [--copy]
 agent-toolkit init
 agent-toolkit project start --title "..." [--source <path>...]
+agent-toolkit project activate --number <n>
 agent-toolkit project reconcile
 agent-toolkit project finalize
 agent-toolkit start --kind feature|fix --title "..." [--project <slug> --milestone <number>] [--issue <number>]

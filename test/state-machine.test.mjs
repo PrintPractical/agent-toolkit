@@ -8,7 +8,7 @@ import { recordTest } from "../src/evidence.mjs";
 import { recordDeveloperFeedback } from "../src/feedback.mjs";
 import { dispositionFinding, prepareReview, recordEscalation, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { artifactFingerprint, designContractFingerprint, executableFingerprint, projectFingerprint } from "../src/fingerprints.mjs";
-import { advance, completeSlice, createState, finalizeProject, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, recordMilestoneDelivery, registerMilestone, saveState, selectState } from "../src/state-machine.mjs";
+import { activateMilestone, advance, completeSlice, createState, finalizeProject, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, recordMilestoneDelivery, registerMilestone, saveState, selectState } from "../src/state-machine.mjs";
 import { temporaryDirectory } from "./helpers.mjs";
 
 async function project(kind = "feature") {
@@ -145,6 +145,21 @@ test("project framing requires developer approval, a fresh critic, and a distinc
   await approveReview(root, state, verifier, "project-verifier");
   assert.equal(state.phase, "active");
   assert.match(nextAction(state, DEFAULT_CONFIG), /next unblocked roadmap milestone/);
+});
+
+test("an active project activates only unblocked provisional milestones", async () => {
+  const { root, state, artifact } = await rollingProject();
+  await markDesignApproved(root, state);
+  state.phase = "active";
+  await writeFile(artifact, (await readFile(artifact, "utf8")).replace(
+    "## Requirement Coverage",
+    "### Milestone 2: Deliver the next workflow\n- Kind: feature\n- Outcome: Users receive the next result.\n- Requirements: [\"REQ-1\"]\n- Dependencies: [1]\n- Status: provisional\n\n## Requirement Coverage"
+  ));
+  await assert.rejects(activateMilestone(root, state, 2), /blocked by incomplete milestones: 1/);
+  await writeFile(artifact, (await readFile(artifact, "utf8")).replace("- Dependencies: [1]\n- Status: provisional", "- Dependencies: []\n- Status: provisional"));
+  const milestone = await activateMilestone(root, state, 2);
+  assert.equal(milestone.status, "active");
+  assert.match(await readFile(artifact, "utf8"), /### Milestone 2:[\s\S]*?- Status: active/);
 });
 
 test("project completion requires delivered milestones, fresh integration evidence, critic, and verifier", async () => {

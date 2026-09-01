@@ -229,6 +229,25 @@ export async function registerMilestone(root, project, change, number) {
   await saveState(root, change);
 }
 
+export async function activateMilestone(root, project, number) {
+  if (project.type !== "project" || project.phase !== "active") throw new Error("Milestones require an active reviewed project");
+  await requireCurrentDesign(root, project);
+  const content = await readFile(path.join(root, project.projectPath), "utf8");
+  const milestone = projectMilestones(content).find(item => item.number === number);
+  if (!milestone) throw new Error(`Unknown project milestone: ${number}`);
+  if (milestone.status !== "provisional") throw new Error(`Milestone ${number} must be provisional before activation`);
+  const incomplete = [];
+  for (const dependency of milestone.dependencies || []) if (!await milestoneDeliveryComplete(root, project, dependency)) incomplete.push(dependency);
+  if (incomplete.length) throw new Error(`Milestone ${number} is blocked by incomplete milestones: ${incomplete.join(", ")}`);
+  const updated = content.replace(
+    new RegExp(`(### Milestone ${number}: [^\\n]+[\\s\\S]*?^- Status:)\\s*provisional\\s*$`, "m"),
+    "$1 active"
+  );
+  if (updated === content) throw new Error(`Could not activate Milestone ${number} in ${project.projectPath}`);
+  await writeFile(path.join(root, project.projectPath), updated);
+  return projectMilestones(updated).find(item => item.number === number);
+}
+
 export async function milestoneDeliveryComplete(root, project, number) {
   const link = project.milestones?.[number];
   if (!link?.workflow || !link.deliveredAt) return false;

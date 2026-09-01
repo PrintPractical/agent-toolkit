@@ -14,7 +14,7 @@ import { currentHead, isGitRepository, requireCleanWorktree, statusPaths } from 
 import { helpText } from "../src/help.mjs";
 import { dispositionFinding, prepareReview, recordEscalation, recordReview, resolveFinding, restartDesignReview, restartQualityReview } from "../src/reviews.mjs";
 import { installSkills, parseInstallOptions } from "../src/skills-installer.mjs";
-import { advance, completeSlice, createState, finalizeProject, findingBlocksCompletion, findingStatus, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, registerMilestone, requireCurrentDesign, selectState, withStateLock } from "../src/state-machine.mjs";
+import { activateMilestone, advance, completeSlice, createState, finalizeProject, findingBlocksCompletion, findingStatus, listStates, loadRegistry, loadState, milestoneDeliveryComplete, nextAction, reconcileMilestone, registerMilestone, requireCurrentDesign, selectState, withStateLock } from "../src/state-machine.mjs";
 
 const root = process.cwd();
 const args = process.argv.slice(2);
@@ -192,12 +192,21 @@ async function project() {
     console.log(`Reconciled Milestone ${state.milestone.number} into ${updated.slug}`);
     return;
   }
+  if (action === "activate") {
+    const raw = option("--number", { required: true });
+    const number = Number(raw);
+    if (!Number.isInteger(number) || number < 1) throw new Error("--number must be a positive integer");
+    const state = await loadState(root);
+    const milestone = await activateMilestone(root, state, number);
+    console.log(`Activated Milestone ${milestone.number}: ${milestone.title}`);
+    return;
+  }
   if (action === "finalize") {
     const state = await finalizeProject(root, await loadState(root));
     console.log(`Phase: ${state.phase}\nNext: ${nextAction(state, await readConfig(root))}`);
     return;
   }
-  throw new Error("Usage: agent-toolkit project start --title \"...\" [--source <path>...] | project reconcile | project finalize");
+  throw new Error("Usage: agent-toolkit project start --title \"...\" [--source <path>...] | project activate --number <n> | project reconcile | project finalize");
 }
 
 async function status() {
