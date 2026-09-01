@@ -631,6 +631,21 @@ test("implementation cannot seal without architecture conformance evidence", asy
   await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Complete Implementation Conformance/);
 });
 
+test("slice completion defers complexity reconciliation until the final candidate", async () => {
+  const { root, state } = await project();
+  state.phase = "ready-to-build";
+  await markDesignApproved(root, state);
+  await advance(root, state, DEFAULT_CONFIG);
+  const design = path.join(root, state.designPath);
+  await writeFile(design, (await readFile(design, "utf8")).replace(
+    /### Complexity Reconciliation\n[\s\S]*?(?=\n### Slice Completion)/,
+    "### Complexity Reconciliation\n- Production code changed:\n- Largest source file:\n- Dependencies or abstractions added:\n- Budget outcome:\n"
+  ));
+  await recordTest(root, state, { kind: "acceptance", expectFail: false, command: process.execPath, args: ["-e", "process.exit(0)"] });
+  await completeSlice(root, state, 1);
+  await assert.rejects(advance(root, state, DEFAULT_CONFIG), /Complexity Reconciliation/);
+});
+
 test("quality critic cannot bypass a drifted sealed baseline", async () => {
   const { root, state } = await project();
   state.phase = "implementing";

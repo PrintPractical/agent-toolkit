@@ -400,7 +400,9 @@ export async function validateArtifacts(root, state, { requireSystem = false, re
     if (!completeFields(architecture, ["Decision", "Owners", "Implementation", "Verification"])) {
       problems.push("Complete Implementation Conformance Architecture Decisions with non-empty Decision, Owners, Implementation, and Verification fields");
     }
-    if (!completeFields(complexity, ["Production code changed", "Largest source file", "Dependencies or abstractions added", "Budget outcome"])) {
+    const requireComplexityReconciliation = !conformanceSliceNumbers && (requireConformance
+      || ["baseline-sealed", "quality-critic", "quality-remediation", "quality-verifier", "review-escalation", "ready-to-commit", "complete"].includes(state.phase));
+    if (requireComplexityReconciliation && !completeFields(complexity, ["Production code changed", "Largest source file", "Dependencies or abstractions added", "Budget outcome"])) {
       problems.push("Complete Implementation Conformance Complexity Reconciliation with production-code, largest-file, dependency or abstraction, and budget evidence");
     }
     const conformanceOwners = jsonField(architecture, "Owners");
